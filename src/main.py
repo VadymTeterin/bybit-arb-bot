@@ -12,6 +12,7 @@ from src.exchanges.bybit.rest import BybitRest
 from src.infra.config import load_settings
 from src.infra.logging import setup_logging
 from src.infra.notify import send_telegram_message
+from src.storage.persistence import init_db  # <-- ДОДАНО
 
 APP_VERSION = "0.1.0"
 
@@ -263,6 +264,16 @@ def main() -> None:
     # логування
     log_dir = Path("./logs")
     setup_logging(log_dir, level="DEBUG")
+
+    # --- ІНІЦІАЛІЗАЦІЯ SQLite БД (КРОК 2) ---
+    try:
+        s = load_settings()
+        Path(s.db_path).parent.mkdir(parents=True, exist_ok=True)  # гарантуємо існування папки data/
+        init_db()
+        logger.success("SQLite initialized at {}", s.db_path)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("SQLite init failed: {}", e)
+        sys.exit(2)
 
     sys.exit(args.func(args))
 
