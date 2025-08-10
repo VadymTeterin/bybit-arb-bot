@@ -13,11 +13,14 @@ from src.infra.config import load_settings
 from src.infra.logging import setup_logging
 from src.infra.notify import send_telegram_message
 
-# --- нове: модулі з КРОКУ 2 ---
+# --- модулі звітів / БД ---
 from src.core.report import get_top_signals, format_report
 from src.storage.persistence import init_db
 
-APP_VERSION = "0.1.1"  # bump
+# --- селектор ---
+from src.core.selector import run_selection
+
+APP_VERSION = "0.1.4"  # bump
 
 
 def cmd_version(_: argparse.Namespace) -> int:
@@ -233,7 +236,7 @@ def cmd_tg_send(args: argparse.Namespace) -> int:
         return 2
 
 
-# ---------- НОВІ КОМАНДИ ЗВІТІВ ----------
+# ---------- ЗВІТИ ----------
 def cmd_report_print(args: argparse.Namespace) -> int:
     s = load_settings()
     hours = int(args.hours)
@@ -268,6 +271,92 @@ def cmd_report_send(args: argparse.Namespace) -> int:
         print("Telegram error:", str(e))
         return 2
 # -----------------------------------------
+
+
+# ---------- SELECTOR SAVE ----------
+def cmd_select_save(args: argparse.Namespace) -> int:
+    """
+    Запускає відбір SPOT vs LINEAR, застосовує фільтри та cooldown,
+    зберігає у SQLite топ N записів і друкує підсумок.
+
+    Параметр --cooldown-sec (за бажанням) переважує ALERT_COOLDOWN_SEC з .env.
+    Для тестів можна ставити 0, щоб зберігати навіть ті самі символи підряд.
+    """
+    s = load_settings()
+    limit = int(args.limit)
+    threshold = float(args.threshold) if args.threshold is not None else s.alert_threshold_pct
+    min_vol = float(args.min_vol) if args.min_vol is not None else s.min_vol_24h_usd
+    min_price = float(args.min_price) if args.min_price is not None else s.min_price
+    cooldown_sec = int(args.cooldown_sec) if args.cooldown_sec is not None else s.alert_cooldown_sec
+
+    from src.core.selector import run_selection  # локальний імпорт, щоб уникнути циклів при тестах
+
+    saved = run_selection(
+        min_vol=min_vol,
+        min_price=min_price,
+        threshold=threshold,
+        limit=limit,
+        cooldown_sec=cooldown_sec,
+        client=None,  # реальний BybitRest всередині
+    )
+
+    if not saved:
+        print("No new signals saved (maybe cooldown or no pairs above threshold).")
+        return 0
+
+    print(f"Saved {len(saved)} signal(s): " + ", ".join(row["symbol"] for row in saved))
+    return 0
+# -----------------------------------------
+
+
+# ---------- НОВЕ: Вивід поточних цін для пари ----------
+def cmd_price_pair(args: argparse.Namespace) -> int:
+    """
+    Друкує поточну ціну спот та ф'ючерса (linear) по заданих символах.
+    Використання:
+      python -m src.main price:pair                          # ETHUSDT, BTCUSDT
+      python -m src.main price:pair --symbol ETHUSDT
+      python -m src.main price:pair -s ETHUSDT -s BTCUSDT
+    """
+    client = BybitRest()
+    spot_map = client.get_spot_map()
+    lin_map = client.get_linear_map()
+
+    symbols = args.symbol if args.symbol else ["ETHUSDT", "BTCUSDT"]
+
+    printed_any = False
+    for sym in symbols:
+        sp = spot_map.get(sym)
+        ln = lin_map.get(sym)
+        if not sp and not ln:
+            print(f"{sym}: not found on SPOT or LINEAR")
+            continue
+        spot_price = float(sp["price"]) if sp and sp.get("price") else None
+        fut_price = float(ln["price"]) if ln and ln.get("price") else None
+
+        line = [sym]
+        if spot_price is not None:
+            line.append(f"spot={spot_price:g}")
+        else:
+            line.append("spot=-")
+        if fut_price is not None:
+            line.append(f"fut={fut_price:g}")
+        else:
+            line.append("fut=-")
+
+        # якщо є обидві ціни — порахуємо basis %
+        if spot_price and fut_price and spot_price > 0:
+            basis = (fut_price - spot_price) / spot_price * 100.0
+            sign = "+" if basis >= 0 else ""
+            line.append(f"basis={sign}{basis:.2f}%")
+
+        print("  ".join(line))
+        printed_any = True
+
+    if not printed_any:
+        print("No data to show.")
+    return 0
+# -------------------------------------------------------
 
 
 def main() -> None:
@@ -307,7 +396,7 @@ def main() -> None:
     p_tg.add_argument("--text", type=str, default="Test message from bybit-arb-bot")
     p_tg.set_defaults(func=cmd_tg_send)
 
-    # --- нові команди звітів ---
+    # --- звіти ---
     p_rp = sub.add_parser("report:print")
     p_rp.add_argument("--hours", type=int, default=24)
     p_rp.add_argument("--limit", type=int, default=None)  # якщо None — візьмемо s.top_n_report
@@ -317,6 +406,20 @@ def main() -> None:
     p_rs.add_argument("--hours", type=int, default=24)
     p_rs.add_argument("--limit", type=int, default=None)
     p_rs.set_defaults(func=cmd_report_send)
+
+    # --- selector save ---
+    p_sel = sub.add_parser("select:save")
+    p_sel.add_argument("--limit", type=int, default=3)
+    p_sel.add_argument("--threshold", type=float, default=None)   # якщо None — з .env
+    p_sel.add_argument("--min-vol", type=float, default=None)     # якщо None — з .env
+    p_sel.add_argument("--min-price", type=float, default=None)   # якщо None — з .env
+    p_sel.add_argument("--cooldown-sec", type=int, default=None, help="Переважує ALERT_COOLDOWN_SEC з .env")
+    p_sel.set_defaults(func=cmd_select_save)
+
+    # --- нове: price:pair ---
+    p_pp = sub.add_parser("price:pair")
+    p_pp.add_argument("-s", "--symbol", action="append", help="Може повторюватися: -s ETHUSDT -s BTCUSDT. За замовчуванням: ETHUSDT,BTCUSDT")
+    p_pp.set_defaults(func=cmd_price_pair)
 
     args = parser.parse_args()
 
