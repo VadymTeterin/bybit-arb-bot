@@ -12,9 +12,12 @@ from src.exchanges.bybit.rest import BybitRest
 from src.infra.config import load_settings
 from src.infra.logging import setup_logging
 from src.infra.notify import send_telegram_message
-from src.storage.persistence import init_db  # <-- ДОДАНО
 
-APP_VERSION = "0.1.0"
+# --- нове: модулі з КРОКУ 2 ---
+from src.core.report import get_top_signals, format_report
+from src.storage.persistence import init_db
+
+APP_VERSION = "0.1.1"  # bump
 
 
 def cmd_version(_: argparse.Namespace) -> int:
@@ -28,6 +31,8 @@ def cmd_env(_: argparse.Namespace) -> int:
     print("ALERT_THRESHOLD_PCT:", s.alert_threshold_pct)
     print("ALERT_COOLDOWN_SEC:", s.alert_cooldown_sec)
     print("MIN_VOL_24H_USD:", s.min_vol_24h_usd)
+    print("MIN_PRICE:", s.min_price)
+    print("DB_PATH:", s.db_path)
     print("TG_CHAT_ID:", s.telegram.alert_chat_id or "")
     print("TELEGRAM_TOKEN set:", bool(s.telegram.bot_token))
     print("BYBIT_API_KEY set:", bool(s.bybit.api_key))
@@ -163,7 +168,10 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
     limit = int(args.limit)
 
     if not s.telegram.bot_token or not s.telegram.alert_chat_id:
-        print("Telegram is not configured: set TELEGRAM_BOT_TOKEN and TG_ALERT_CHAT_ID in .env")
+        print(
+            "Telegram is not configured: set TELEGRAM__BOT_TOKEN / TELEGRAM_BOT_TOKEN and "
+            "TELEGRAM__ALERT_CHAT_ID / TG_ALERT_CHAT_ID in .env"
+        )
         return 1
 
     rows_pass, _ = _basis_rows(min_vol=min_vol, threshold=threshold)
@@ -204,7 +212,10 @@ def cmd_tg_send(args: argparse.Namespace) -> int:
     """
     s = load_settings()
     if not s.telegram.bot_token or not s.telegram.alert_chat_id:
-        print("Telegram is not configured: set TELEGRAM_BOT_TOKEN and TG_ALERT_CHAT_ID in .env")
+        print(
+            "Telegram is not configured: set TELEGRAM__BOT_TOKEN / TELEGRAM_BOT_TOKEN and "
+            "TELEGRAM__ALERT_CHAT_ID / TG_ALERT_CHAT_ID in .env"
+        )
         return 1
     text = args.text or "Test message from bybit-arb-bot"
     try:
@@ -220,6 +231,43 @@ def cmd_tg_send(args: argparse.Namespace) -> int:
     except Exception as e:  # noqa: BLE001
         print("Telegram error:", str(e))
         return 2
+
+
+# ---------- НОВІ КОМАНДИ ЗВІТІВ ----------
+def cmd_report_print(args: argparse.Namespace) -> int:
+    s = load_settings()
+    hours = int(args.hours)
+    limit = int(args.limit) if args.limit is not None else int(s.top_n_report)
+    items = get_top_signals(last_hours=hours, limit=limit)
+    text = format_report(items)
+    print(text)
+    return 0
+
+
+def cmd_report_send(args: argparse.Namespace) -> int:
+    s = load_settings()
+    if not s.telegram.bot_token or not s.telegram.alert_chat_id:
+        print(
+            "Telegram is not configured: set TELEGRAM__BOT_TOKEN / TELEGRAM_BOT_TOKEN and "
+            "TELEGRAM__ALERT_CHAT_ID / TG_ALERT_CHAT_ID in .env"
+        )
+        return 1
+    hours = int(args.hours)
+    limit = int(args.limit) if args.limit is not None else int(s.top_n_report)
+    items = get_top_signals(last_hours=hours, limit=limit)
+    text = format_report(items)
+    try:
+        send_telegram_message(s.telegram.bot_token, s.telegram.alert_chat_id, text)
+        logger.success("Report sent to Telegram.")
+        print("OK")
+        return 0
+    except requests.HTTPError as e:
+        print("Telegram HTTP error:", e.response.text if e.response is not None else str(e))
+        return 2
+    except Exception as e:  # noqa: BLE001
+        print("Telegram error:", str(e))
+        return 2
+# -----------------------------------------
 
 
 def main() -> None:
@@ -259,13 +307,24 @@ def main() -> None:
     p_tg.add_argument("--text", type=str, default="Test message from bybit-arb-bot")
     p_tg.set_defaults(func=cmd_tg_send)
 
+    # --- нові команди звітів ---
+    p_rp = sub.add_parser("report:print")
+    p_rp.add_argument("--hours", type=int, default=24)
+    p_rp.add_argument("--limit", type=int, default=None)  # якщо None — візьмемо s.top_n_report
+    p_rp.set_defaults(func=cmd_report_print)
+
+    p_rs = sub.add_parser("report:send")
+    p_rs.add_argument("--hours", type=int, default=24)
+    p_rs.add_argument("--limit", type=int, default=None)
+    p_rs.set_defaults(func=cmd_report_send)
+
     args = parser.parse_args()
 
     # логування
     log_dir = Path("./logs")
     setup_logging(log_dir, level="DEBUG")
 
-    # --- ІНІЦІАЛІЗАЦІЯ SQLite БД (КРОК 2) ---
+    # --- ініціалізація SQLite БД на старті ---
     try:
         s = load_settings()
         Path(s.db_path).parent.mkdir(parents=True, exist_ok=True)  # гарантуємо існування папки data/
