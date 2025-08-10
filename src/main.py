@@ -2,23 +2,26 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
+from typing import Any, Dict
 
 from loguru import logger
 
 from src.infra.config import load_settings
 from src.infra.logging import setup_logging
+from src.exchanges.bybit.rest import BybitRest
+
 
 APP_VERSION = "0.1.0"
 
 
-def cmd_version() -> int:
+def cmd_version(_: argparse.Namespace) -> int:
     print(APP_VERSION)
     return 0
 
 
-def cmd_env() -> int:
+def cmd_env(_: argparse.Namespace) -> int:
     s = load_settings()
-    # короткий читабельний вивід ключових параметрів
     print("ENV:", s.env)
     print("ALERT_THRESHOLD_PCT:", s.alert_threshold_pct)
     print("ALERT_COOLDOWN_SEC:", s.alert_cooldown_sec)
@@ -28,7 +31,7 @@ def cmd_env() -> int:
     return 0
 
 
-def cmd_logtest() -> int:
+def cmd_logtest(_: argparse.Namespace) -> int:
     logger.debug("Debug message")
     logger.info("Info message")
     logger.warning("Warning message")
@@ -38,7 +41,7 @@ def cmd_logtest() -> int:
     return 0
 
 
-def cmd_healthcheck() -> int:
+def cmd_healthcheck(_: argparse.Namespace) -> int:
     try:
         s = load_settings()
         assert s.alert_threshold_pct > 0
@@ -50,31 +53,73 @@ def cmd_healthcheck() -> int:
         return 1
 
 
+def cmd_bybit_ping(_: argparse.Namespace) -> int:
+    """
+    Проста перевірка REST: запит часу сервера (публічний ендпоінт).
+    """
+    client = BybitRest()
+    data = client.get_server_time()  # dict
+    result = data.get("result", {})
+    print("Bybit time (sec):", result.get("timeSecond"))
+    return 0
+
+
+def _parse_turnover_usd(row: Dict[str, Any]) -> float:
+    for key in ("turnover24h", "turnoverUsd"):
+        v = row.get(key)
+        if v is not None:
+            try:
+                return float(v)
+            except Exception:
+                pass
+    return 0.0
+
+
+def cmd_bybit_top(args: argparse.Namespace) -> int:
+    """
+    Вивести топ тікерів за 24h оборотом (USD) для категорії.
+    """
+    client = BybitRest()
+    data = client.get_tickers(category=args.category)
+    rows = data.get("result", {}).get("list", [])
+
+    rows.sort(key=_parse_turnover_usd, reverse=True)
+    top = rows[: args.limit]
+
+    print(f"Top {args.limit} by 24h turnover (category={args.category}):")
+    for i, r in enumerate(top, 1):
+        sym = r.get("symbol", "-")
+        last = r.get("lastPrice") or r.get("lastPriceLatest") or "-"
+        usd = _parse_turnover_usd(r)
+        print(f"{i:>2}. {sym:<14} last={last}  turnover=${usd:,.0f}")
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="bybit-arb-bot")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("version")
-    sub.add_parser("env")
-    sub.add_parser("logtest")
-    sub.add_parser("healthcheck")
+    # базові команди
+    sub.add_parser("version").set_defaults(func=cmd_version)
+    sub.add_parser("env").set_defaults(func=cmd_env)
+    sub.add_parser("logtest").set_defaults(func=cmd_logtest)
+    sub.add_parser("healthcheck").set_defaults(func=cmd_healthcheck)
+
+    # bybit
+    sub.add_parser("bybit:ping").set_defaults(func=cmd_bybit_ping)
+
+    p_top = sub.add_parser("bybit:top")
+    p_top.add_argument("--category", default="spot", choices=["spot", "linear", "inverse", "option"])
+    p_top.add_argument("--limit", type=int, default=5)
+    p_top.set_defaults(func=cmd_bybit_top)
 
     args = parser.parse_args()
 
-    # Ініціалізуємо логування один раз (DEBUG у dev зручно)
-    setup_logging(load_settings().log_dir, level="DEBUG")
+    # ініціалізація логування
+    log_dir = Path("./logs")
+    setup_logging(log_dir, level="DEBUG")
 
-    match args.command:
-        case "version":
-            sys.exit(cmd_version())
-        case "env":
-            sys.exit(cmd_env())
-        case "logtest":
-            sys.exit(cmd_logtest())
-        case "healthcheck":
-            sys.exit(cmd_healthcheck())
-        case _:
-            parser.print_help()
+    sys.exit(args.func(args))
 
 
 if __name__ == "__main__":
