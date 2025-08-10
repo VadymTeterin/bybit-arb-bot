@@ -34,8 +34,8 @@ class AppSettings(BaseSettings):
     env: Literal["dev", "prod", "test"] = "dev"
 
     # Пороги та інтервали
-    alert_threshold_pct: float = 1.0       # поріг basis, %
-    alert_cooldown_sec: int = 300          # cooldown алертів, сек
+    alert_threshold_pct: float = 1.0  # поріг basis, %
+    alert_cooldown_sec: int = 300  # cooldown алертів, сек
     min_vol_24h_usd: float = 10_000_000.0  # фільтр ліквідності, USD
 
     # Вкладені секції
