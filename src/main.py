@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 from loguru import logger
 import requests
@@ -17,10 +17,7 @@ from src.infra.notify import send_telegram_message
 from src.core.report import get_top_signals, format_report
 from src.storage.persistence import init_db
 
-# --- селектор ---
-from src.core.selector import run_selection
-
-APP_VERSION = "0.1.4"  # bump
+APP_VERSION = "0.1.5"  # bump
 
 
 def cmd_version(_: argparse.Namespace) -> int:
@@ -39,6 +36,10 @@ def cmd_env(_: argparse.Namespace) -> int:
     print("TG_CHAT_ID:", s.telegram.alert_chat_id or "")
     print("TELEGRAM_TOKEN set:", bool(s.telegram.bot_token))
     print("BYBIT_API_KEY set:", bool(s.bybit.api_key))
+    # інфо-поля (можуть бути відсутні у старих конфігах)
+    print("ENABLE_ALERTS:", getattr(s, "enable_alerts", True))
+    print("ALLOW_SYMBOLS:", ",".join(getattr(s, "allow_symbols", []) or []))
+    print("DENY_SYMBOLS:", ",".join(getattr(s, "deny_symbols", []) or []))
     return 0
 
 
@@ -108,8 +109,8 @@ def _basis_rows(min_vol: float, threshold: float) -> tuple[list[tuple[str, float
     spot_map = client.get_spot_map()
     lin_map = client.get_linear_map()
 
-    rows_all: List[Tuple[str, float, float, float, float]] = []
-    rows_pass: List[Tuple[str, float, float, float, float]] = []
+    rows_all: List[tuple[str, float, float, float, float]] = []
+    rows_pass: List[tuple[str, float, float, float, float]] = []
 
     common = set(spot_map.keys()) & set(lin_map.keys())
     for sym in common:
@@ -160,12 +161,21 @@ def cmd_basis_scan(args: argparse.Namespace) -> int:
     return 0
 
 
+def _alerts_allowed(s) -> bool:
+    """Безпечна перевірка прапора enable_alerts (за замовчуванням True)."""
+    return bool(getattr(s, "enable_alerts", True))
+
+
 def cmd_basis_alert(args: argparse.Namespace) -> int:
     """
     Обчислює basis, фільтрує за порогом і шле топ N у Telegram.
     Якщо пар немає — надсилає діагностичне повідомлення.
     """
     s = load_settings()
+    if not _alerts_allowed(s):
+        print("Alerts are disabled by config (enable_alerts=false). Skipping Telegram send.")
+        return 0
+
     min_vol = float(args.min_vol if args.min_vol is not None else s.min_vol_24h_usd)
     threshold = float(args.threshold if args.threshold is not None else s.alert_threshold_pct)
     limit = int(args.limit)
@@ -214,6 +224,9 @@ def cmd_tg_send(args: argparse.Namespace) -> int:
     Використання: python -m src.main tg:send --text "hello"
     """
     s = load_settings()
+    if not _alerts_allowed(s):
+        print("Alerts are disabled by config (enable_alerts=false). Skipping Telegram send.")
+        return 0
     if not s.telegram.bot_token or not s.telegram.alert_chat_id:
         print(
             "Telegram is not configured: set TELEGRAM__BOT_TOKEN / TELEGRAM_BOT_TOKEN and "
@@ -249,6 +262,9 @@ def cmd_report_print(args: argparse.Namespace) -> int:
 
 def cmd_report_send(args: argparse.Namespace) -> int:
     s = load_settings()
+    if not _alerts_allowed(s):
+        print("Alerts are disabled by config (enable_alerts=false). Skipping Telegram send.")
+        return 0
     if not s.telegram.bot_token or not s.telegram.alert_chat_id:
         print(
             "Telegram is not configured: set TELEGRAM__BOT_TOKEN / TELEGRAM_BOT_TOKEN and "
@@ -289,7 +305,8 @@ def cmd_select_save(args: argparse.Namespace) -> int:
     min_price = float(args.min_price) if args.min_price is not None else s.min_price
     cooldown_sec = int(args.cooldown_sec) if args.cooldown_sec is not None else s.alert_cooldown_sec
 
-    from src.core.selector import run_selection  # локальний імпорт, щоб уникнути циклів при тестах
+    # локальний імпорт, щоб уникнути циклів/попереджень про невикористаний імпорт
+    from src.core.selector import run_selection
 
     saved = run_selection(
         min_vol=min_vol,
@@ -309,7 +326,7 @@ def cmd_select_save(args: argparse.Namespace) -> int:
 # -----------------------------------------
 
 
-# ---------- НОВЕ: Вивід поточних цін для пари ----------
+# ---------- Вивід поточних цін для пари ----------
 def cmd_price_pair(args: argparse.Namespace) -> int:
     """
     Друкує поточну ціну спот та ф'ючерса (linear) по заданих символах.
@@ -416,7 +433,7 @@ def main() -> None:
     p_sel.add_argument("--cooldown-sec", type=int, default=None, help="Переважує ALERT_COOLDOWN_SEC з .env")
     p_sel.set_defaults(func=cmd_select_save)
 
-    # --- нове: price:pair ---
+    # --- price:pair ---
     p_pp = sub.add_parser("price:pair")
     p_pp.add_argument("-s", "--symbol", action="append", help="Може повторюватися: -s ETHUSDT -s BTCUSDT. За замовчуванням: ETHUSDT,BTCUSDT")
     p_pp.set_defaults(func=cmd_price_pair)

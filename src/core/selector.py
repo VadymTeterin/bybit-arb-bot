@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional
 
 from src.infra.config import load_settings
 from src.core.filters.liquidity import enough_liquidity
@@ -65,8 +65,6 @@ def _basis_candidates(
         vol_min = min(spot_vol, lin_vol)
 
         # фільтр ліквідності
-        # enough_liquidity перевіряє price>=min_price та 24hVol>=min_vol_usd,
-        # але йому потрібен один рядок — візьмемо «синтетичний» з ціною SPOT і обігом мінімальним між ринками
         syn = {"price": spot_price, "turnover_usd": vol_min}
         if not enough_liquidity(syn, min_vol_usd=min_vol_usd, min_price=min_price):
             continue
@@ -119,6 +117,15 @@ def run_selection(
     candidates = _basis_candidates(api, min_price=min_price, min_vol_usd=min_vol, threshold_pct=threshold)
     if not candidates:
         return []
+
+    # --- НОВЕ: фільтри allow/deny ---
+    allow = set(getattr(s, "allow_symbols", []) or [])
+    deny = set(getattr(s, "deny_symbols", []) or [])
+    if allow:
+        candidates = [it for it in candidates if it.symbol in allow]
+    if deny:
+        candidates = [it for it in candidates if it.symbol not in deny]
+    # ---------------------------------
 
     saved: List[Dict[str, Any]] = []
     for it in candidates[:limit]:
