@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 from importlib import reload
 
 import sqlite3
-import os
 
 from src.storage import persistence
 
