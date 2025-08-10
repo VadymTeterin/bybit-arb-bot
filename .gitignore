@@ -14,3 +14,7 @@ logs/
 # OS / editor
 .DS_Store
 .vscode/
+/data/*.db
+/venv/
+/.venv/
+/logs/*.log
