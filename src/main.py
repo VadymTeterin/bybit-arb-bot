@@ -1,3 +1,4 @@
+# src/main.py
 from __future__ import annotations
 
 import argparse
@@ -327,6 +328,11 @@ def cmd_select_save(args: argparse.Namespace) -> int:
 
 
 # ---------- Вивід поточних цін для пари ----------
+def create_bybit_client() -> BybitRest:
+    """Фабрика клієнта Bybit для можливості підміни у тестах."""
+    return BybitRest()
+
+
 def cmd_price_pair(args: argparse.Namespace) -> int:
     """
     Друкує поточну ціну спот та ф'ючерса (linear) по заданих символах.
@@ -335,7 +341,7 @@ def cmd_price_pair(args: argparse.Namespace) -> int:
       python -m src.main price:pair --symbol ETHUSDT
       python -m src.main price:pair -s ETHUSDT -s BTCUSDT
     """
-    client = BybitRest()
+    client = create_bybit_client()
     spot_map = client.get_spot_map()
     lin_map = client.get_linear_map()
 
