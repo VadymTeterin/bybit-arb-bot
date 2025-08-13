@@ -120,3 +120,5 @@ import os
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 TELEGRAM_COOLDOWN_SECONDS = int(os.getenv("TELEGRAM_COOLDOWN_SECONDS", "30"))
+# Feature flag for Telegram notifications
+TELEGRAM_ENABLED = os.getenv("TELEGRAM_ENABLED", "0").strip().lower() in ("1", "true", "yes", "y")
