@@ -114,3 +114,9 @@ class AppSettings(BaseSettings):
 def load_settings() -> AppSettings:
     """Єдина точка завантаження налаштувань."""
     return AppSettings()
+import os
+
+# Telegram alerts config (step-4.5)
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+TELEGRAM_COOLDOWN_SECONDS = int(os.getenv("TELEGRAM_COOLDOWN_SECONDS", "30"))
