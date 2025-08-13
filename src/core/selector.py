@@ -6,6 +6,12 @@ from typing import Any, Dict, List, Mapping, Optional
 
 from src.infra.config import load_settings
 from src.core.filters.liquidity import enough_liquidity
+# Імпорт залишаємо: тести можуть monkeypatch-ити selector.has_enough_depth
+try:
+    from src.core.filters.depth import has_enough_depth  # type: ignore
+except Exception:
+    has_enough_depth = None  # type: ignore[assignment]
+
 from src.storage import persistence
 
 
@@ -97,7 +103,7 @@ def run_selection(
 ) -> List[Dict[str, Any]]:
     """
     Запускає відбір SPOT vs LINEAR, фільтрує за ціною/ліквідністю/порогом,
-    застосовує allow/deny та cooldown, зберігає у БД і повертає реально збережені записи.
+    застосовує allow/deny та cooldown, опційно — фільтр глибини, зберігає у БД і повертає реально збережені записи.
     """
     s = load_settings()
     min_vol = s.min_vol_24h_usd if min_vol is None else float(min_vol)
@@ -105,9 +111,21 @@ def run_selection(
     threshold = s.alert_threshold_pct if threshold is None else float(threshold)
     cooldown_sec = s.alert_cooldown_sec if cooldown_sec is None else int(cooldown_sec)
 
-    # підтримуємо ОБИДВА варіанти:
-    # - тести можуть підмінити SimpleNamespace з list
-    # - .env дає сирий рядок, який ми парсимо
+    # --- параметри depth-фільтра (беквард-сумісно) ---
+    # Якщо їх немає у налаштуваннях, depth-фільтр буде вимкнений.
+    min_depth_usd = getattr(s, "min_depth_usd", None)
+    depth_window_pct = getattr(s, "depth_window_pct", None)
+    min_depth_levels = getattr(s, "min_depth_levels", None)
+
+    # флаг: чи можемо застосувати depth-фільтр
+    depth_enabled = (
+        (min_depth_usd is not None)
+        and (depth_window_pct is not None)
+        and (min_depth_levels is not None)
+        and (has_enough_depth is not None)
+    )
+
+    # підтримуємо ОБИДВА варіанти allow/deny:
     if hasattr(s, "allow_list"):
         allow: List[str] = getattr(s, "allow_list")  # type: ignore[assignment]
     else:
@@ -131,15 +149,45 @@ def run_selection(
 
     pairs = _build_pairs(spot_map, linear_map)
 
-    # базові фільтри (ліквідність/мін.ціна/поріг + allow/deny)
+    # чи є у клієнта методи ордербука (для depth-фільтра)?
+    client_has_orderbook = all(
+        hasattr(client, name) for name in ("get_orderbook_spot", "get_orderbook_linear")
+    )
+
     candidates: List[_Pair] = []
     for p in pairs:
-        # enough_liquidity очікує мапу з ціною та обігом — формуємо ряд
+        # базові фільтри (ліквідність/ціна/поріг + allow/deny)
         spot_row = {"price": p.spot, "turnover_usd": p.vol_usd}
         if not enough_liquidity(spot_row, min_vol, min_price):
             continue
         if p.spot < min_price or p.fut <= 0:
             continue
+
+        # --- опційний depth-фільтр ---
+        if depth_enabled and client_has_orderbook:
+            try:
+                ob_spot = client.get_orderbook_spot(p.symbol, limit=200)
+                ob_linear = client.get_orderbook_linear(p.symbol, limit=200)
+                if not has_enough_depth(
+                    ob_spot,
+                    p.spot,
+                    min_depth_usd=float(min_depth_usd),  # type: ignore[arg-type]
+                    window_pct=float(depth_window_pct),  # type: ignore[arg-type]
+                    min_levels=int(min_depth_levels),    # type: ignore[arg-type]
+                ):
+                    continue
+                if not has_enough_depth(
+                    ob_linear,
+                    p.fut,
+                    min_depth_usd=float(min_depth_usd),  # type: ignore[arg-type]
+                    window_pct=float(depth_window_pct),  # type: ignore[arg-type]
+                    min_levels=int(min_depth_levels),    # type: ignore[arg-type]
+                ):
+                    continue
+            except Exception:
+                # У випадку проблем із ордербуком — не завалюємо відбір, просто пропускаємо depth-чек.
+                pass
+
         if abs(p.basis_pct) < threshold:
             continue
         if not _allowed(p.symbol, allow, deny):

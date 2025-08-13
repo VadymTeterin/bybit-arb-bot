@@ -29,6 +29,14 @@ class AppSettings(BaseSettings):
     db_path: str = "data/signals.db"
     top_n_report: int = 3
 
+    # --- нові параметри depth-фільтра ---
+    # мінімальна глибина (у $) у межах ±depth_window_pct від ціни
+    min_depth_usd: float = 1_000_000.0
+    # ширина вікна у відсотках (0.5 => ±0.5% від ціни)
+    depth_window_pct: float = 0.5
+    # мінімальна сумарна кількість рівнів (bid+ask) у вікні
+    min_depth_levels: int = 30
+
     # прапор надсилання алертів
     enable_alerts: bool = True
 
