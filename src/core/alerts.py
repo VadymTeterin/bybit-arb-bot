@@ -90,3 +90,23 @@ class RealtimeAlerter:
 
             self._last_sent[symbol] = now
             return True
+# --- step-4.5: optional Telegram async sender (non-invasive) ---
+try:
+    from src.infra import config as _cfg
+    from src.infra.notify_telegram import TelegramNotifier
+
+    async def telegram_sender(text: str) -> None:
+        """
+        Безпечно викликається як SendFunc (Awaitable[None]).
+        Працює тільки якщо TELEGRAM_ENABLED увімкнено.
+        """
+        if not getattr(_cfg, "TELEGRAM_ENABLED", False):
+            return
+        notifier = TelegramNotifier(enabled=True)
+        loop = asyncio.get_running_loop()
+        # виконуємо синхронну відправку у пулі без блокування event loop
+        await loop.run_in_executor(None, lambda: notifier.send_text(text))
+
+except Exception:
+    # fail-silent: не впливаємо на основний цикл алертів
+    pass
