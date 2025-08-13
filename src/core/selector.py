@@ -6,8 +6,21 @@ from typing import Any, Dict, List, Mapping, Optional
 
 from src.infra.config import load_settings
 from src.core.filters.liquidity import enough_liquidity
-from src.exchanges.bybit.rest import BybitRest
 from src.storage import persistence
+
+
+@dataclass
+class _Pair:
+    symbol: str
+    spot: float
+    fut: float
+    vol_usd: float
+
+    @property
+    def basis_pct(self) -> float:
+        if self.spot <= 0:
+            return 0.0
+        return (self.fut / self.spot - 1.0) * 100.0
 
 
 def _to_float(x: Any, default: float = 0.0) -> float:
@@ -17,141 +30,142 @@ def _to_float(x: Any, default: float = 0.0) -> float:
         return float(default)
 
 
-def _pick_float(row: Mapping[str, Any], *keys: str, default: float = 0.0) -> float:
-    for k in keys:
-        if k in row and row[k] is not None:
+def _parse_symbols_value(v: Any) -> List[str]:
+    """
+    Приймає None / list / рядок з JSON-масивом або CSV.
+    Повертає список аперкейс-символів без порожніх елементів.
+    """
+    if v is None or v == "":
+        return []
+    if isinstance(v, list):
+        return [str(x).strip().upper() for x in v if str(x).strip()]
+    if isinstance(v, str):
+        s = v.strip()
+        # JSON-масив
+        if s.startswith("[") and s.endswith("]"):
             try:
-                return float(row[k])
+                import json
+
+                arr = json.loads(s)
+                if isinstance(arr, list):
+                    return [str(x).strip().upper() for x in arr if str(x).strip()]
             except Exception:
-                continue
-    return float(default)
+                # якщо не JSON — впадемо у CSV
+                pass
+        parts = [p.strip() for p in s.replace(";", ",").split(",") if p.strip()]
+        return [p.upper() for p in parts]
+    return []
 
 
-@dataclass
-class SelectionItem:
-    symbol: str
-    spot_price: float
-    futures_price: float
-    basis_pct: float
-    volume_24h_usd: float
-
-
-def _basis_candidates(
-    client: BybitRest,
-    min_price: float,
-    min_vol_usd: float,
-    threshold_pct: float,
-) -> List[SelectionItem]:
-    """
-    Формуємо список кандидатів для збереження:
-      - перетин SPOT/LINEAR
-      - фільтр ліквідності (min_price, min_vol_usd)
-      - поріг |basis| >= threshold_pct
-      - сортуємо за abs(basis) (спадно)
-    """
-    spot_map: Dict[str, Dict[str, Any]] = client.get_spot_map()
-    lin_map: Dict[str, Dict[str, Any]] = client.get_linear_map()
-
-    out: List[SelectionItem] = []
-    for sym in set(spot_map.keys()) & set(lin_map.keys()):
-        sp = spot_map[sym]
-        ln = lin_map[sym]
-
-        # нормалізуємо ціну/обіг
-        spot_price = _pick_float(sp, "lastPrice", "lastPriceLatest", "price")
-        fut_price = _pick_float(ln, "lastPrice", "lastPriceLatest", "price")
-        spot_vol = _pick_float(sp, "turnoverUsd", "turnover_usd", "turnover24h")
-        lin_vol = _pick_float(ln, "turnoverUsd", "turnover_usd", "turnover24h")
-        vol_min = min(spot_vol, lin_vol)
-
-        # фільтр ліквідності
-        syn = {"price": spot_price, "turnover_usd": vol_min}
-        if not enough_liquidity(syn, min_vol_usd=min_vol_usd, min_price=min_price):
+def _build_pairs(
+    spot_map: Mapping[str, Mapping[str, float]],
+    linear_map: Mapping[str, Mapping[str, float]],
+) -> List[_Pair]:
+    out: List[_Pair] = []
+    for sym, srow in spot_map.items():
+        if sym not in linear_map:
             continue
-
-        if spot_price <= 0 or fut_price <= 0:
-            continue
-
-        basis_pct = (fut_price - spot_price) / spot_price * 100.0
-        if abs(basis_pct) < float(threshold_pct):
-            continue
-
+        frow = linear_map[sym]
         out.append(
-            SelectionItem(
+            _Pair(
                 symbol=sym,
-                spot_price=spot_price,
-                futures_price=fut_price,
-                basis_pct=basis_pct,
-                volume_24h_usd=vol_min,
+                spot=_to_float(srow.get("price", 0.0)),
+                fut=_to_float(frow.get("price", 0.0)),
+                vol_usd=_to_float(srow.get("turnover_usd", 0.0)),
             )
         )
-
-    out.sort(key=lambda it: abs(it.basis_pct), reverse=True)
     return out
 
 
+def _allowed(symbol: str, allow: List[str], deny: List[str]) -> bool:
+    u = symbol.upper()
+    if u in (x.upper() for x in deny):
+        return False
+    if allow:
+        return u in (x.upper() for x in allow)
+    return True
+
+
 def run_selection(
+    *,
     min_vol: Optional[float] = None,
     min_price: Optional[float] = None,
     threshold: Optional[float] = None,
     limit: int = 3,
-    *,
     cooldown_sec: Optional[int] = None,
-    client: Optional[BybitRest] = None,
+    client: Any | None = None,
 ) -> List[Dict[str, Any]]:
     """
-    Запускає відбір, зберігає у БД лише ті, що не під cooldown, і повертає
-    список **реально збережених** записів у вигляді dict.
+    Запускає відбір SPOT vs LINEAR, фільтрує за ціною/ліквідністю/порогом,
+    застосовує allow/deny та cooldown, зберігає у БД і повертає реально збережені записи.
     """
     s = load_settings()
-    min_vol = float(min_vol if min_vol is not None else s.min_vol_24h_usd)
-    min_price = float(min_price if min_price is not None else s.min_price)
-    threshold = float(threshold if threshold is not None else s.alert_threshold_pct)
-    cooldown_sec = int(cooldown_sec if cooldown_sec is not None else s.alert_cooldown_sec)
-    limit = int(limit)
+    min_vol = s.min_vol_24h_usd if min_vol is None else float(min_vol)
+    min_price = s.min_price if min_price is None else float(min_price)
+    threshold = s.alert_threshold_pct if threshold is None else float(threshold)
+    cooldown_sec = s.alert_cooldown_sec if cooldown_sec is None else int(cooldown_sec)
 
-    # гарантуємо, що схема є
-    persistence.init_db()
+    # підтримуємо ОБИДВА варіанти:
+    # - тести можуть підмінити SimpleNamespace з list
+    # - .env дає сирий рядок, який ми парсимо
+    if hasattr(s, "allow_list"):
+        allow: List[str] = getattr(s, "allow_list")  # type: ignore[assignment]
+    else:
+        raw_allow = getattr(s, "allow_symbols", "")
+        allow = raw_allow if isinstance(raw_allow, list) else _parse_symbols_value(raw_allow)
 
-    api = client or BybitRest()
-    candidates = _basis_candidates(api, min_price=min_price, min_vol_usd=min_vol, threshold_pct=threshold)
-    if not candidates:
-        return []
+    if hasattr(s, "deny_list"):
+        deny: List[str] = getattr(s, "deny_list")  # type: ignore[assignment]
+    else:
+        raw_deny = getattr(s, "deny_symbols", "")
+        deny = raw_deny if isinstance(raw_deny, list) else _parse_symbols_value(raw_deny)
 
-    # --- НОВЕ: фільтри allow/deny ---
-    allow = set(getattr(s, "allow_symbols", []) or [])
-    deny = set(getattr(s, "deny_symbols", []) or [])
-    if allow:
-        candidates = [it for it in candidates if it.symbol in allow]
-    if deny:
-        candidates = [it for it in candidates if it.symbol not in deny]
-    # ---------------------------------
+    # відкладений імпорт реального клієнта
+    if client is None:
+        from src.exchanges.bybit.rest import BybitRest
 
-    saved: List[Dict[str, Any]] = []
-    for it in candidates[:limit]:
-        # перевіряємо cooldown
-        if persistence.recent_signal_exists(it.symbol, cooldown_sec=cooldown_sec):
+        client = BybitRest()
+
+    spot_map = client.get_spot_map()
+    linear_map = client.get_linear_map()
+
+    pairs = _build_pairs(spot_map, linear_map)
+
+    # базові фільтри (ліквідність/мін.ціна/поріг + allow/deny)
+    candidates: List[_Pair] = []
+    for p in pairs:
+        # enough_liquidity очікує мапу з ціною та обігом — формуємо ряд
+        spot_row = {"price": p.spot, "turnover_usd": p.vol_usd}
+        if not enough_liquidity(spot_row, min_vol, min_price):
             continue
+        if p.spot < min_price or p.fut <= 0:
+            continue
+        if abs(p.basis_pct) < threshold:
+            continue
+        if not _allowed(p.symbol, allow, deny):
+            continue
+        candidates.append(p)
 
-        # зберігаємо
-        now = datetime.utcnow()
-        persistence.save_signal(
-            it.symbol,
-            it.spot_price,
-            it.futures_price,
-            it.basis_pct,
-            it.volume_24h_usd,
-            now,
-        )
+    # сортування та ліміт
+    candidates.sort(key=lambda x: abs(x.basis_pct), reverse=True)
+    candidates = candidates[: max(1, int(limit))]
+
+    # збереження у БД (з урахуванням cooldown)
+    persistence.init_db()
+    saved: List[Dict[str, Any]] = []
+    now = datetime.utcnow()
+    for p in candidates:
+        if persistence.recent_signal_exists(p.symbol, cooldown_sec):
+            continue
+        persistence.save_signal(p.symbol, p.spot, p.fut, p.basis_pct, p.vol_usd, now)
         saved.append(
             {
-                "symbol": it.symbol,
-                "spot_price": it.spot_price,
-                "futures_price": it.futures_price,
-                "basis_pct": it.basis_pct,
-                "volume_24h_usd": it.volume_24h_usd,
-                "timestamp": now.isoformat(timespec="seconds"),
+                "symbol": p.symbol,
+                "spot_price": p.spot,
+                "futures_price": p.fut,
+                "basis_pct": p.basis_pct,
+                "turnover_usd": p.vol_usd,
+                "ts": now.isoformat(),
             }
         )
-
     return saved
