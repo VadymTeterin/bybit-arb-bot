@@ -651,3 +651,20 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+# --- step-4.5: helper to wire Telegram sender into RealtimeAlerter (when you have an instance) ---
+def try_setup_telegram_sender(alerter: Any) -> None:
+    """
+    Якщо доступні core.alerts.telegram_sender та екземпляр RealtimeAlerter,
+    підкидає асинхронний відправник у нього. Безпечно нічого не робить, якщо чогось бракує.
+    """
+    try:
+        # перевіряємо, що є RealtimeAlerter і метод set_sender
+        from src.core.alerts import RealtimeAlerter  # type: ignore
+        if not isinstance(alerter, RealtimeAlerter) or not hasattr(alerter, "set_sender"):
+            return
+        # беремо наш async sender з alerts.py (додано вище)
+        from src.core.alerts import telegram_sender  # type: ignore
+        alerter.set_sender(telegram_sender)
+        logger.info("Telegram sender wired into RealtimeAlerter.")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Failed to wire Telegram sender: {e!r}")
