@@ -14,3 +14,12 @@ logs/
 # OS / editor
 .DS_Store
 .vscode/
+/data/*.db
+/venv/
+/.venv/
+/logs/*.log
+data/*.db
+
+/data/*.db
+seed_signals.py
+seed_signals.py
