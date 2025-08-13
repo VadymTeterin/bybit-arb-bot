@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Mapping, Any
+
+from typing import Any, Mapping
 
 
 def _get_float(d: Mapping[str, Any], *keys: str, default: float = 0.0) -> float:
@@ -13,7 +14,9 @@ def _get_float(d: Mapping[str, Any], *keys: str, default: float = 0.0) -> float:
     return float(default)
 
 
-def enough_liquidity(row: Mapping[str, Any], min_vol_usd: float, min_price: float) -> bool:
+def enough_liquidity(
+    row: Mapping[str, Any], min_vol_usd: float, min_price: float
+) -> bool:
     """
     Перевіряє, що інструмент ліквідний за двома критеріями:
       1) ціна >= min_price

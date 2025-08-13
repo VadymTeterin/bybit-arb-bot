@@ -1,11 +1,11 @@
 from __future__ import annotations
+
+import os
 from datetime import datetime, timedelta
 from importlib import reload
 
-import os
-
-from src.storage import persistence
 from src.core import report
+from src.storage import persistence
 
 
 def _seed(db_path):

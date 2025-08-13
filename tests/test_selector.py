@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta
 from importlib import reload
-
-import os
 
 from src.core import selector
 from src.storage import persistence
@@ -40,11 +39,14 @@ def test_selector_basic_saves_and_respects_limit(tmp_path):
     spot = {
         "AAAUSDT": {"price": 2.0, "turnover_usd": 12_000_000},
         "BBBUSDT": {"price": 3.0, "turnover_usd": 25_000_000},
-        "PENNYUSDT": {"price": 0.0001, "turnover_usd": 100_000},  # має відсіктись за ціною/обігом
+        "PENNYUSDT": {
+            "price": 0.0001,
+            "turnover_usd": 100_000,
+        },  # має відсіктись за ціною/обігом
     }
     linear = {
-        "AAAUSDT": {"price": 2.04, "turnover_usd": 11_000_000},   # basis ~ 2%
-        "BBBUSDT": {"price": 3.09, "turnover_usd": 30_000_000},   # basis ~ 3%
+        "AAAUSDT": {"price": 2.04, "turnover_usd": 11_000_000},  # basis ~ 2%
+        "BBBUSDT": {"price": 3.09, "turnover_usd": 30_000_000},  # basis ~ 3%
         "PENNYUSDT": {"price": 0.00011, "turnover_usd": 200_000},
     }
 
@@ -54,8 +56,8 @@ def test_selector_basic_saves_and_respects_limit(tmp_path):
         min_vol=10_000_000,
         min_price=0.001,
         threshold=1.0,
-        limit=1,                   # має зберегти лише ТОП-1 за |basis|
-        cooldown_sec=0,            # щоб не вплинув
+        limit=1,  # має зберегти лише ТОП-1 за |basis|
+        cooldown_sec=0,  # щоб не вплинув
         client=fake,
     )
 
@@ -74,7 +76,9 @@ def test_selector_respects_cooldown(tmp_path):
 
     # Початково збережемо свіжий сигнал для AAAUSDT
     now = datetime.utcnow()
-    persistence.save_signal("AAAUSDT", 2.0, 2.02, 1.0, 12_000_000, now - timedelta(seconds=30))
+    persistence.save_signal(
+        "AAAUSDT", 2.0, 2.02, 1.0, 12_000_000, now - timedelta(seconds=30)
+    )
 
     # Ті ж дані, AAA знов проходить пороги — але має відсіятись кулдауном
     spot = {
@@ -83,7 +87,10 @@ def test_selector_respects_cooldown(tmp_path):
     }
     linear = {
         "AAAUSDT": {"price": 2.04, "turnover_usd": 11_000_000},  # basis ~ 2%
-        "BBBUSDT": {"price": 3.00, "turnover_usd": 26_000_000},  # basis ~ 0% (не пройде threshold 1.0)
+        "BBBUSDT": {
+            "price": 3.00,
+            "turnover_usd": 26_000_000,
+        },  # basis ~ 0% (не пройде threshold 1.0)
     }
     fake = _FakeBybitRest(spot, linear)
 
@@ -116,14 +123,14 @@ def test_selector_threshold_filters_out(tmp_path):
     }
     linear = {
         "XUSDT": {"price": 10.05, "turnover_usd": 22_000_000},  # ~0.5%
-        "YUSDT": {"price": 5.04, "turnover_usd": 16_000_000},   # ~0.8%
+        "YUSDT": {"price": 5.04, "turnover_usd": 16_000_000},  # ~0.8%
     }
     fake = _FakeBybitRest(spot, linear)
 
     saved = selector.run_selection(
         min_vol=10_000_000,
         min_price=0.001,
-        threshold=1.0,   # поріг 1%
+        threshold=1.0,  # поріг 1%
         limit=5,
         cooldown_sec=0,
         client=fake,

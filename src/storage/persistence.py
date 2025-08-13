@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 from src.infra.config import load_settings
 
@@ -77,7 +77,14 @@ def save_signal(
             INSERT INTO signals(symbol, spot_price, futures_price, basis_pct, volume_24h_usd, timestamp)
             VALUES (?,?,?,?,?,?)
             """,
-            (symbol, float(spot), float(fut), float(basis_pct), float(vol_usd), _ts_to_db_value(ts)),
+            (
+                symbol,
+                float(spot),
+                float(fut),
+                float(basis_pct),
+                float(vol_usd),
+                _ts_to_db_value(ts),
+            ),
         )
         con.commit()
 
@@ -105,6 +112,7 @@ def get_signals(last_hours: int = 24, limit: int | None = None) -> List[Dict[str
 # ---------------------
 #   COOLDOWN API
 # ---------------------
+
 
 def get_last_signal_ts(symbol: str) -> Optional[datetime]:
     """

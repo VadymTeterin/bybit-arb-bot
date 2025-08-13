@@ -6,16 +6,15 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
-from loguru import logger
 import requests
+from loguru import logger
 
+# --- модулі звітів / БД ---
+from src.core.report import format_report, get_top_signals
 from src.exchanges.bybit.rest import BybitRest
 from src.infra.config import load_settings
 from src.infra.logging import setup_logging
 from src.infra.notify import send_telegram_message
-
-# --- модулі звітів / БД ---
-from src.core.report import get_top_signals, format_report
 from src.storage.persistence import init_db
 
 APP_VERSION = "0.1.5"  # bump
@@ -99,7 +98,10 @@ def cmd_bybit_top(args: argparse.Namespace) -> int:
     return 0
 
 
-def _basis_rows(min_vol: float, threshold: float) -> tuple[list[tuple[str, float, float, float, float]], list[tuple[str, float, float, float, float]]]:
+def _basis_rows(min_vol: float, threshold: float) -> tuple[
+    list[tuple[str, float, float, float, float]],
+    list[tuple[str, float, float, float, float]],
+]:
     """
     Повертає (rows_pass, rows_all):
       - rows_pass: пари, що пройшли фільтри (vol && |basis|>=threshold)
@@ -142,7 +144,9 @@ def cmd_basis_scan(args: argparse.Namespace) -> int:
     """
     s = load_settings()
     min_vol = float(args.min_vol if args.min_vol is not None else s.min_vol_24h_usd)
-    threshold = float(args.threshold if args.threshold is not None else s.alert_threshold_pct)
+    threshold = float(
+        args.threshold if args.threshold is not None else s.alert_threshold_pct
+    )
 
     rows_pass, rows_all = _basis_rows(min_vol=min_vol, threshold=threshold)
 
@@ -152,13 +156,19 @@ def cmd_basis_scan(args: argparse.Namespace) -> int:
         print(f"{header} → showing {len(top)}")
         for i, (sym, sp, fu, b, vol) in enumerate(top, 1):
             sign = "+" if b >= 0 else ""
-            print(f"{i:>2}. {sym:<12} spot={sp:<12g} fut={fu:<12g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}")
+            print(
+                f"{i:>2}. {sym:<12} spot={sp:<12g} fut={fu:<12g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}"
+            )
     else:
         top = rows_all[: args.limit]
-        print(f"{header} → no pairs met the threshold; showing diagnostic top {len(top)} (below threshold)")
+        print(
+            f"{header} → no pairs met the threshold; showing diagnostic top {len(top)} (below threshold)"
+        )
         for i, (sym, sp, fu, b, vol) in enumerate(top, 1):
             sign = "+" if b >= 0 else ""
-            print(f"{i:>2}. {sym:<12} spot={sp:<12g} fut={fu:<12g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}")
+            print(
+                f"{i:>2}. {sym:<12} spot={sp:<12g} fut={fu:<12g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}"
+            )
     return 0
 
 
@@ -174,11 +184,15 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
     """
     s = load_settings()
     if not _alerts_allowed(s):
-        print("Alerts are disabled by config (enable_alerts=false). Skipping Telegram send.")
+        print(
+            "Alerts are disabled by config (enable_alerts=false). Skipping Telegram send."
+        )
         return 0
 
     min_vol = float(args.min_vol if args.min_vol is not None else s.min_vol_24h_usd)
-    threshold = float(args.threshold if args.threshold is not None else s.alert_threshold_pct)
+    threshold = float(
+        args.threshold if args.threshold is not None else s.alert_threshold_pct
+    )
     limit = int(args.limit)
 
     if not s.telegram.bot_token or not s.telegram.alert_chat_id:
@@ -198,7 +212,10 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
             send_telegram_message(s.telegram.bot_token, s.telegram.alert_chat_id, text)
             logger.success("Telegram notice sent (no pairs).")
         except requests.HTTPError as e:
-            logger.error("Telegram HTTP error: {}", e.response.text if e.response is not None else str(e))
+            logger.error(
+                "Telegram HTTP error: {}",
+                e.response.text if e.response is not None else str(e),
+            )
         except Exception as e:  # noqa: BLE001
             logger.exception("Telegram send failed: {}", e)
         return 0
@@ -206,14 +223,19 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
     lines = [f"Top {len(rows)} basis (≥ {threshold:.2f}%, MinVol ${min_vol:,.0f})"]
     for i, (sym, sp, fu, b, vol) in enumerate(rows, 1):
         sign = "+" if b >= 0 else ""
-        lines.append(f"{i}. {sym}: spot={sp:g} fut={fu:g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}")
+        lines.append(
+            f"{i}. {sym}: spot={sp:g} fut={fu:g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}"
+        )
     text = "\n".join(lines)
     print(text)
     try:
         send_telegram_message(s.telegram.bot_token, s.telegram.alert_chat_id, text)
         logger.success("Telegram alert sent.")
     except requests.HTTPError as e:
-        logger.error("Telegram HTTP error: {}", e.response.text if e.response is not None else str(e))
+        logger.error(
+            "Telegram HTTP error: {}",
+            e.response.text if e.response is not None else str(e),
+        )
     except Exception as e:  # noqa: BLE001
         logger.exception("Telegram send failed: {}", e)
     return 0
@@ -226,7 +248,9 @@ def cmd_tg_send(args: argparse.Namespace) -> int:
     """
     s = load_settings()
     if not _alerts_allowed(s):
-        print("Alerts are disabled by config (enable_alerts=false). Skipping Telegram send.")
+        print(
+            "Alerts are disabled by config (enable_alerts=false). Skipping Telegram send."
+        )
         return 0
     if not s.telegram.bot_token or not s.telegram.alert_chat_id:
         print(
@@ -236,7 +260,9 @@ def cmd_tg_send(args: argparse.Namespace) -> int:
         return 1
     text = args.text or "Test message from bybit-arb-bot"
     try:
-        res = send_telegram_message(s.telegram.bot_token, s.telegram.alert_chat_id, text)
+        res = send_telegram_message(
+            s.telegram.bot_token, s.telegram.alert_chat_id, text
+        )
         ok = res.get("ok")
         print("Telegram send ok:", ok)
         logger.success("Telegram test sent.")
@@ -264,7 +290,9 @@ def cmd_report_print(args: argparse.Namespace) -> int:
 def cmd_report_send(args: argparse.Namespace) -> int:
     s = load_settings()
     if not _alerts_allowed(s):
-        print("Alerts are disabled by config (enable_alerts=false). Skipping Telegram send.")
+        print(
+            "Alerts are disabled by config (enable_alerts=false). Skipping Telegram send."
+        )
         return 0
     if not s.telegram.bot_token or not s.telegram.alert_chat_id:
         print(
@@ -282,11 +310,16 @@ def cmd_report_send(args: argparse.Namespace) -> int:
         print("OK")
         return 0
     except requests.HTTPError as e:
-        print("Telegram HTTP error:", e.response.text if e.response is not None else str(e))
+        print(
+            "Telegram HTTP error:",
+            e.response.text if e.response is not None else str(e),
+        )
         return 2
     except Exception as e:  # noqa: BLE001
         print("Telegram error:", str(e))
         return 2
+
+
 # -----------------------------------------
 
 
@@ -301,10 +334,16 @@ def cmd_select_save(args: argparse.Namespace) -> int:
     """
     s = load_settings()
     limit = int(args.limit)
-    threshold = float(args.threshold) if args.threshold is not None else s.alert_threshold_pct
+    threshold = (
+        float(args.threshold) if args.threshold is not None else s.alert_threshold_pct
+    )
     min_vol = float(args.min_vol) if args.min_vol is not None else s.min_vol_24h_usd
     min_price = float(args.min_price) if args.min_price is not None else s.min_price
-    cooldown_sec = int(args.cooldown_sec) if args.cooldown_sec is not None else s.alert_cooldown_sec
+    cooldown_sec = (
+        int(args.cooldown_sec)
+        if args.cooldown_sec is not None
+        else s.alert_cooldown_sec
+    )
 
     # локальний імпорт, щоб уникнути циклів/попереджень про невикористаний імпорт
     from src.core.selector import run_selection
@@ -324,6 +363,8 @@ def cmd_select_save(args: argparse.Namespace) -> int:
 
     print(f"Saved {len(saved)} signal(s): " + ", ".join(row["symbol"] for row in saved))
     return 0
+
+
 # -----------------------------------------
 
 
@@ -379,6 +420,8 @@ def cmd_price_pair(args: argparse.Namespace) -> int:
     if not printed_any:
         print("No data to show.")
     return 0
+
+
 # -------------------------------------------------------
 
 
@@ -396,7 +439,9 @@ def main() -> None:
     sub.add_parser("bybit:ping").set_defaults(func=cmd_bybit_ping)
 
     p_top = sub.add_parser("bybit:top")
-    p_top.add_argument("--category", default="spot", choices=["spot", "linear", "inverse", "option"])
+    p_top.add_argument(
+        "--category", default="spot", choices=["spot", "linear", "inverse", "option"]
+    )
     p_top.add_argument("--limit", type=int, default=5)
     p_top.set_defaults(func=cmd_bybit_top)
 
@@ -404,7 +449,7 @@ def main() -> None:
     p_basis = sub.add_parser("basis:scan")
     p_basis.add_argument("--limit", type=int, default=10)
     p_basis.add_argument("--threshold", type=float, default=None)  # якщо None — з .env
-    p_basis.add_argument("--min-vol", type=float, default=None)    # якщо None — з .env
+    p_basis.add_argument("--min-vol", type=float, default=None)  # якщо None — з .env
     p_basis.set_defaults(func=cmd_basis_scan)
 
     # basis alert (telegram)
@@ -422,7 +467,9 @@ def main() -> None:
     # --- звіти ---
     p_rp = sub.add_parser("report:print")
     p_rp.add_argument("--hours", type=int, default=24)
-    p_rp.add_argument("--limit", type=int, default=None)  # якщо None — візьмемо s.top_n_report
+    p_rp.add_argument(
+        "--limit", type=int, default=None
+    )  # якщо None — візьмемо s.top_n_report
     p_rp.set_defaults(func=cmd_report_print)
 
     p_rs = sub.add_parser("report:send")
@@ -433,15 +480,25 @@ def main() -> None:
     # --- selector save ---
     p_sel = sub.add_parser("select:save")
     p_sel.add_argument("--limit", type=int, default=3)
-    p_sel.add_argument("--threshold", type=float, default=None)   # якщо None — з .env
-    p_sel.add_argument("--min-vol", type=float, default=None)     # якщо None — з .env
-    p_sel.add_argument("--min-price", type=float, default=None)   # якщо None — з .env
-    p_sel.add_argument("--cooldown-sec", type=int, default=None, help="Переважує ALERT_COOLDOWN_SEC з .env")
+    p_sel.add_argument("--threshold", type=float, default=None)  # якщо None — з .env
+    p_sel.add_argument("--min-vol", type=float, default=None)  # якщо None — з .env
+    p_sel.add_argument("--min-price", type=float, default=None)  # якщо None — з .env
+    p_sel.add_argument(
+        "--cooldown-sec",
+        type=int,
+        default=None,
+        help="Переважує ALERT_COOLDOWN_SEC з .env",
+    )
     p_sel.set_defaults(func=cmd_select_save)
 
     # --- price:pair ---
     p_pp = sub.add_parser("price:pair")
-    p_pp.add_argument("-s", "--symbol", action="append", help="Може повторюватися: -s ETHUSDT -s BTCUSDT. За замовчуванням: ETHUSDT,BTCUSDT")
+    p_pp.add_argument(
+        "-s",
+        "--symbol",
+        action="append",
+        help="Може повторюватися: -s ETHUSDT -s BTCUSDT. За замовчуванням: ETHUSDT,BTCUSDT",
+    )
     p_pp.set_defaults(func=cmd_price_pair)
 
     args = parser.parse_args()
@@ -453,7 +510,9 @@ def main() -> None:
     # --- ініціалізація SQLite БД на старті ---
     try:
         s = load_settings()
-        Path(s.db_path).parent.mkdir(parents=True, exist_ok=True)  # гарантуємо існування папки data/
+        Path(s.db_path).parent.mkdir(
+            parents=True, exist_ok=True
+        )  # гарантуємо існування папки data/
         init_db()
         logger.success("SQLite initialized at {}", s.db_path)
     except Exception as e:  # noqa: BLE001

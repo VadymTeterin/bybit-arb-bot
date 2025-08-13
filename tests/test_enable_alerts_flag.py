@@ -20,10 +20,15 @@ def test_report_send_respects_enable_alerts(monkeypatch, capsys):
     monkeypatch.setattr(app, "load_settings", lambda: fake_settings)
 
     # штучні дані звіту
-    monkeypatch.setattr(app, "get_top_signals", lambda last_hours, limit: [{"symbol": "ETHUSDT", "basis_pct": 1.0}])
+    monkeypatch.setattr(
+        app,
+        "get_top_signals",
+        lambda last_hours, limit: [{"symbol": "ETHUSDT", "basis_pct": 1.0}],
+    )
     monkeypatch.setattr(app, "format_report", lambda items: "report text")
 
     called = {"sent": False}
+
     def fake_send(token, chat, text):
         called["sent"] = True
         return {"ok": True}

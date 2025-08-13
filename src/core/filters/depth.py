@@ -10,7 +10,9 @@ def _to_float(x, default: float = 0.0) -> float:
         return float(default)
 
 
-def _levels_in_window(levels: Iterable[Tuple[float, float]], lo: float, hi: float) -> List[Tuple[float, float]]:
+def _levels_in_window(
+    levels: Iterable[Tuple[float, float]], lo: float, hi: float
+) -> List[Tuple[float, float]]:
     """Фільтрує рівні книги за ціновим вікном [lo, hi]."""
     out: List[Tuple[float, float]] = []
     for p, q in levels:
@@ -28,7 +30,9 @@ def _sum_notional(levels: Iterable[Tuple[float, float]]) -> float:
     return s
 
 
-def _normalize_ob(orderbook: Dict) -> Tuple[List[Tuple[float, float]], List[Tuple[float, float]]]:
+def _normalize_ob(
+    orderbook: Dict,
+) -> Tuple[List[Tuple[float, float]], List[Tuple[float, float]]]:
     """
     Нормалізує формат книги до двох списків bids/asks у вигляді [(price, qty), ...].
     Підтримує варіанти:
@@ -37,12 +41,22 @@ def _normalize_ob(orderbook: Dict) -> Tuple[List[Tuple[float, float]], List[Tupl
     """
     bids_raw = orderbook.get("b") or orderbook.get("bids") or []
     asks_raw = orderbook.get("a") or orderbook.get("asks") or []
-    bids = [( _to_float(r[0]), _to_float(r[1]) ) for r in bids_raw if isinstance(r, (list, tuple)) and len(r) >= 2]
-    asks = [( _to_float(r[0]), _to_float(r[1]) ) for r in asks_raw if isinstance(r, (list, tuple)) and len(r) >= 2]
+    bids = [
+        (_to_float(r[0]), _to_float(r[1]))
+        for r in bids_raw
+        if isinstance(r, (list, tuple)) and len(r) >= 2
+    ]
+    asks = [
+        (_to_float(r[0]), _to_float(r[1]))
+        for r in asks_raw
+        if isinstance(r, (list, tuple)) and len(r) >= 2
+    ]
     return bids, asks
 
 
-def calc_window_depth_usd(orderbook: Dict, mid_price: float, window_pct: float) -> Tuple[float, float, int]:
+def calc_window_depth_usd(
+    orderbook: Dict, mid_price: float, window_pct: float
+) -> Tuple[float, float, int]:
     """
     Розраховує сумарний нотіонал у межах ±window_pct від mid_price.
     Повертає: (bid_usd, ask_usd, levels_in_window_total).

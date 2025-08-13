@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import time
 from typing import Any, Dict, List, Optional
 
 import requests
-import time
 
 BASE_URL = "https://api.bybit.com"
 
@@ -58,7 +58,9 @@ class BybitRest:
     @staticmethod
     def _price_for_linear(row: Dict[str, Any]) -> float:
         # для linear — пріоритет markPrice; якщо нема, fallback на lastPrice/lastPriceLatest
-        return _to_float(row.get("markPrice") or row.get("lastPrice") or row.get("lastPriceLatest"))
+        return _to_float(
+            row.get("markPrice") or row.get("lastPrice") or row.get("lastPriceLatest")
+        )
 
     @staticmethod
     def _turnover_usd(row: Dict[str, Any]) -> float:

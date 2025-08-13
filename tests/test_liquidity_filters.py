@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from src.core.filters.liquidity import enough_liquidity
 
 

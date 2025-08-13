@@ -15,11 +15,15 @@ class _FakeBybitRest:
     """
     Фейковий клієнт Bybit REST з мінімальним набором даних для інтеграційного проходу.
     """
+
     def __init__(self):
         self._spot = {
             "AAAUSDT": {"price": 2.0, "turnover_usd": 12_000_000},
             "BBBUSDT": {"price": 5.0, "turnover_usd": 25_000_000},
-            "PENNYUSDT": {"price": 0.0009, "turnover_usd": 50_000},  # має відсіктись за ціною/обігом
+            "PENNYUSDT": {
+                "price": 0.0009,
+                "turnover_usd": 50_000,
+            },  # має відсіктись за ціною/обігом
         }
         self._linear = {
             "AAAUSDT": {"price": 2.04, "turnover_usd": 11_000_000},  # ~2%
@@ -70,7 +74,9 @@ def test_selector_end_to_end_with_cooldown(monkeypatch):
         saved.append(args)
 
     monkeypatch.setattr(selector.persistence, "init_db", fake_init_db)
-    monkeypatch.setattr(selector.persistence, "recent_signal_exists", fake_recent_signal_exists)
+    monkeypatch.setattr(
+        selector.persistence, "recent_signal_exists", fake_recent_signal_exists
+    )
     monkeypatch.setattr(selector.persistence, "save_signal", fake_save_signal)
 
     fake = _FakeBybitRest()

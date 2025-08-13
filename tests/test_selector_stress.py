@@ -5,6 +5,7 @@
 """
 
 from types import SimpleNamespace
+
 from src.core import selector
 
 
@@ -24,7 +25,7 @@ class _FakeBybitRest:
             sym = f"S{i}USDT"
             spot_p = price
             fut_p = price * (1 + i / 10_000)  # дедалі більший basis
-            vol = 20_000_000 + i * 1_000      # всі проходять min_vol
+            vol = 20_000_000 + i * 1_000  # всі проходять min_vol
             self._spot[sym] = {"price": spot_p, "turnover_usd": vol}
             self._linear[sym] = {"price": fut_p, "turnover_usd": vol}
             price += 0.01
@@ -48,7 +49,7 @@ def test_selector_stress_sorted_and_limited(monkeypatch):
     fake_settings = SimpleNamespace(
         min_vol_24h_usd=10_000_000,
         min_price=0.001,
-        alert_threshold_pct=0.2,   # щоб більшість пар пройшли
+        alert_threshold_pct=0.2,  # щоб більшість пар пройшли
         alert_cooldown_sec=0,
         allow_symbols=[],
         deny_symbols=[],
@@ -59,8 +60,12 @@ def test_selector_stress_sorted_and_limited(monkeypatch):
     # відключаємо реальну БД
     saved = []
     monkeypatch.setattr(selector.persistence, "init_db", lambda: None)
-    monkeypatch.setattr(selector.persistence, "recent_signal_exists", lambda symbol, cooldown_sec: False)
-    monkeypatch.setattr(selector.persistence, "save_signal", lambda *args, **kwargs: saved.append(args))
+    monkeypatch.setattr(
+        selector.persistence, "recent_signal_exists", lambda symbol, cooldown_sec: False
+    )
+    monkeypatch.setattr(
+        selector.persistence, "save_signal", lambda *args, **kwargs: saved.append(args)
+    )
 
     fake = _FakeBybitRest(n=240)
     res = selector.run_selection(limit=7, client=fake)

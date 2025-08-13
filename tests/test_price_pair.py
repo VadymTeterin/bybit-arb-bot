@@ -1,10 +1,12 @@
 # tests/test_price_pair.py
 import types
+
 import src.main as app
 
 
 class FakeRest:
     """Мінімальний двійник BybitRest для price:pair."""
+
     def __init__(self, spot_prices: dict[str, float], fut_prices: dict[str, float]):
         # будуємо мапи у форматі, який очікує команда (з ключем 'price')
         self._spot_map = {s: {"price": p} for s, p in spot_prices.items()}

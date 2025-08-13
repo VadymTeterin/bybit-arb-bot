@@ -1,15 +1,16 @@
 from __future__ import annotations
+
+import sqlite3
 from datetime import datetime, timedelta
 from importlib import reload
 
-import sqlite3
-
 from src.storage import persistence
+
 
 def test_init_db_tmp(tmp_path, monkeypatch):
     db = tmp_path / "t.db"
     monkeypatch.setenv("DB_PATH", str(db))  # підмінимо шлях через env
-    reload(persistence)                     # щоб settings перечитався
+    reload(persistence)  # щоб settings перечитався
     persistence.init_db()
     assert db.exists()
     with sqlite3.connect(db) as con:
@@ -17,6 +18,7 @@ def test_init_db_tmp(tmp_path, monkeypatch):
             "SELECT name FROM sqlite_master WHERE type='table' AND name='signals'"
         ).fetchone()
         assert row is not None
+
 
 def test_save_and_get(tmp_path, monkeypatch):
     db = tmp_path / "t2.db"

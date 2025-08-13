@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Mapping, Optional
 
-from src.infra.config import load_settings
 from src.core.filters.liquidity import enough_liquidity
+from src.infra.config import load_settings
+
 # Імпорт залишаємо: тести можуть monkeypatch-ити selector.has_enough_depth
 try:
     from src.core.filters.depth import has_enough_depth  # type: ignore
@@ -130,13 +131,19 @@ def run_selection(
         allow: List[str] = getattr(s, "allow_list")  # type: ignore[assignment]
     else:
         raw_allow = getattr(s, "allow_symbols", "")
-        allow = raw_allow if isinstance(raw_allow, list) else _parse_symbols_value(raw_allow)
+        allow = (
+            raw_allow
+            if isinstance(raw_allow, list)
+            else _parse_symbols_value(raw_allow)
+        )
 
     if hasattr(s, "deny_list"):
         deny: List[str] = getattr(s, "deny_list")  # type: ignore[assignment]
     else:
         raw_deny = getattr(s, "deny_symbols", "")
-        deny = raw_deny if isinstance(raw_deny, list) else _parse_symbols_value(raw_deny)
+        deny = (
+            raw_deny if isinstance(raw_deny, list) else _parse_symbols_value(raw_deny)
+        )
 
     # відкладений імпорт реального клієнта
     if client is None:
@@ -173,7 +180,7 @@ def run_selection(
                     p.spot,
                     min_depth_usd=float(min_depth_usd),  # type: ignore[arg-type]
                     window_pct=float(depth_window_pct),  # type: ignore[arg-type]
-                    min_levels=int(min_depth_levels),    # type: ignore[arg-type]
+                    min_levels=int(min_depth_levels),  # type: ignore[arg-type]
                 ):
                     continue
                 if not has_enough_depth(
@@ -181,7 +188,7 @@ def run_selection(
                     p.fut,
                     min_depth_usd=float(min_depth_usd),  # type: ignore[arg-type]
                     window_pct=float(depth_window_pct),  # type: ignore[arg-type]
-                    min_levels=int(min_depth_levels),    # type: ignore[arg-type]
+                    min_levels=int(min_depth_levels),  # type: ignore[arg-type]
                 ):
                     continue
             except Exception:

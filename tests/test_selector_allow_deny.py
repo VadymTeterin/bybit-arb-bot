@@ -25,10 +25,10 @@ def test_allow_deny_filters(monkeypatch):
     fake_settings = SimpleNamespace(
         min_vol_24h_usd=1_000_000,
         min_price=0.001,
-        alert_threshold_pct=0.5,      # ETH ~1%, BTC ~0.46%, XRP ~0.67%
-        alert_cooldown_sec=0,         # щоб не заважав
+        alert_threshold_pct=0.5,  # ETH ~1%, BTC ~0.46%, XRP ~0.67%
+        alert_cooldown_sec=0,  # щоб не заважав
         allow_symbols=["ETHUSDT", "XRPUSDT"],  # дозволимо тільки ETH/XRP
-        deny_symbols=["XRPUSDT"],               # але XRP забороняємо
+        deny_symbols=["XRPUSDT"],  # але XRP забороняємо
         db_path=":memory:",
     )
     monkeypatch.setattr(selector, "load_settings", lambda: fake_settings)
@@ -36,7 +36,9 @@ def test_allow_deny_filters(monkeypatch):
     # відключаємо реальні виклики до SQLite
     saved = []
     monkeypatch.setattr(selector.persistence, "init_db", lambda: None)
-    monkeypatch.setattr(selector.persistence, "recent_signal_exists", lambda symbol, cooldown_sec: False)
+    monkeypatch.setattr(
+        selector.persistence, "recent_signal_exists", lambda symbol, cooldown_sec: False
+    )
     monkeypatch.setattr(
         selector.persistence,
         "save_signal",

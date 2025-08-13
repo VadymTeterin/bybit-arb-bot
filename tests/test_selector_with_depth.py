@@ -5,6 +5,7 @@
 """
 
 from types import SimpleNamespace
+
 from src.core import selector
 
 
@@ -14,14 +15,15 @@ class _FakeBybitRest:
     - дає мінімально потрібні мапи ціни/обігу;
     - надає orderbook-методи, щоб selector увімкнув depth-фільтр.
     """
+
     def __init__(self):
         self._spot = {
             "AAAUSDT": {"price": 100.0, "turnover_usd": 20_000_000},
-            "BBBUSDT": {"price": 5.0,   "turnover_usd": 25_000_000},
+            "BBBUSDT": {"price": 5.0, "turnover_usd": 25_000_000},
         }
         self._linear = {
             "AAAUSDT": {"price": 101.0, "turnover_usd": 22_000_000},
-            "BBBUSDT": {"price": 5.05,  "turnover_usd": 26_000_000},
+            "BBBUSDT": {"price": 5.05, "turnover_usd": 26_000_000},
         }
         # довільні "порожні" книги — реальний результат підміняємо monkeypatch-ом has_enough_depth
         self._ob = {"b": [], "a": []}
@@ -63,8 +65,12 @@ def test_selector_filters_by_depth(monkeypatch):
     # Відключаємо реальну БД
     saved = []
     monkeypatch.setattr(selector.persistence, "init_db", lambda: None)
-    monkeypatch.setattr(selector.persistence, "recent_signal_exists", lambda symbol, cooldown_sec: False)
-    monkeypatch.setattr(selector.persistence, "save_signal", lambda *a, **k: saved.append(a))
+    monkeypatch.setattr(
+        selector.persistence, "recent_signal_exists", lambda symbol, cooldown_sec: False
+    )
+    monkeypatch.setattr(
+        selector.persistence, "save_signal", lambda *a, **k: saved.append(a)
+    )
 
     # Мокаємо has_enough_depth так, щоб:
     #  - для AAAUSDT → True (mid_price ~100)
@@ -72,7 +78,9 @@ def test_selector_filters_by_depth(monkeypatch):
     def fake_has_enough_depth(orderbook, mid_price, **kwargs):
         return mid_price >= 100.0
 
-    monkeypatch.setattr(selector, "has_enough_depth", fake_has_enough_depth, raising=False)
+    monkeypatch.setattr(
+        selector, "has_enough_depth", fake_has_enough_depth, raising=False
+    )
 
     fake = _FakeBybitRest()
     res = selector.run_selection(limit=5, client=fake)
