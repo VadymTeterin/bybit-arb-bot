@@ -17,7 +17,7 @@ from src.infra.logging import setup_logging
 from src.infra.notify import send_telegram_message
 from src.storage.persistence import init_db
 
-APP_VERSION = "0.4.0"  # 4.3: realtime basis + filters (min price/vol) wiring
+APP_VERSION = "0.4.1"  # 4.3: fix argparse and keep backward-compat snapshot()
 
 
 def cmd_version(_: argparse.Namespace) -> int:
@@ -151,10 +151,6 @@ def _basis_rows(min_vol: float, threshold: float) -> tuple[
 
 
 def cmd_basis_scan(args: argparse.Namespace) -> int:
-    """
-    Зіставляє SPOT і LINEAR та рахує basis %.
-    Якщо немає пар вище порога — показує діагностичний top за |basis|.
-    """
     s = load_settings()
     min_vol = float(args.min_vol if args.min_vol is not None else s.min_vol_24h_usd)
     threshold = float(
@@ -186,20 +182,13 @@ def cmd_basis_scan(args: argparse.Namespace) -> int:
 
 
 def _alerts_allowed(s) -> bool:
-    """Безпечна перевірка прапора enable_alerts (за замовчуванням True)."""
     return bool(s.enable_alerts)
 
 
 def cmd_basis_alert(args: argparse.Namespace) -> int:
-    """
-    Обчислює basis, фільтрує за порогом і шле топ N у Telegram.
-    Якщо пар немає — надсилає діагностичне повідомлення.
-    """
     s = load_settings()
     if not _alerts_allowed(s):
-        print(
-            "Alerts are disabled by config (enable_alerts=false). Skipping Telegram send."
-        )
+        print("Alerts are disabled by config (enable_alerts=false).")
         return 0
 
     min_vol = float(args.min_vol if args.min_vol is not None else s.min_vol_24h_usd)
@@ -209,10 +198,7 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
     limit = int(args.limit)
 
     if not s.telegram.bot_token or not s.telegram.alert_chat_id:
-        print(
-            "Telegram is not configured: set TELEGRAM__BOT_TOKEN / TELEGRAM_BOT_TOKEN and "
-            "TELEGRAM__ALERT_CHAT_ID / TG_ALERT_CHAT_ID in .env"
-        )
+        print("Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env")
         return 1
 
     rows_pass, _ = _basis_rows(min_vol=min_vol, threshold=threshold)
@@ -225,10 +211,7 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
             send_telegram_message(s.telegram.bot_token, s.telegram.alert_chat_id, text)
             logger.success("Telegram notice sent (no pairs).")
         except requests.HTTPError as e:
-            logger.error(
-                "Telegram HTTP error: {}",
-                e.response.text if e.response is not None else str(e),
-            )
+            logger.error("Telegram HTTP error: {}", e.response.text if e.response is not None else str(e))
         except Exception as e:  # noqa: BLE001
             logger.exception("Telegram send failed: {}", e)
         return 0
@@ -236,46 +219,30 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
     lines = [f"Top {len(rows)} basis (≥ {threshold:.2f}%, MinVol ${min_vol:,.0f})"]
     for i, (sym, sp, fu, b, vol) in enumerate(rows, 1):
         sign = "+" if b >= 0 else ""
-        lines.append(
-            f"{i}. {sym}: spot={sp:g} fut={fu:g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}"
-        )
+        lines.append(f"{i}. {sym}: spot={sp:g} fut={fu:g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}")
     text = "\n".join(lines)
     print(text)
     try:
         send_telegram_message(s.telegram.bot_token, s.telegram.alert_chat_id, text)
         logger.success("Telegram alert sent.")
     except requests.HTTPError as e:
-        logger.error(
-            "Telegram HTTP error: {}",
-            e.response.text if e.response is not None else str(e),
-        )
+        logger.error("Telegram HTTP error: {}", e.response.text if e.response is not None else str(e))
     except Exception as e:  # noqa: BLE001
         logger.exception("Telegram send failed: {}", e)
     return 0
 
 
 def cmd_tg_send(args: argparse.Namespace) -> int:
-    """
-    Надсилає тестове повідомлення в Telegram з .env.
-    Використання: python -m src.main tg:send --text "hello"
-    """
     s = load_settings()
     if not _alerts_allowed(s):
-        print(
-            "Alerts are disabled by config (enable_alerts=false). Skipping Telegram send."
-        )
+        print("Alerts are disabled by config (enable_alerts=false).")
         return 0
     if not s.telegram.bot_token or not s.telegram.alert_chat_id:
-        print(
-            "Telegram is not configured: set TELEGRAM__BOT_TOKEN / TELEGRAM_BOT_TOKEN and "
-            "TELEGRAM__ALERT_CHAT_ID / TG_ALERT_CHAT_ID in .env"
-        )
+        print("Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env")
         return 1
     text = args.text or "Test message from bybit-arb-bot"
     try:
-        res = send_telegram_message(
-            s.telegram.bot_token, s.telegram.alert_chat_id, text
-        )
+        res = send_telegram_message(s.telegram.bot_token, s.telegram.alert_chat_id, text)
         ok = res.get("ok")
         print("Telegram send ok:", ok)
         logger.success("Telegram test sent.")
@@ -303,15 +270,10 @@ def cmd_report_print(args: argparse.Namespace) -> int:
 def cmd_report_send(args: argparse.Namespace) -> int:
     s = load_settings()
     if not _alerts_allowed(s):
-        print(
-            "Alerts are disabled by config (enable_alerts=false). Skipping Telegram send."
-        )
+        print("Alerts are disabled by config (enable_alerts=false).")
         return 0
     if not s.telegram.bot_token or not s.telegram.alert_chat_id:
-        print(
-            "Telegram is not configured: set TELEGRAM__BOT_TOKEN / TELEGRAM_BOT_TOKEN and "
-            "TELEGRAM__ALERT_CHAT_ID / TG_ALERT_CHAT_ID in .env"
-        )
+        print("Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env")
         return 1
     hours = int(args.hours)
     limit = int(args.limit) if args.limit is not None else int(s.top_n_report)
@@ -323,10 +285,7 @@ def cmd_report_send(args: argparse.Namespace) -> int:
         print("OK")
         return 0
     except requests.HTTPError as e:
-        print(
-            "Telegram HTTP error:",
-            e.response.text if e.response is not None else str(e),
-        )
+        print("Telegram HTTP error:", e.response.text if e.response is not None else str(e))
         return 2
     except Exception as e:  # noqa: BLE001
         print("Telegram error:", str(e))
@@ -335,24 +294,13 @@ def cmd_report_send(args: argparse.Namespace) -> int:
 
 # ---------- SELECTOR SAVE ----------
 def cmd_select_save(args: argparse.Namespace) -> int:
-    """
-    Запускає відбір SPOT vs LINEAR, застосовує фільтри та cooldown,
-    зберігає у SQLite топ N записів і друкує підсумок.
-    """
     s = load_settings()
     limit = int(args.limit)
-    threshold = (
-        float(args.threshold) if args.threshold is not None else s.alert_threshold_pct
-    )
+    threshold = float(args.threshold) if args.threshold is not None else s.alert_threshold_pct
     min_vol = float(args.min_vol) if args.min_vol is not None else s.min_vol_24h_usd
     min_price = float(args.min_price) if args.min_price is not None else s.min_price
-    cooldown_sec = (
-        int(args.cooldown_sec)
-        if args.cooldown_sec is not None
-        else s.alert_cooldown_sec
-    )
+    cooldown_sec = int(args.cooldown_sec) if args.cooldown_sec is not None else s.alert_cooldown_sec
 
-    # локальний імпорт, щоб уникнути циклів/попереджень про невикористаний імпорт
     from src.core.selector import run_selection
 
     saved = run_selection(
@@ -361,7 +309,7 @@ def cmd_select_save(args: argparse.Namespace) -> int:
         threshold=threshold,
         limit=limit,
         cooldown_sec=cooldown_sec,
-        client=None,  # реальний BybitRest всередині
+        client=None,
     )
 
     if not saved:
@@ -374,14 +322,10 @@ def cmd_select_save(args: argparse.Namespace) -> int:
 
 # ---------- Вивід поточних цін для пари ----------
 def create_bybit_client() -> BybitRest:
-    """Фабрика клієнта Bybit для можливості підміни у тестах."""
     return BybitRest()
 
 
 def cmd_price_pair(args: argparse.Namespace) -> int:
-    """
-    Друкує поточну ціну спот та ф'ючерса (linear) по заданих символах.
-    """
     client = create_bybit_client()
     spot_map = client.get_spot_map()
     lin_map = client.get_linear_map()
@@ -399,16 +343,9 @@ def cmd_price_pair(args: argparse.Namespace) -> int:
         fut_price = float(ln["price"]) if ln and ln.get("price") else None
 
         line = [sym]
-        if spot_price is not None:
-            line.append(f"spot={spot_price:g}")
-        else:
-            line.append("spot=-")
-        if fut_price is not None:
-            line.append(f"fut={fut_price:g}")
-        else:
-            line.append("fut=-")
+        line.append(f"spot={spot_price:g}" if spot_price is not None else "spot=-")
+        line.append(f"fut={fut_price:g}" if fut_price is not None else "fut=-")
 
-        # якщо є обидві ціни — порахуємо basis %
         if spot_price and fut_price and spot_price > 0:
             basis = (fut_price - spot_price) / spot_price * 100.0
             sign = "+" if basis >= 0 else ""
@@ -424,11 +361,6 @@ def cmd_price_pair(args: argparse.Namespace) -> int:
 
 # ---------- WS:RUN (4.3 realtime basis + filters) ----------
 def cmd_ws_run(_: argparse.Namespace) -> int:
-    """
-    Запуск WS-режиму з двома потоками (SPOT/LINEAR), обчислення basis%,
-    застосування простих фільтрів (min price/vol) у реальному часі.
-    (depth-фільтр інтегруємо окремим підкроком 4.3.x)
-    """
     s = load_settings()
     if not s.ws_enabled:
         print("WS is disabled by config (set WS_ENABLED=1 in .env).")
@@ -448,13 +380,11 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
     ws_spot = BybitWS(s.ws_public_url_spot, s.ws_topics_list_spot)
 
     async def refresh_meta_task():
-        """Періодично оновлюємо 24h turnover для символів, щоб працював min_vol фільтр."""
         client = BybitRest()
         while True:
             try:
                 spot_map = client.get_spot_map()
                 lin_map = client.get_linear_map()
-                # мінімум по потокам, як у офлайновому відборі
                 combined = {}
                 common = set(spot_map.keys()) & set(lin_map.keys())
                 for sym in common:
@@ -470,8 +400,9 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
                 logger.bind(tag="RTMETA").warning(f"Meta refresh failed: {e!r}")
             await asyncio.sleep(max(30, int(s.rt_meta_refresh_sec)))
 
+    import math
+
     async def maybe_log_realtime_pass(sym: str):
-        # Перевіряємо кандидата за поточними фільтрами
         rows = await cache.candidates(
             threshold_pct=s.alert_threshold_pct,
             min_price=s.min_price,
@@ -485,8 +416,6 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
                     sign = "+" if basis >= 0 else ""
                     logger.bind(tag="RT").success(f"{rsym} basis={sign}{basis:.2f}%  (passes filters)")
                 break
-
-    import math
 
     async def on_message_spot(msg: dict):
         for item in iter_ticker_entries(msg):
@@ -543,17 +472,15 @@ def main() -> None:
     sub.add_parser("bybit:ping").set_defaults(func=cmd_bybit_ping)
 
     p_top = sub.add_parser("bybit:top")
-    p_top.add_argument(
-        "--category", default="spot", choices=["spot", "linear", "inverse", "option"]
-    )
+    p_top.add_argument("--category", default="spot", choices=["spot", "linear", "inverse", "option"])
     p_top.add_argument("--limit", type=int, default=5)
     p_top.set_defaults(func=cmd_bybit_top)
 
     # basis scan (консольний)
     p_basis = sub.add_parser("basis:scan")
     p_basis.add_argument("--limit", type=int, default=10)
-    p_basis.add_argument("--threshold", type=float, default=None)  # якщо None — з .env
-    p_basis.add_argument("--min-vol", type=float, default=None)  # якщо None — з .env
+    p_basis.add_argument("--threshold", type=float, default=None)
+    p_basis.add_argument("--min-vol", type=float, default=None)
     p_basis.set_defaults(func=cmd_basis_scan)
 
     # basis alert (telegram)
@@ -571,9 +498,7 @@ def main() -> None:
     # --- звіти ---
     p_rp = sub.add_parser("report:print")
     p_rp.add_argument("--hours", type=int, default=24)
-    p_rp.add_argument(
-        "--limit", type=int, default=None
-    )  # якщо None — візьмемо s.top_n_report
+    p_rp.add_argument("--limit", type=int, default=None)
     p_rp.set_defaults(func=cmd_report_print)
 
     p_rs = sub.add_parser("report:send")
@@ -584,12 +509,12 @@ def main() -> None:
     # --- selector save ---
     p_sel = sub.add_parser("select:save")
     p_sel.add_argument("--limit", type=int, default=3)
-    p_sel.add_argument("--threshold", type=float, default=None)  # якщо None — з .env
-    p_sel.add_argument("--min-vol", type=float, default=None)  # якщо None — з .env
-    p_sel.add_argument("--min-price", type=float, default=None)  # якщо None — з .env
+    p_sel.add_argument("--threshold", type=float, default=None)
+    p_sel.add_argument("--min-vol", type=float, default=None)
+    p_sel.add_argument("--min-price", type=float, default=None)
     p_sel.add_argument(
         "--cooldown-sec",
-        int,
+        type=int,
         default=None,
         help="Переважує ALERT_COOLDOWN_SEC з .env",
     )

@@ -16,12 +16,15 @@ class QuoteCache:
       - basis_pct: (linear_mark - spot) / spot * 100, якщо обидві ціни відомі
       - ts_spot / ts_linear / ts_basis: таймстемпи останніх оновлень
       - vol24h_usd: останній відомий 24h turnover у $, для фільтра по ліквідності
+
+    ВАЖЛИВО: метод snapshot() зберігає зворотну сумісність і повертає
+    саме 3‑кортеж (spot, linear_mark, ts), як очікують наявні тести.
+    Розширені дані доступні через snapshot_extended().
     """
 
     def __init__(self) -> None:
         self._lock = asyncio.Lock()
         self._data: Dict[str, Dict[str, float]] = {}
-        # окремо тримаємо vol, щоб масово оновлювати без конфліктів
         self._vol24h: Dict[str, float] = {}
 
     async def update(
@@ -88,17 +91,32 @@ class QuoteCache:
                 }
             return dict(row)
 
-    async def snapshot(self) -> Dict[str, Tuple[float, float, float, float, float, float]]:
+    async def snapshot(self) -> Dict[str, Tuple[float, float, float]]:
+        """
+        BACKWARD‑COMPAT: повертає {symbol: (spot, linear_mark, ts)}
+        де ts = max(ts_spot, ts_linear, ts_basis).
+        """
+        async with self._lock:
+            out: Dict[str, Tuple[float, float, float]] = {}
+            for k, v in self._data.items():
+                ts = max(float(v.get("ts_spot", 0.0)), float(v.get("ts_linear", 0.0)), float(v.get("ts_basis", 0.0)))
+                out[k] = (float(v.get("spot", math.nan)), float(v.get("linear_mark", math.nan)), ts)
+            return out
+
+    async def snapshot_extended(self) -> Dict[str, Tuple[float, float, float, float, float, float]]:
+        """
+        Розширена версія снапшоту: {symbol: (spot, linear_mark, basis_pct, ts_spot, ts_linear, ts_basis)}
+        """
         async with self._lock:
             out: Dict[str, Tuple[float, float, float, float, float, float]] = {}
             for k, v in self._data.items():
                 out[k] = (
-                    v["spot"],
-                    v["linear_mark"],
-                    v["basis_pct"],
-                    v["ts_spot"],
-                    v["ts_linear"],
-                    v["ts_basis"],
+                    float(v.get("spot", math.nan)),
+                    float(v.get("linear_mark", math.nan)),
+                    float(v.get("basis_pct", math.nan)),
+                    float(v.get("ts_spot", 0.0)),
+                    float(v.get("ts_linear", 0.0)),
+                    float(v.get("ts_basis", 0.0)),
                 )
             return out
 
@@ -128,8 +146,8 @@ class QuoteCache:
                     continue
                 if sym in deny_set:
                     continue
-                spot = v.get("spot", math.nan)
-                basis = v.get("basis_pct", math.nan)
+                spot = float(v.get("spot", math.nan))
+                basis = float(v.get("basis_pct", math.nan))
                 if math.isnan(spot) or math.isnan(basis):
                     continue
                 if spot < float(min_price):
