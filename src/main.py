@@ -17,7 +17,37 @@ from src.infra.logging import setup_logging
 from src.infra.notify import send_telegram_message
 from src.storage.persistence import init_db
 
-APP_VERSION = "0.4.1"  # 4.3: fix argparse and keep backward-compat snapshot()
+# Опціональна інтеграція з новими модулями (не ламає роботу, якщо їх ще немає / без потрібних функцій)
+try:  # telegram форматування повідомлень
+    from src.telegram import formatters as _tg_formatters  # type: ignore
+except Exception:  # noqa: BLE001
+    _tg_formatters = None
+
+try:  # core alerts (наприклад, cooldown, пост-обробка кандидатів)
+    from src.core import alerts as _core_alerts  # type: ignore
+except Exception:  # noqa: BLE001
+    _core_alerts = None
+
+
+APP_VERSION = "0.4.2"  # 4.4: інтеграція core/alerts + telegram/formatters (опціонально)
+
+
+def _safe_call(fn, *args, **kwargs):
+    """
+    Викликає функцію, але tolerant до різниць підпису.
+    Повертає None, якщо виклик не вдався або функції немає.
+    """
+    if fn is None:
+        return None
+    try:
+        return fn(*args, **kwargs)
+    except TypeError:
+        try:
+            return fn(*args)  # відкидаємо kwargs, якщо підпис інший
+        except Exception:
+            return None
+    except Exception:
+        return None
 
 
 def cmd_version(_: argparse.Namespace) -> int:
@@ -185,6 +215,32 @@ def _alerts_allowed(s) -> bool:
     return bool(s.enable_alerts)
 
 
+def _format_alert_text(rows: list[tuple[str, float, float, float, float]], threshold: float, min_vol: float) -> str:
+    """
+    Використовує src/telegram/formatters якщо доступний, інакше — дефолтне форматування.
+    """
+    if rows:
+        header = f"Top {len(rows)} basis (≥ {threshold:.2f}%, MinVol ${min_vol:,.0f})"
+        if _tg_formatters and hasattr(_tg_formatters, "format_basis_top"):
+            txt = _safe_call(getattr(_tg_formatters, "format_basis_top", None), rows, header)
+            if isinstance(txt, str) and txt.strip():
+                return txt
+        # дефолт
+        lines = [header]
+        for i, (sym, sp, fu, b, vol) in enumerate(rows, 1):
+            sign = "+" if b >= 0 else ""
+            lines.append(f"{i}. {sym}: spot={sp:g} fut={fu:g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}")
+        return "\n".join(lines)
+    else:
+        header = f"Basis scan: no pairs ≥ {threshold:.2f}% at MinVol ${min_vol:,.0f}."
+        if _tg_formatters and hasattr(_tg_formatters, "format_no_candidates"):
+            txt = _safe_call(getattr(_tg_formatters, "format_no_candidates", None), header)
+            if isinstance(txt, str) and txt.strip():
+                return txt
+        # дефолт
+        return header + "\nTry lowering threshold or MinVol."
+
+
 def cmd_basis_alert(args: argparse.Namespace) -> int:
     s = load_settings()
     if not _alerts_allowed(s):
@@ -202,29 +258,24 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
         return 1
 
     rows_pass, _ = _basis_rows(min_vol=min_vol, threshold=threshold)
+
+    # опціональна пост-обробка кандидатів через core.alerts (наприклад, cooldown)
+    if _core_alerts and hasattr(_core_alerts, "apply_cooldown"):
+        cooled = _safe_call(getattr(_core_alerts, "apply_cooldown", None), rows_pass, getattr(s, "alert_cooldown_sec", 0))
+        if isinstance(cooled, list):
+            rows_pass = cooled
+
     rows = rows_pass[:limit]
 
-    if not rows:
-        text = f"Basis scan: no pairs ≥ {threshold:.2f}% at MinVol ${min_vol:,.0f}.\nTry lowering threshold or MinVol."
-        print(text)
-        try:
-            send_telegram_message(s.telegram.bot_token, s.telegram.alert_chat_id, text)
-            logger.success("Telegram notice sent (no pairs).")
-        except requests.HTTPError as e:
-            logger.error("Telegram HTTP error: {}", e.response.text if e.response is not None else str(e))
-        except Exception as e:  # noqa: BLE001
-            logger.exception("Telegram send failed: {}", e)
-        return 0
-
-    lines = [f"Top {len(rows)} basis (≥ {threshold:.2f}%, MinVol ${min_vol:,.0f})"]
-    for i, (sym, sp, fu, b, vol) in enumerate(rows, 1):
-        sign = "+" if b >= 0 else ""
-        lines.append(f"{i}. {sym}: spot={sp:g} fut={fu:g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}")
-    text = "\n".join(lines)
+    text = _format_alert_text(rows, threshold, min_vol)
     print(text)
+
     try:
         send_telegram_message(s.telegram.bot_token, s.telegram.alert_chat_id, text)
         logger.success("Telegram alert sent.")
+        # опціонально повідомимо core.alerts про успішну відправку
+        if _core_alerts and hasattr(_core_alerts, "on_alert_sent"):
+            _safe_call(getattr(_core_alerts, "on_alert_sent", None), rows)
     except requests.HTTPError as e:
         logger.error("Telegram HTTP error: {}", e.response.text if e.response is not None else str(e))
     except Exception as e:  # noqa: BLE001
