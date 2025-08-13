@@ -241,6 +241,30 @@ def _format_alert_text(rows: list[tuple[str, float, float, float, float]], thres
         return header + "\nTry lowering threshold or MinVol."
 
 
+# --------- ПРЕВ'Ю АЛЕРТУ (без відправки) ---------
+def preview_message(symbol: str, spot: float, mark: float, vol: float, threshold: float) -> str:
+    """
+    Формує текст повідомлення для однієї пари, використовуючи форматер (якщо є).
+    """
+    if spot <= 0 or mark <= 0:
+        return "Invalid prices for preview."
+    basis = (mark - spot) / spot * 100.0
+    rows = [(symbol, spot, mark, basis, vol)]
+    return _format_alert_text(rows, threshold=threshold, min_vol=vol)
+
+
+def cmd_alerts_preview(args: argparse.Namespace) -> int:
+    s = load_settings()
+    symbol = args.symbol
+    spot = float(args.spot)
+    mark = float(args.mark)
+    vol = float(args.vol)
+    threshold = float(args.threshold if args.threshold is not None else s.alert_threshold_pct)
+    text = preview_message(symbol, spot, mark, vol, threshold)
+    print(text)
+    return 0
+
+
 def cmd_basis_alert(args: argparse.Namespace) -> int:
     s = load_settings()
     if not _alerts_allowed(s):
@@ -540,6 +564,15 @@ def main() -> None:
     p_alert.add_argument("--threshold", type=float, default=None)
     p_alert.add_argument("--min-vol", type=float, default=None)
     p_alert.set_defaults(func=cmd_basis_alert)
+
+    # alerts:preview (формування повідомлення без надсилання)
+    p_prev = sub.add_parser("alerts:preview")
+    p_prev.add_argument("--symbol", required=True, type=str)
+    p_prev.add_argument("--spot", required=True, type=float)
+    p_prev.add_argument("--mark", required=True, type=float)
+    p_prev.add_argument("--vol", type=float, default=0.0, help="Мін. обіг (USD) серед легів для заголовка")
+    p_prev.add_argument("--threshold", type=float, default=None, help="Поріг для заголовка (%, якщо не задано — з .env)")
+    p_prev.set_defaults(func=cmd_alerts_preview)
 
     # telegram test
     p_tg = sub.add_parser("tg:send")
