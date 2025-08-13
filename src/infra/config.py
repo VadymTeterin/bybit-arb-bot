@@ -45,7 +45,7 @@ class AppSettings(BaseSettings):
     allow_symbols: str = ""
     deny_symbols: str = ""
 
-    # ---- WS (фаза 4.2) ----
+    # ---- WS (фаза 4.2+) ----
     ws_enabled: bool = False
 
     # окремі канали для linear та spot
@@ -61,6 +61,10 @@ class AppSettings(BaseSettings):
     # (Залишено для зворотної сумісності — НЕ використовується в 4.2+)
     ws_public_url: str = "wss://stream.bybit.com/v5/public/linear"
     ws_sub_topics: str = "tickers"
+
+    # ---- 4.3: realtime wiring ----
+    rt_meta_refresh_sec: int = 300  # як часто оновлювати vol24h із REST (сек)
+    rt_log_passes: bool = True      # логувати коли символ проходить пороги в реальному часі
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -108,8 +112,5 @@ class AppSettings(BaseSettings):
 
 
 def load_settings() -> AppSettings:
-    """
-    Єдина точка завантаження налаштувань.
-    У тестах monkeypatch переозначає саме цю функцію.
-    """
+    """Єдина точка завантаження налаштувань."""
     return AppSettings()

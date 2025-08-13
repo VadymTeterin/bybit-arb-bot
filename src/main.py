@@ -17,7 +17,7 @@ from src.infra.logging import setup_logging
 from src.infra.notify import send_telegram_message
 from src.storage.persistence import init_db
 
-APP_VERSION = "0.3.0"  # 4.2: dual WS + parsing helpers
+APP_VERSION = "0.4.0"  # 4.3: realtime basis + filters (min price/vol) wiring
 
 
 def cmd_version(_: argparse.Namespace) -> int:
@@ -43,15 +43,16 @@ def cmd_env(_: argparse.Namespace) -> int:
     print("ALLOW_SYMBOLS (list):", ",".join(s.allow_symbols_list))
     print("DENY_SYMBOLS (raw):", s.deny_symbols)
     print("DENY_SYMBOLS (list):", ",".join(s.deny_symbols_list))
-    # WS-параметри (4.2)
+    # WS-параметри (4.2+)
     print("WS_ENABLED:", s.ws_enabled)
     print("WS_PUBLIC_URL_LINEAR:", s.ws_public_url_linear)
     print("WS_PUBLIC_URL_SPOT:", s.ws_public_url_spot)
-    print("WS_SUB_TOPICS_LINEAR (raw):", s.ws_sub_topics_linear)
     print("WS_SUB_TOPICS_LINEAR (list):", ",".join(s.ws_topics_list_linear))
-    print("WS_SUB_TOPICS_SPOT (raw):", s.ws_sub_topics_spot)
     print("WS_SUB_TOPICS_SPOT (list):", ",".join(s.ws_topics_list_spot))
     print("WS_RECONNECT_MAX_SEC:", s.ws_reconnect_max_sec)
+    # 4.3
+    print("RT_META_REFRESH_SEC:", s.rt_meta_refresh_sec)
+    print("RT_LOG_PASSES:", s.rt_log_passes)
     return 0
 
 
@@ -421,12 +422,12 @@ def cmd_price_pair(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---------- WS:RUN (4.2 dual streams) ----------
+# ---------- WS:RUN (4.3 realtime basis + filters) ----------
 def cmd_ws_run(_: argparse.Namespace) -> int:
     """
-    Запуск WS-режиму з двома потоками:
-      - SPOT (tickers.*) -> оновлюємо cache.spot
-      - LINEAR (tickers.*) -> оновлюємо cache.linear_mark
+    Запуск WS-режиму з двома потоками (SPOT/LINEAR), обчислення basis%,
+    застосування простих фільтрів (min price/vol) у реальному часі.
+    (depth-фільтр інтегруємо окремим підкроком 4.3.x)
     """
     s = load_settings()
     if not s.ws_enabled:
@@ -446,26 +447,72 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
     ws_linear = BybitWS(s.ws_public_url_linear, s.ws_topics_list_linear)
     ws_spot = BybitWS(s.ws_public_url_spot, s.ws_topics_list_spot)
 
+    async def refresh_meta_task():
+        """Періодично оновлюємо 24h turnover для символів, щоб працював min_vol фільтр."""
+        client = BybitRest()
+        while True:
+            try:
+                spot_map = client.get_spot_map()
+                lin_map = client.get_linear_map()
+                # мінімум по потокам, як у офлайновому відборі
+                combined = {}
+                common = set(spot_map.keys()) & set(lin_map.keys())
+                for sym in common:
+                    try:
+                        sv = float(spot_map[sym].get("turnover_usd") or 0.0)
+                        lv = float(lin_map[sym].get("turnover_usd") or 0.0)
+                        combined[sym] = min(sv, lv)
+                    except Exception:
+                        continue
+                await cache.update_vol24h_bulk(combined)
+                logger.bind(tag="RTMETA").info(f"Refreshed vol24h for {len(combined)} symbols")
+            except Exception as e:
+                logger.bind(tag="RTMETA").warning(f"Meta refresh failed: {e!r}")
+            await asyncio.sleep(max(30, int(s.rt_meta_refresh_sec)))
+
+    async def maybe_log_realtime_pass(sym: str):
+        # Перевіряємо кандидата за поточними фільтрами
+        rows = await cache.candidates(
+            threshold_pct=s.alert_threshold_pct,
+            min_price=s.min_price,
+            min_vol24h_usd=s.min_vol_24h_usd,
+            allow=s.allow_symbols_list,
+            deny=s.deny_symbols_list,
+        )
+        for rsym, basis in rows[:10]:
+            if rsym == sym:
+                if s.rt_log_passes:
+                    sign = "+" if basis >= 0 else ""
+                    logger.bind(tag="RT").success(f"{rsym} basis={sign}{basis:.2f}%  (passes filters)")
+                break
+
+    import math
+
     async def on_message_spot(msg: dict):
         for item in iter_ticker_entries(msg):
             sym = item.get("symbol")
             last = item.get("last")
             if sym and last is not None:
-                await cache.update(sym, spot=last)
+                bp = await cache.update(sym, spot=last)
                 logger.bind(tag="WS.SPOT").debug(f"{sym} spot={last}")
+                if not math.isnan(bp):
+                    await maybe_log_realtime_pass(sym)
 
     async def on_message_linear(msg: dict):
         for item in iter_ticker_entries(msg):
             sym = item.get("symbol")
             mark = item.get("mark")
             if sym and mark is not None:
-                await cache.update(sym, linear_mark=mark)
+                bp = await cache.update(sym, linear_mark=mark)
                 logger.bind(tag="WS.LINEAR").debug(f"{sym} mark={mark}")
+                if not math.isnan(bp):
+                    await maybe_log_realtime_pass(sym)
 
     async def runner():
         await asyncio.gather(
             ws_spot.run(on_message_spot),
             ws_linear.run(on_message_linear),
+            refresh_meta_task(),
         )
 
     try:
@@ -542,7 +589,7 @@ def main() -> None:
     p_sel.add_argument("--min-price", type=float, default=None)  # якщо None — з .env
     p_sel.add_argument(
         "--cooldown-sec",
-        type=int,
+        int,
         default=None,
         help="Переважує ALERT_COOLDOWN_SEC з .env",
     )

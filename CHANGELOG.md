@@ -37,7 +37,7 @@
 - [2025-08-10] Реалізовано команду `price:pair` і тести `tests/test_price_pair.py`.
 
 ## Фаза 3 — Крок 3.4: Фільтр глибини стакану (depth filter)
-- [2025-08-13] Додано `src/core/filters/depth.py`, оновлено `rest.py`, інтегровано у `selector.py`.
+- [2025-08-13] Додано `src/core/filters/depth.py`, оновлено REST-методи, інтегровано у `selector.py`.
 - [2025-08-13] Оновлено конфіг (`src/infra/config.py`, `.env.example`) новими параметрами depth.
 - [2025-08-13] Додано тести: `tests/test_depth_filter.py`, `tests/test_selector_with_depth.py`.
 
@@ -53,3 +53,10 @@
 - [2025-08-13] `ws:run` запускає обидва клієнти паралельно; оновлює `QuoteCache` (spot/linear_mark).
 - [2025-08-13] Додано тести `tests/test_ws_parse_payload.py`.
 - [2025-08-13] Оновлено `.env.example`, `src/infra/config.py`, `src/exchanges/bybit/ws.py`, `src/main.py`.
+
+## Фаза 4 — Крок 4.3: Real-time basis + фільтри
+- [2025-08-13] Додано обчислення basis% у реальному часі при оновленні кеша (spot/linear).
+- [2025-08-13] Додано періодичне оновлення 24h turnover з REST для онлайн-фільтра `min_vol_24h_usd`.
+- [2025-08-13] Інтегровано фільтри у стрімовий режим: `threshold`, `min_price`, `min_vol_24h_usd`.
+- [2025-08-13] Оновлено `src/main.py`, `src/core/cache.py`, `src/infra/config.py`.
+- [2025-08-13] Додано тести: `tests/test_realtime_basis.py`.
