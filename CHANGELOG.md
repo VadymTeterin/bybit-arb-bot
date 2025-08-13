@@ -1,9 +1,4 @@
-﻿
----
-
-## `CHANGELOG.md`
-```markdown
-# CHANGELOG
+﻿# CHANGELOG
 
 ## Фаза 0 — Підготовка середовища
 - [2025-08-10 12:55] Створено структуру проєкту згідно з інструкціями.
@@ -32,47 +27,29 @@
   - Telegram токен та Bybit ключ зчитуються успішно.
 
 ## Фаза 3 — Крок 2: Фільтри ліквідності + репорти
-- [2025-08-10] Додано модуль `src/core/filters/liquidity.py`:
-  - Фільтр за мінімальним обсягом торгів (`min_vol_24h_usd`).
-  - Фільтр за мінімальною ціною (`min_price`).
-  - Можливість легко додавати нові фільтри.
-- [2025-08-10] Додано модуль `src/core/report.py`:
-  - Генерація топ-N монет за basis% з історії сигналів у SQLite.
-  - Форматований вивід для Telegram.
-- [2025-08-10] Додано тести:
-  - `tests/test_liquidity_filters.py` — покриває роботу фільтрів.
-  - `tests/test_report.py` — перевіряє генерацію звітів.
-- [2025-08-10] Оновлено `main.py`:
-  - Додано команди `report:print` (вивід у термінал) та `report:send` (відправка у Telegram).
-  - Інтегровано ініціалізацію SQLite на старті бота.
-- [2025-08-10] Перевірено роботу:
-  - `report:print` — показує звіт у терміналі.
-  - `report:send` — надсилає той самий звіт у Telegram.
-  - Перевірка з тестовими даними у `seed_signals.py` — звіт формується коректно.
+- [2025-08-10] Додано модуль `src/core/filters/liquidity.py`.
+- [2025-08-10] Додано модуль `src/core/report.py`.
+- [2025-08-10] Додано тести: `tests/test_liquidity_filters.py`, `tests/test_report.py`.
+- [2025-08-10] Оновлено `main.py`: команди `report:print`, `report:send`; ініціалізація SQLite.
+- [2025-08-10] Перевірено роботу звітів (термінал + Telegram).
 
 ## Фаза 3 — Крок 2.1: Цінові пари (price:pair) + тести
-- [2025-08-10] Додано функціонал отримання парних цін SPOT і LINEAR ф'ючерсів з Bybit.
-- [2025-08-10] Реалізовано команду `price:pair` у `main.py` з підтримкою вибору символів.
-- [2025-08-10] Додано тести:
-  - `tests/test_price_pair.py` — перевіряє:
-    - Пару для одного символу.
-    - Пару для кількох символів.
-    - Пару з дефолтного списку.
-    - Повну відсутність даних у SPOT і LINEAR.
-- [2025-08-10] Всі тести (`pytest`) проходять успішно.
+- [2025-08-10] Реалізовано команду `price:pair` і тести `tests/test_price_pair.py`.
 
 ## Фаза 3 — Крок 3.4: Фільтр глибини стакану (depth filter)
-- [2025-08-13] Додано модуль `src/core/filters/depth.py`:
-  - Обчислення глибини у $ в межах ±`DEPTH_WINDOW_PCT` від середньої ціни.
-  - Перевірка мінімального обсягу з обох сторін (`MIN_DEPTH_USD`).
-  - Перевірка мінімальної кількості рівнів (`MIN_DEPTH_LEVELS`).
-- [2025-08-13] Оновлено `src/exchanges/bybit/rest.py`:
-  - Методи `get_orderbook_spot` та `get_orderbook_linear` з кешем.
-- [2025-08-13] Оновлено `src/core/selector.py`:
-  - Інтегровано depth-фільтр із зворотною сумісністю для старих тестів.
-- [2025-08-13] Оновлено `src/infra/config.py` та `.env.example`:
-  - Нові параметри: `MIN_DEPTH_USD`, `DEPTH_WINDOW_PCT`, `MIN_DEPTH_LEVELS`.
-- [2025-08-13] Додано тести:
-  - `tests/test_depth_filter.py` — юніт-тести для модуля depth.
-  - `tests/test_selector_with_depth.py` — інтеграційний тест з фільтром глибини.
-- [2025-08-13] Всі тести проходять (`pytest -q` → зелено).
+- [2025-08-13] Додано `src/core/filters/depth.py`, оновлено `rest.py`, інтегровано у `selector.py`.
+- [2025-08-13] Оновлено конфіг (`src/infra/config.py`, `.env.example`) новими параметрами depth.
+- [2025-08-13] Додано тести: `tests/test_depth_filter.py`, `tests/test_selector_with_depth.py`.
+
+## Фаза 4 — Крок 4.1: WS skeleton
+- [2025-08-13] Додано `src/exchanges/bybit/ws.py` (автоперепідключення) та `src/core/cache.py`.
+- [2025-08-13] Додано базові тести: `tests/test_backoff.py`, `tests/test_cache_basic.py`.
+- [2025-08-13] Оновлено `.env.example`, `src/infra/config.py`, `src/main.py` — команда `ws:run` (скелет).
+- [2025-08-13] Всі тести пройшли успішно.
+
+## Фаза 4 — Крок 4.2: WS parsing + cache update
+- [2025-08-13] Розведено два WS потоки: `SPOT` і `LINEAR` (окремі URL та топіки).
+- [2025-08-13] Додано парсинг `tickers.*` з нормалізацією `E4/E8 → float`.
+- [2025-08-13] `ws:run` запускає обидва клієнти паралельно; оновлює `QuoteCache` (spot/linear_mark).
+- [2025-08-13] Додано тести `tests/test_ws_parse_payload.py`.
+- [2025-08-13] Оновлено `.env.example`, `src/infra/config.py`, `src/exchanges/bybit/ws.py`, `src/main.py`.

@@ -17,7 +17,7 @@ from src.infra.logging import setup_logging
 from src.infra.notify import send_telegram_message
 from src.storage.persistence import init_db
 
-APP_VERSION = "0.2.0"  # bump for WS skeleton
+APP_VERSION = "0.3.0"  # 4.2: dual WS + parsing helpers
 
 
 def cmd_version(_: argparse.Namespace) -> int:
@@ -43,11 +43,14 @@ def cmd_env(_: argparse.Namespace) -> int:
     print("ALLOW_SYMBOLS (list):", ",".join(s.allow_symbols_list))
     print("DENY_SYMBOLS (raw):", s.deny_symbols)
     print("DENY_SYMBOLS (list):", ",".join(s.deny_symbols_list))
-    # WS-параметри
+    # WS-параметри (4.2)
     print("WS_ENABLED:", s.ws_enabled)
-    print("WS_PUBLIC_URL:", s.ws_public_url)
-    print("WS_SUB_TOPICS (raw):", s.ws_sub_topics)
-    print("WS_SUB_TOPICS (list):", ",".join(s.ws_topics_list))
+    print("WS_PUBLIC_URL_LINEAR:", s.ws_public_url_linear)
+    print("WS_PUBLIC_URL_SPOT:", s.ws_public_url_spot)
+    print("WS_SUB_TOPICS_LINEAR (raw):", s.ws_sub_topics_linear)
+    print("WS_SUB_TOPICS_LINEAR (list):", ",".join(s.ws_topics_list_linear))
+    print("WS_SUB_TOPICS_SPOT (raw):", s.ws_sub_topics_spot)
+    print("WS_SUB_TOPICS_SPOT (list):", ",".join(s.ws_topics_list_spot))
     print("WS_RECONNECT_MAX_SEC:", s.ws_reconnect_max_sec)
     return 0
 
@@ -418,12 +421,12 @@ def cmd_price_pair(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---------- WS:RUN (скелет 4.1) ----------
+# ---------- WS:RUN (4.2 dual streams) ----------
 def cmd_ws_run(_: argparse.Namespace) -> int:
     """
-    Скелет запуску WS-режиму. Потрібні файли:
-      - src/exchanges/bybit/ws.py  (клас BybitWS з автоперепідключенням)
-      - src/core/cache.py          (QuoteCache)
+    Запуск WS-режиму з двома потоками:
+      - SPOT (tickers.*) -> оновлюємо cache.spot
+      - LINEAR (tickers.*) -> оновлюємо cache.linear_mark
     """
     s = load_settings()
     if not s.ws_enabled:
@@ -432,24 +435,38 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
 
     try:
         import asyncio
-        from src.exchanges.bybit.ws import BybitWS
+        from src.exchanges.bybit.ws import BybitWS, iter_ticker_entries
         from src.core.cache import QuoteCache
     except Exception as e:  # noqa: BLE001
         print("WS components are missing. Please add ws.py and cache.py:", str(e))
         return 1
 
     cache = QuoteCache()
-    ws = BybitWS(s.ws_public_url, s.ws_topics_list)
 
-    async def on_message(msg: dict):
-        # TODO: 4.2 — реальний парсинг Bybit payload
-        # Поки що — просто лог теми/наявності data
-        topic = msg.get("topic", "unknown")
-        has_data = "data" in msg
-        logger.bind(tag="WS").debug(f"msg topic={topic} data={has_data}")
+    ws_linear = BybitWS(s.ws_public_url_linear, s.ws_topics_list_linear)
+    ws_spot = BybitWS(s.ws_public_url_spot, s.ws_topics_list_spot)
+
+    async def on_message_spot(msg: dict):
+        for item in iter_ticker_entries(msg):
+            sym = item.get("symbol")
+            last = item.get("last")
+            if sym and last is not None:
+                await cache.update(sym, spot=last)
+                logger.bind(tag="WS.SPOT").debug(f"{sym} spot={last}")
+
+    async def on_message_linear(msg: dict):
+        for item in iter_ticker_entries(msg):
+            sym = item.get("symbol")
+            mark = item.get("mark")
+            if sym and mark is not None:
+                await cache.update(sym, linear_mark=mark)
+                logger.bind(tag="WS.LINEAR").debug(f"{sym} mark={mark}")
 
     async def runner():
-        await ws.run(on_message)
+        await asyncio.gather(
+            ws_spot.run(on_message_spot),
+            ws_linear.run(on_message_linear),
+        )
 
     try:
         asyncio.run(runner())

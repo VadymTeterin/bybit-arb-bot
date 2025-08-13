@@ -42,16 +42,25 @@ class AppSettings(BaseSettings):
     bybit: BybitSettings = BybitSettings()
 
     # allow/deny як СИРОВІ РЯДКИ з .env (CSV або JSON-масив).
-    # Не робимо List[str], щоб .env-провайдер не робив json.loads сам.
     allow_symbols: str = ""
     deny_symbols: str = ""
 
-    # ---- WS (фаза 4.1) ----
+    # ---- WS (фаза 4.2) ----
     ws_enabled: bool = False
-    ws_public_url: str = "wss://stream.bybit.com/v5/public/linear"
-    # CSV рядок, напр. "tickers" або "tickers.BTCUSDT,tickers.ETHUSDT"
-    ws_sub_topics: str = "tickers"
+
+    # окремі канали для linear та spot
+    ws_public_url_linear: str = "wss://stream.bybit.com/v5/public/linear"
+    ws_public_url_spot: str = "wss://stream.bybit.com/v5/public/spot"
+
+    # CSV рядки топіків (наприклад: "tickers" або "tickers.BTCUSDT,tickers.ETHUSDT")
+    ws_sub_topics_linear: str = "tickers"
+    ws_sub_topics_spot: str = "tickers"
+
     ws_reconnect_max_sec: int = 30
+
+    # (Залишено для зворотної сумісності — НЕ використовується в 4.2+)
+    ws_public_url: str = "wss://stream.bybit.com/v5/public/linear"
+    ws_sub_topics: str = "tickers"
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -83,6 +92,16 @@ class AppSettings(BaseSettings):
     def deny_symbols_list(self) -> List[str]:
         return self._parse_symbols(self.deny_symbols)
 
+    # нові: окремі списки топіків
+    @property
+    def ws_topics_list_linear(self) -> List[str]:
+        return self._parse_symbols(self.ws_sub_topics_linear)
+
+    @property
+    def ws_topics_list_spot(self) -> List[str]:
+        return self._parse_symbols(self.ws_sub_topics_spot)
+
+    # старий метод (не використовується в 4.2, але лишаємо)
     @property
     def ws_topics_list(self) -> List[str]:
         return self._parse_symbols(self.ws_sub_topics)

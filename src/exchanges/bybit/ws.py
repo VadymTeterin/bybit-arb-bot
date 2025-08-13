@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import random
-from typing import Awaitable, Callable, Iterable, Optional
+from typing import Awaitable, Callable, Dict, Iterable, Iterator, List, Optional
 
 import aiohttp
 from loguru import logger
@@ -98,3 +98,81 @@ class BybitWS:
         self._stop.set()
         if self._session and not self._session.closed:
             await self._session.close()
+
+
+# ---------------------------
+#   УТИЛІТИ ПАРСИНГУ TICKERS
+# ---------------------------
+
+def _to_float(x) -> Optional[float]:
+    if x is None:
+        return None
+    try:
+        return float(x)
+    except Exception:
+        return None
+
+
+def _scale_from_key(key: str) -> float:
+    # ..E4 -> 1e-4, ..E8 -> 1e-8
+    k = key.lower()
+    if k.endswith("e4"):
+        return 1e-4
+    if k.endswith("e8"):
+        return 1e-8
+    return 1.0
+
+
+def _extract_first_number(obj: Dict, keys: List[str]) -> Optional[float]:
+    """
+    Повертає перше знайдене числове значення за списком ключів.
+    Підтримує *_E4/*_E8 (ділення на 1e4/1e8).
+    """
+    for k in keys:
+        if k in obj and obj[k] is not None:
+            val = obj[k]
+            scale = _scale_from_key(k)
+            f = _to_float(val)
+            if f is not None:
+                return f * scale
+    return None
+
+
+def _symbol_from_topic(topic: str) -> Optional[str]:
+    # "tickers.BTCUSDT" -> "BTCUSDT"
+    if not topic:
+        return None
+    parts = topic.split(".")
+    return parts[-1] if len(parts) > 1 else None
+
+
+def iter_ticker_entries(msg: Dict) -> Iterator[Dict[str, Optional[float]]]:
+    """
+    Генерує елементи виду {"symbol": str, "last": float|None, "mark": float|None}
+    з повідомлення Bybit v5 для теми tickers.* (spot/linear).
+    """
+    if not isinstance(msg, dict):
+        return
+    topic = msg.get("topic", "") or ""
+    data = msg.get("data")
+
+    # Деякі повідомлення мають data як список, інші — як dict
+    rows: List[Dict] = []
+    if isinstance(data, list):
+        rows = [d for d in data if isinstance(d, dict)]
+    elif isinstance(data, dict):
+        rows = [data]
+
+    for row in rows:
+        sym = row.get("symbol") or _symbol_from_topic(topic)
+        last = _extract_first_number(row, ["lastPrice", "lastPriceE4", "lastPriceE8"])
+        mark = _extract_first_number(row, ["markPrice", "markPriceE4", "markPriceE8"])
+        if sym:
+            yield {"symbol": sym, "last": last, "mark": mark}
+
+
+__all__ = [
+    "BybitWS",
+    "exp_backoff_with_jitter",
+    "iter_ticker_entries",
+]
