@@ -1,5 +1,5 @@
-﻿from __future__ import annotations
-import os
+from __future__ import annotations
+
 from typing import Literal, List
 
 from pydantic import BaseModel
@@ -30,8 +30,8 @@ class AppSettings(BaseSettings):
     top_n_report: int = 3
 
     # ---- depth-фільтр (із фази 3.4) ----
-    min_depth_usd: float = 1_000_000.0   # мінімальна глибина ($) у межах depth_window_pct
-    depth_window_pct: float = 0.5        # ширина вікна у %, 0.5 => 0.5%
+    min_depth_usd: float = 1_000_000.0   # мінімальна глибина ($) у межах ±depth_window_pct
+    depth_window_pct: float = 0.5        # ширина вікна у %, 0.5 => ±0.5%
     min_depth_levels: int = 30           # мінімальна сумарна к-сть рівнів (bid+ask) у вікні
 
     # прапор надсилання алертів
@@ -58,7 +58,7 @@ class AppSettings(BaseSettings):
 
     ws_reconnect_max_sec: int = 30
 
-    # (Залишено для зворотної сумісності  НЕ використовується в 4.2+)
+    # (Залишено для зворотної сумісності — НЕ використовується в 4.2+)
     ws_public_url: str = "wss://stream.bybit.com/v5/public/linear"
     ws_sub_topics: str = "tickers"
 
@@ -114,12 +114,11 @@ class AppSettings(BaseSettings):
 def load_settings() -> AppSettings:
     """Єдина точка завантаження налаштувань."""
     return AppSettings()
-
+import os
 
 # Telegram alerts config (step-4.5)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 TELEGRAM_COOLDOWN_SECONDS = int(os.getenv("TELEGRAM_COOLDOWN_SECONDS", "30"))
-
 # Feature flag for Telegram notifications
 TELEGRAM_ENABLED = os.getenv("TELEGRAM_ENABLED", "0").strip().lower() in ("1", "true", "yes", "y")

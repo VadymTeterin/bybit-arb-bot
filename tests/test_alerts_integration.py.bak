@@ -1,4 +1,7 @@
-﻿from types import SimpleNamespace
+import types
+from types import SimpleNamespace
+
+import builtins
 import importlib
 
 # Ми тестуємо, що main використовує форматери, якщо вони доступні,
@@ -86,4 +89,3 @@ def test_alerts_formatter_used_when_no_rows(monkeypatch):
     rc = m.cmd_basis_alert(ns)
     assert rc == 0
     assert sent["text"] == "FAKE_NO_ROWS"
-

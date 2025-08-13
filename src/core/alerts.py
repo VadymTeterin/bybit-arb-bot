@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import math
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Awaitable, Callable, Optional, Dict
 
 from src.telegram.formatters import format_signal
