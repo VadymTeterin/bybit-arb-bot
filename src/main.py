@@ -17,7 +17,7 @@ from src.infra.logging import setup_logging
 from src.infra.notify import send_telegram_message
 from src.storage.persistence import init_db
 
-APP_VERSION = "0.1.5"  # bump
+APP_VERSION = "0.2.0"  # bump for WS skeleton
 
 
 def cmd_version(_: argparse.Namespace) -> int:
@@ -36,10 +36,19 @@ def cmd_env(_: argparse.Namespace) -> int:
     print("TG_CHAT_ID:", s.telegram.alert_chat_id or "")
     print("TELEGRAM_TOKEN set:", bool(s.telegram.bot_token))
     print("BYBIT_API_KEY set:", bool(s.bybit.api_key))
-    # інфо-поля (можуть бути відсутні у старих конфігах)
-    print("ENABLE_ALERTS:", getattr(s, "enable_alerts", True))
-    print("ALLOW_SYMBOLS:", ",".join(getattr(s, "allow_symbols", []) or []))
-    print("DENY_SYMBOLS:", ",".join(getattr(s, "deny_symbols", []) or []))
+    # інфо-поля
+    print("ENABLE_ALERTS:", s.enable_alerts)
+    # виводимо сирі рядки та вже розпарсені списки
+    print("ALLOW_SYMBOLS (raw):", s.allow_symbols)
+    print("ALLOW_SYMBOLS (list):", ",".join(s.allow_symbols_list))
+    print("DENY_SYMBOLS (raw):", s.deny_symbols)
+    print("DENY_SYMBOLS (list):", ",".join(s.deny_symbols_list))
+    # WS-параметри
+    print("WS_ENABLED:", s.ws_enabled)
+    print("WS_PUBLIC_URL:", s.ws_public_url)
+    print("WS_SUB_TOPICS (raw):", s.ws_sub_topics)
+    print("WS_SUB_TOPICS (list):", ",".join(s.ws_topics_list))
+    print("WS_RECONNECT_MAX_SEC:", s.ws_reconnect_max_sec)
     return 0
 
 
@@ -174,7 +183,7 @@ def cmd_basis_scan(args: argparse.Namespace) -> int:
 
 def _alerts_allowed(s) -> bool:
     """Безпечна перевірка прапора enable_alerts (за замовчуванням True)."""
-    return bool(getattr(s, "enable_alerts", True))
+    return bool(s.enable_alerts)
 
 
 def cmd_basis_alert(args: argparse.Namespace) -> int:
@@ -320,17 +329,11 @@ def cmd_report_send(args: argparse.Namespace) -> int:
         return 2
 
 
-# -----------------------------------------
-
-
 # ---------- SELECTOR SAVE ----------
 def cmd_select_save(args: argparse.Namespace) -> int:
     """
     Запускає відбір SPOT vs LINEAR, застосовує фільтри та cooldown,
     зберігає у SQLite топ N записів і друкує підсумок.
-
-    Параметр --cooldown-sec (за бажанням) переважує ALERT_COOLDOWN_SEC з .env.
-    Для тестів можна ставити 0, щоб зберігати навіть ті самі символи підряд.
     """
     s = load_settings()
     limit = int(args.limit)
@@ -365,9 +368,6 @@ def cmd_select_save(args: argparse.Namespace) -> int:
     return 0
 
 
-# -----------------------------------------
-
-
 # ---------- Вивід поточних цін для пари ----------
 def create_bybit_client() -> BybitRest:
     """Фабрика клієнта Bybit для можливості підміни у тестах."""
@@ -377,10 +377,6 @@ def create_bybit_client() -> BybitRest:
 def cmd_price_pair(args: argparse.Namespace) -> int:
     """
     Друкує поточну ціну спот та ф'ючерса (linear) по заданих символах.
-    Використання:
-      python -m src.main price:pair                          # ETHUSDT, BTCUSDT
-      python -m src.main price:pair --symbol ETHUSDT
-      python -m src.main price:pair -s ETHUSDT -s BTCUSDT
     """
     client = create_bybit_client()
     spot_map = client.get_spot_map()
@@ -420,6 +416,50 @@ def cmd_price_pair(args: argparse.Namespace) -> int:
     if not printed_any:
         print("No data to show.")
     return 0
+
+
+# ---------- WS:RUN (скелет 4.1) ----------
+def cmd_ws_run(_: argparse.Namespace) -> int:
+    """
+    Скелет запуску WS-режиму. Потрібні файли:
+      - src/exchanges/bybit/ws.py  (клас BybitWS з автоперепідключенням)
+      - src/core/cache.py          (QuoteCache)
+    """
+    s = load_settings()
+    if not s.ws_enabled:
+        print("WS is disabled by config (set WS_ENABLED=1 in .env).")
+        return 0
+
+    try:
+        import asyncio
+        from src.exchanges.bybit.ws import BybitWS
+        from src.core.cache import QuoteCache
+    except Exception as e:  # noqa: BLE001
+        print("WS components are missing. Please add ws.py and cache.py:", str(e))
+        return 1
+
+    cache = QuoteCache()
+    ws = BybitWS(s.ws_public_url, s.ws_topics_list)
+
+    async def on_message(msg: dict):
+        # TODO: 4.2 — реальний парсинг Bybit payload
+        # Поки що — просто лог теми/наявності data
+        topic = msg.get("topic", "unknown")
+        has_data = "data" in msg
+        logger.bind(tag="WS").debug(f"msg topic={topic} data={has_data}")
+
+    async def runner():
+        await ws.run(on_message)
+
+    try:
+        asyncio.run(runner())
+        return 0
+    except KeyboardInterrupt:
+        print("WS stopped by user.")
+        return 0
+    except Exception as e:  # noqa: BLE001
+        logger.exception("WS run failed: {}", e)
+        return 2
 
 
 # -------------------------------------------------------
@@ -501,6 +541,9 @@ def main() -> None:
     )
     p_pp.set_defaults(func=cmd_price_pair)
 
+    # --- ws:run ---
+    sub.add_parser("ws:run").set_defaults(func=cmd_ws_run)
+
     args = parser.parse_args()
 
     # логування
@@ -510,9 +553,7 @@ def main() -> None:
     # --- ініціалізація SQLite БД на старті ---
     try:
         s = load_settings()
-        Path(s.db_path).parent.mkdir(
-            parents=True, exist_ok=True
-        )  # гарантуємо існування папки data/
+        Path(s.db_path).parent.mkdir(parents=True, exist_ok=True)
         init_db()
         logger.success("SQLite initialized at {}", s.db_path)
     except Exception as e:  # noqa: BLE001
