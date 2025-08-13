@@ -61,3 +61,24 @@ def format_signal(
         f"*24h Vol*: { _fmt_usd(vol24h_usd) }\n"
         f"*Time*: {_fmt_time(ts)}"
     )
+from datetime import datetime
+
+def format_arbitrage_alert(symbol_a: str, symbol_b: str, spread_pct: float, vol_24h: float, basis: float) -> str:
+    """
+    Форматує текст повідомлення для Telegram у стилі:
+     Arbitrage Signal
+     2025-08-14 12:34:56 UTC
+     Pair: BTCUSDT  BTCUSDT:PERP
+     Spread: 0.85%
+     24h Vol: 123,456,789
+     Basis: 0.0012
+    """
+    ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+    return (
+        f" <b>Arbitrage Signal</b>\n"
+        f" {ts}\n"
+        f" Pair: <b>{symbol_a}</b>  <b>{symbol_b}</b>\n"
+        f" Spread: <b>{spread_pct:.2f}%</b>\n"
+        f" 24h Vol: <b>{vol_24h:,.0f}</b>\n"
+        f" Basis: <b>{basis:.4f}</b>\n"
+    )
