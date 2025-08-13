@@ -8,8 +8,8 @@ from typing import Dict, Optional, Tuple
 
 class QuoteCache:
     """
-    Потокобезпечний кеш останніх котирувань.
-    Зберігає: symbol -> {spot, linear_mark, ts}
+    Асинхронний потокобезпечний кеш котирувань:
+      symbol -> {spot, linear_mark, ts}
     """
 
     def __init__(self) -> None:
@@ -38,4 +38,5 @@ class QuoteCache:
 
     async def snapshot(self) -> Dict[str, Tuple[float, float, float]]:
         async with self._lock:
+            # клон без посилань
             return {k: (v["spot"], v["linear_mark"], v["ts"]) for k, v in self._data.items()}
