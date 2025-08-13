@@ -11,10 +11,10 @@ except Exception:  # noqa: BLE001
 
 
 class TelegramNotifier:
-    \"\"\"
+    """
     Невтручальний адаптер для відправки повідомлень у Telegram.
     Працює якщо є токен і chat_id: з плоских ключів або з AppSettings().telegram.
-    \"\"\"
+    """
 
     def __init__(
         self,
@@ -30,7 +30,7 @@ class TelegramNotifier:
         _chat  = chat_id or config.TELEGRAM_CHAT_ID
         _cooldown = cooldown_s if cooldown_s is not None else config.TELEGRAM_COOLDOWN_SECONDS
 
-        # 2) якщо щось відсутнє  fallback на nested (.env -> AppSettings().telegram)
+        # 2) якщо щось відсутнє — fallback на nested (.env -> AppSettings().telegram)
         if (not _token or not _chat) and load_settings:
             try:
                 s = load_settings()
