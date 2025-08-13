@@ -29,7 +29,7 @@ except Exception:  # noqa: BLE001
     _core_alerts = None
 
 
-APP_VERSION = "0.4.2"  # 4.4: інтеграція core/alerts + telegram/formatters (опціонально)
+APP_VERSION = "0.4.3"  # 4.4: інтеграція core/alerts + telegram/formatters + alerts:preview
 
 
 def _safe_call(fn, *args, **kwargs):
@@ -258,7 +258,8 @@ def cmd_alerts_preview(args: argparse.Namespace) -> int:
     symbol = args.symbol
     spot = float(args.spot)
     mark = float(args.mark)
-    vol = float(args.vol)
+    # підтримка обох прапорців: --vol і --min-vol
+    vol = float(args.min_vol if args.min_vol is not None else 0.0)
     threshold = float(args.threshold if args.threshold is not None else s.alert_threshold_pct)
     text = preview_message(symbol, spot, mark, vol, threshold)
     print(text)
@@ -570,8 +571,11 @@ def main() -> None:
     p_prev.add_argument("--symbol", required=True, type=str)
     p_prev.add_argument("--spot", required=True, type=float)
     p_prev.add_argument("--mark", required=True, type=float)
-    p_prev.add_argument("--vol", type=float, default=0.0, help="Мін. обіг (USD) серед легів для заголовка")
-    p_prev.add_argument("--threshold", type=float, default=None, help="Поріг для заголовка (%, якщо не задано — з .env)")
+    # один dest для двох прапорців: --vol і --min-vol (заради сумісності з тестами/скриптами)
+    p_prev.add_argument("--vol", "--min-vol", dest="min_vol", type=float, default=0.0,
+                        help="Мін. обіг (USD) серед легів для заголовка")
+    p_prev.add_argument("--threshold", type=float, default=None,
+                        help="Поріг для заголовка (%, якщо не задано — з .env)")
     p_prev.set_defaults(func=cmd_alerts_preview)
 
     # telegram test
