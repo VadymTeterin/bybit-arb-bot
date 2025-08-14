@@ -27,3 +27,7 @@ seed_signals.py
 .coverage
 app_console.log
 files.txt
+
+exports/*.csv# CSV exports
+exports/
+*.csv
