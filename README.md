@@ -1,89 +1,41 @@
-# Bybit Arbitrage Bot (MVP)
+# Bybit Arbitrage Bot
 
-## Опис
-Бот для моніторингу цін на Bybit (SPOT та ф'ючерси) та пошуку можливостей арбітражу.  
-Реалізовані функції:
-- Перевірка з'єднання з API Bybit
-- Отримання топових торгових пар за різницею SPOT / Futures
-- Сканування та збереження сигналів у SQLite
-- Надсилання алертів у Telegram
-- Формування та відправка звітів
-- Фільтрація торгових пар через allow/deny списки
-- CLI-команда `price:pair` для перегляду цін по символах
+Бот для моніторингу арбітражних можливостей між спотом та ф'ючерсами на біржі Bybit.
 
-**Нові параметри підкроку 3.4 (depth-фільтр):**
-MIN_DEPTH_USD=1000000        # мінімальна глибина стакану в $
-DEPTH_WINDOW_PCT=0.5         # вікно для розрахунку глибини у %
-MIN_DEPTH_LEVELS=30          # мінімальна кількість рівнів у вікні
+## Фази розробки
 
----
+### Phase #1 — Початкове налаштування
+1.1 Ініціалізація проєкту  
+1.2 Налаштування логування
 
-## Швидкий старт (Windows 11)
+### Phase #2 — Підключення біржі Bybit
+2.1 REST API  
+2.2 WebSocket API
 
-1. **Створити віртуальне середовище**
-   ```powershell
-   py -3.11 -m venv .venv
-   ```
+### Phase #3 — Логіка обчислення Basis
+3.1 Формули та відбір  
+3.2 Фільтрація результатів
 
-2. **Активувати середовище**   
-.\.venv\Scripts\Activate.ps1
+### Phase #4 — Інтеграція Telegram
+4.1 Форматування повідомлень  
+4.2 Відправка повідомлень  
+4.3 Команда basis:alert  
+4.4 Тести форматерів  
+4.5 Інтеграційні тести
 
-3. **Оновити pip**
-pip install --upgrade pip
+### Phase #5 — Funding та WS-алерти
+5.1 Funding API  
+5.2 Відображення funding у CLI  
+5.3 WS-алерти з Funding
 
-4. **Встановити залежності**
-pip install -r requirements.txt
+## Запуск
+```powershell
+# Активація віртуального середовища
+& .venv/Scripts/Activate.ps1
 
-5. **Налаштувати .env**
--Скопіювати:
-    copy .env.example .env
+# Запуск WebSocket клієнта
+python -m src.main ws:run
 
--Заповнити ключі API, токен Telegram, параметри фільтрів.
-
-6. **Перевірити код**
-pytest -q
-ruff .
-black .
-isort .
-
-`Приклади CLI-команд`
-**Перевірка з'єднання з Bybit**
-python -m src.main bybit:ping
-python3 -m src.main bybit:ping
-
-**Отримати топ-5 пар за різницею SPOT/Futures**
-python -m src.main bybit:top --limit 5
-python3 -m src.main bybit:top --limit 5
-
-**Сканування сигналів і збереження в базу**
-python -m src.main basis:scan
-python3 -m src.main basis:scan
-
-**Надіслати звіт у Telegram (за останні 24 години)**
-python -m src.main report:send --hours 24
-python3 -m src.main report:send --hours 24
-
-**Перегляд цін по одній парі**
-python -m src.main price:pair --symbol ETHUSDT
-
----
-
-## Приклад отримання Funding (локальна перевірка)
-> Тимчасовий приклад для налагодження (без змін в CLI):
-```python
-from src.exchanges.bybit.rest import BybitRest
-from src.telegram.formatters import format_signal
-c = BybitRest()
-f = c.get_prev_funding("BTCUSDT")
-txt = format_signal(
-    symbol="BTCUSDT",
-    spot_price=121_000.0,
-    mark_price=121_500.0,
-    basis_pct=(121_500.0-121_000.0)/121_000.0*100.0,
-    vol24h_usd=5_000_000.0,
-    ts=None,
-    funding_rate=f["funding_rate"],
-    next_funding_time=f["next_funding_time"],
-)
-print(txt)
+# Попередній перегляд алерту
+python -m src.main alerts:preview --symbol BTCUSDT --spot 62850.12 --mark 62823.44 --vol 2100000000
 ```
