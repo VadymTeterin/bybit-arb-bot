@@ -23,3 +23,7 @@ data/*.db
 /data/*.db
 seed_signals.py
 seed_signals.py
+
+.coverage
+app_console.log
+files.txt
