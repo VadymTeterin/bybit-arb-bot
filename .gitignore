@@ -31,3 +31,4 @@ files.txt
 exports/*.csv# CSV exports
 exports/
 *.csv
+.env
