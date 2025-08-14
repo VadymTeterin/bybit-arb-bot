@@ -5,6 +5,7 @@ import argparse
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
+from datetime import datetime, timezone  # ← додано для форматування UTC часу
 
 import requests
 from loguru import logger
@@ -266,6 +267,19 @@ def preview_message(symbol: str, spot: float, mark: float, vol: float, threshold
     return _format_alert_text(rows, threshold=threshold, min_vol=vol)
 
 
+def _fmt_pct(x: float | None) -> str:
+    return f"{x*100:.2f}%" if x is not None else "n/a"
+
+
+def _fmt_ts(ts: float | None) -> str:
+    if not ts:
+        return "n/a"
+    try:
+        return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    except Exception:
+        return "n/a"
+
+
 def cmd_alerts_preview(args: argparse.Namespace) -> int:
     s = load_settings()
     symbol = args.symbol
@@ -273,8 +287,25 @@ def cmd_alerts_preview(args: argparse.Namespace) -> int:
     mark = float(args.mark)
     vol = float(args.vol)
     threshold = float(args.threshold if args.threshold is not None else s.alert_threshold_pct)
+
+    # 1) Основний заголовок/табличка (як і було)
     text = preview_message(symbol, spot, mark, vol, threshold)
     safe_print(text)
+
+    # 2) Додатково: Funding (prev) + Next funding (UTC)
+    try:
+        client = BybitRest()
+        f = client.get_prev_funding(symbol)
+        rate = f.get("funding_rate", None)
+        next_ts = f.get("next_funding_time", None)
+    except Exception:
+        rate, next_ts = None, None
+
+    if rate is not None or next_ts:
+        # Друкуємо нові рядки нижче існуючого прев’ю
+        print(f"Funding (prev): {_fmt_pct(rate)}")
+        print(f"Next funding: {_fmt_ts(next_ts)}")
+
     return 0
 
 
