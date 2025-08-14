@@ -6,22 +6,20 @@ from typing import Optional
 
 
 def _fmt_usd(x: Optional[float]) -> str:
-    if x is None or math.isnan(x):
+    if x is None or (isinstance(x, float) and math.isnan(x)):
         return "n/a"
-    # Дружнє форматування з розрядами
     if x >= 1_000_000_000:
         return f"${x/1_000_000_000:.2f}B"
     if x >= 1_000_000:
         return f"${x/1_000_000:.2f}M"
     if x >= 1_000:
         return f"${x/1_000:.2f}K"
-    return f"${x:,.2f}"
+    return f"${x:,.0f}"
 
 
 def _fmt_price(x: Optional[float]) -> str:
-    if x is None or math.isnan(x):
+    if x is None or (isinstance(x, float) and math.isnan(x)):
         return "n/a"
-    # 2–6 знаків після коми залежно від величини
     if x >= 1000:
         return f"{x:,.2f}"
     if x >= 1:
@@ -30,13 +28,16 @@ def _fmt_price(x: Optional[float]) -> str:
 
 
 def _fmt_pct(x: Optional[float]) -> str:
-    if x is None or math.isnan(x):
+    if x is None or (isinstance(x, float) and math.isnan(x)):
         return "n/a"
     sign = "+" if x > 0 else ""
     return f"{sign}{x:.2f}%"
 
+
 def _fmt_time(ts: Optional[float]) -> str:
-    dt = datetime.fromtimestamp(ts or 0, tz=timezone.utc)
+    if not ts:
+        return "n/a"
+    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
     return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
@@ -48,29 +49,40 @@ def format_signal(
     basis_pct: Optional[float],
     vol24h_usd: Optional[float],
     ts: Optional[float] = None,
+    # ---- NEW (optional) ----
+    funding_rate: Optional[float] = None,        # частка: 0.0001 == 0.01%
+    next_funding_time: Optional[float] = None,   # UNIX seconds
 ) -> str:
     """
     Формат повідомлення для Telegram/логів.
+    Нові поля опційні: якщо не задані — рядок з funding не з'являється.
     """
-    return (
-        "🔔 *Arbitrage Signal*\n"
-        f"*Symbol*: `{symbol}`\n"
-        f"*Spot*: { _fmt_price(spot_price) }\n"
-        f"*Futures (mark)*: { _fmt_price(mark_price) }\n"
-        f"*Basis*: {_fmt_pct(basis_pct)}\n"
-        f"*24h Vol*: { _fmt_usd(vol24h_usd) }\n"
-        f"*Time*: {_fmt_time(ts)}"
-    )
+    lines = [
+        "🔔 *Arbitrage Signal*",
+        f"*Symbol*: `{symbol}`",
+        f"*Spot*: {_fmt_price(spot_price)}",
+        f"*Futures (mark)*: {_fmt_price(mark_price)}",
+        f"*Basis*: {_fmt_pct(basis_pct)}",
+        f"*24h Vol*: {_fmt_usd(vol24h_usd)}",
+        f"*Time*: {_fmt_time(ts)}",
+    ]
+    if funding_rate is not None:
+        # funding_rate тут — частка. Переведемо у % для відображення.
+        lines.insert(6, f"*Funding (prev)*: {_fmt_pct((funding_rate or 0.0) * 100.0)}")
+        if next_funding_time:
+            lines.insert(7, f"*Next funding*: {_fmt_time(next_funding_time)}")
+    return "\n".join(lines)
 
-def format_arbitrage_alert(symbol_a: str, symbol_b: str, spread_pct: float, vol_24h: float, basis: float) -> str:
+
+def format_arbitrage_alert(
+    symbol_a: str,
+    symbol_b: str,
+    spread_pct: float,
+    vol_24h: float,
+    basis: float,
+) -> str:
     """
-    Форматує текст повідомлення для Telegram у стилі:
-     Arbitrage Signal
-     2025-08-14 12:34:56 UTC
-     Pair: BTCUSDT  BTCUSDT:PERP
-     Spread: 0.85%
-     24h Vol: 123,456,789
-     Basis: 0.0012
+    Класичний HTML‑формат для альтернативних каналів (залишаємо як був).
     """
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     return (
@@ -81,6 +93,3 @@ def format_arbitrage_alert(symbol_a: str, symbol_b: str, spread_pct: float, vol_
         f" 24h Vol: <b>{vol_24h:,.0f}</b>\n"
         f" Basis: <b>{basis:.4f}</b>\n"
     )
-
-
-

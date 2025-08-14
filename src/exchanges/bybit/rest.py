@@ -86,7 +86,7 @@ class BybitRest:
 
     def get_linear_map(self) -> Dict[str, Dict[str, float]]:
         """
-        Повертає {symbol: {price, turnover_usd}} для USDT-перпетуалів (LINEAR).
+        Повертає {symbol: {price, turnover_usд}} для USDT‑перпетуалів (LINEAR).
         Для ціни використовуємо markPrice, якщо він є (інакше lastPrice).
         """
         rows = self.get_tickers("linear")
@@ -127,3 +127,60 @@ class BybitRest:
 
     def get_orderbook_linear(self, symbol: str, limit: int = 200) -> Dict:
         return self.get_orderbook("linear", symbol, limit)
+
+    # ---- funding ----
+    def _get_funding_interval_min(self, symbol: str) -> int:
+        """
+        Отримати fundingInterval (у хвилинах) для символу через instruments-info.
+        Повертає 480 (8 год) за замовчуванням, якщо поле відсутнє.
+        """
+        try:
+            data = self._get(
+                "/v5/market/instruments-info",
+                {"category": "linear", "symbol": symbol},
+            )
+            lst = data.get("result", {}).get("list") or []
+            row = lst[0] if lst else {}
+            return int(row.get("fundingInterval") or 480)
+        except Exception:
+            return 480
+
+    def get_prev_funding(self, symbol: str) -> Dict[str, float]:
+        """
+        Отримує попередню ставку фінансування (prev funding) для USDT‑перпетуалів
+        та обчислює час наступного фінансування.
+
+        Повертає:
+            {
+              "symbol": "BTCUSDT",
+              "funding_rate": 0.0001,        # частка (0.01% = 0.0001)
+              "next_funding_time": 1_695_999_600.0  # UNIX seconds
+            }
+        """
+        try:
+            # 1) останній запис історії фінансування
+            data = self._get(
+                "/v5/market/funding/history",
+                {"category": "linear", "symbol": symbol, "limit": "1"},
+            )
+            lst = data.get("result", {}).get("list") or []
+            row: Dict[str, Any] = lst[0] if lst else {}
+
+            # fundingRate як рядок -> float (частка)
+            rate = _to_float(row.get("fundingRate"), 0.0)
+
+            # fundingRateTimestamp у мілісекундах -> у секундах
+            ts_ms = _to_float(row.get("fundingRateTimestamp"), 0.0)
+            last_ts_sec = ts_ms / 1000.0 if ts_ms > 1e12 else ts_ms  # підстрахуємось
+
+            # 2) інтервал і next time
+            interval_min = self._get_funding_interval_min(symbol)
+            next_ts_sec = last_ts_sec + interval_min * 60.0 if last_ts_sec > 0 else 0.0
+
+            return {
+                "symbol": symbol,
+                "funding_rate": rate,
+                "next_funding_time": next_ts_sec,
+            }
+        except Exception:
+            return {"symbol": symbol, "funding_rate": 0.0, "next_funding_time": 0.0}

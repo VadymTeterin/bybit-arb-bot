@@ -1,4 +1,3 @@
-
 # Bybit Arbitrage Bot (MVP)
 
 ## Опис
@@ -24,6 +23,7 @@ MIN_DEPTH_LEVELS=30          # мінімальна кількість рівн�
 1. **Створити віртуальне середовище**
    ```powershell
    py -3.11 -m venv .venv
+   ```
 
 2. **Активувати середовище**   
 .\.venv\Scripts\Activate.ps1
@@ -65,22 +65,25 @@ python3 -m src.main report:send --hours 24
 
 **Перегляд цін по одній парі**
 python -m src.main price:pair --symbol ETHUSDT
-python3 -m src.main price:pair --symbol ETHUSDT
 
-**Перегляд цін по кількох парах**
-python -m src.main price:pair --symbol ETHUSDT --symbol BTCUSDT
+---
 
-**Структура проєкту**
-src/            # Основний код бота
-tests/          # Тести Pytest
-logs/           # Логи виконання
-requirements.txt# Залежності
-.env            # Конфігурація середовища
-
-**Тести**
-**Запустити всі тести:**
-pytest -q
-**Запустити тести з виводом:**
-pytest -v
-
-**Ліцензія** MIT License
+## Приклад отримання Funding (локальна перевірка)
+> Тимчасовий приклад для налагодження (без змін в CLI):
+```python
+from src.exchanges.bybit.rest import BybitRest
+from src.telegram.formatters import format_signal
+c = BybitRest()
+f = c.get_prev_funding("BTCUSDT")
+txt = format_signal(
+    symbol="BTCUSDT",
+    spot_price=121_000.0,
+    mark_price=121_500.0,
+    basis_pct=(121_500.0-121_000.0)/121_000.0*100.0,
+    vol24h_usd=5_000_000.0,
+    ts=None,
+    funding_rate=f["funding_rate"],
+    next_funding_time=f["next_funding_time"],
+)
+print(txt)
+```
