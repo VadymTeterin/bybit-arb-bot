@@ -36,8 +36,9 @@ def test_launcher_cmd_executes_in_its_own_dir(tmp_path: Path):
     # Підмінимо лише рядок з python.exe  решту логіки лишаємо як є.
     pattern = re.compile(r'^\s*\.\\\.venv\\Scripts\\python\.exe.*$', flags=re.MULTILINE)
 
-    # НАДІЙНА підміна: чистий cmd.exe створює ran.txt і щось пише в export.log
-    replacement = r'cmd.exe /c "mkdir logs && echo ok>logs\ran.txt" >> logs\export.log 2>&1'
+    # НАДІЙНА підміна без лапок і без cmd.exe:
+    # створює ran.txt та пише щось у export.log з використанням редіректів.
+    replacement = r'if not exist logs mkdir logs & (echo ok>logs\ran.txt) & (echo launched)>>logs\export.log 2>&1'
 
     # Використовуємо lambda, щоб re не трактував backslash-и як посилання на групи
     modified = pattern.sub(lambda m: replacement, original)
