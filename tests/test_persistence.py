@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from importlib import reload
 
 from src.storage import persistence
@@ -27,8 +27,8 @@ def test_save_and_get(tmp_path, monkeypatch):
     persistence.init_db()
 
     # збережемо 2 записи: один «давній», один «свіжий»
-    old_ts = datetime.utcnow() - timedelta(hours=30)
-    new_ts = datetime.utcnow() - timedelta(hours=1)
+    old_ts = datetime.now(timezone.utc) - timedelta(hours=30)
+    new_ts = datetime.now(timezone.utc) - timedelta(hours=1)
 
     persistence.save_signal("BTCUSDT", 68000, 68200, 0.294, 250_000_000, old_ts)
     persistence.save_signal("ETHUSDT", 3000, 3020, 0.667, 150_000_000, new_ts)

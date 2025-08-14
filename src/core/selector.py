@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Mapping, Optional
 
 from src.core.filters.liquidity import enough_liquidity
@@ -208,7 +208,7 @@ def run_selection(
     # збереження у БД (з урахуванням cooldown)
     persistence.init_db()
     saved: List[Dict[str, Any]] = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     for p in candidates:
         if persistence.recent_signal_exists(p.symbol, cooldown_sec):
             continue

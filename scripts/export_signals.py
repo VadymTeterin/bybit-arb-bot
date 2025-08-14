@@ -1,4 +1,4 @@
-ï»¿from __future__ import annotations
+from __future__ import annotations
 import argparse
 import csv
 import os
@@ -41,7 +41,7 @@ def _select_rows(
             where.append("timestamp <= ?")
             params.append(until)
     elif last_hours is not None:
-        cutoff = (datetime.utcnow() - timedelta(hours=int(last_hours))).isoformat()
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=int(last_hours))).isoformat()
         where.append("timestamp >= ?")
         params.append(cutoff)
 
@@ -61,7 +61,7 @@ def _localize_ts(ts: str, tz_name: Optional[str]) -> str:
         return ts
     try:
         if tz_name.upper() == "EUROPE/KYIV" or tz_name.lower() == "europe/kyiv":
-            offset = timedelta(hours=3)  # Ð»Ñ–Ñ‚Ð½Ñ–Ð¹ Ñ‡Ð°Ñ (ÑÐ¿Ñ€Ð¾Ñ‰ÐµÐ½Ð¾)
+            offset = timedelta(hours=3)  # ë³òí³é ÷àñ (ñïðîùåíî)
         elif tz_name.startswith(("+", "-")) and len(tz_name) in (6, 9):
             parts = tz_name[1:].split(":")
             sign = 1 if tz_name[0] == "+" else -1
@@ -120,7 +120,7 @@ def export_signals(
     return out_path
 
 def _default_out_name(prefix: str = "signals") -> str:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     return f"{prefix}_{now.strftime('%Y-%m-%d_%H%M')}.csv"
 
 def main() -> None:

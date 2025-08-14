@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from importlib import reload
 
 from src.core import selector
@@ -75,7 +75,7 @@ def test_selector_respects_cooldown(tmp_path):
     _reset_db(str(db))
 
     # Початково збережемо свіжий сигнал для AAAUSDT
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     persistence.save_signal(
         "AAAUSDT", 2.0, 2.02, 1.0, 12_000_000, now - timedelta(seconds=30)
     )

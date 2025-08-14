@@ -1,7 +1,7 @@
-п»їfrom __future__ import annotations
+from __future__ import annotations
 import csv
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from importlib import reload
 from pathlib import Path
 
@@ -25,18 +25,18 @@ def _seed(db_path: Path, rows):
 
 
 def test_export_last_24h(tmp_path, monkeypatch):
-    # РўРёРјС‡Р°СЃРѕРІР° Р‘Р” С– РїСЂРёРІ'СЏР·РєР° С€Р»СЏС…Сѓ С‡РµСЂРµР· env
+    # Тимчасова БД і прив'язка шляху через env
     db = tmp_path / "t.db"
     monkeypatch.setenv("DB_PATH", str(db))
 
-    # РџРµСЂРµС‡РёС‚Р°С‚Рё РјРѕРґСѓР»СЊ persistence, С‰РѕР± РІС–РЅ РїРѕР±Р°С‡РёРІ РЅРѕРІРёР№ DB_PATH
+    # Перечитати модуль persistence, щоб він побачив новий DB_PATH
     persistence = reload(_persistence)
 
-    # 1) Р†РЅС–С†С–Р°Р»С–Р·Р°С†С–СЏ СЃС…РµРјРё РІ tmp Р‘Р”
+    # 1) Ініціалізація схеми в tmp БД
     persistence.init_db()
 
-    # 2) Seed РґР°РЅРёС…: РѕРґРёРЅ СЃС‚Р°СЂС€Рµ 24h, РґРІР° РІ РјРµР¶Р°С… 24h
-    now = datetime.utcnow()
+    # 2) Seed даних: один старше 24h, два в межах 24h
+    now = datetime.now(timezone.utc)
     old = now - timedelta(hours=30)
     recent1 = now - timedelta(hours=1)
     recent2 = now - timedelta(hours=2)
@@ -53,15 +53,15 @@ def test_export_last_24h(tmp_path, monkeypatch):
     out = tmp_path / "signals_test.csv"
     path = export_signals.export_signals(out_path=out, last_hours=24, limit=None, tz=None)
 
-    # CSV СЃС‚РІРѕСЂРµРЅРѕ
+    # CSV створено
     assert path.exists()
 
-    # РџРµСЂРµРІС–СЂРєР° РІРјС–СЃС‚Сѓ
+    # Перевірка вмісту
     with path.open("r", encoding="utf-8", newline="") as f:
         reader = csv.reader(f)
         rows = list(reader)
 
-    # Р„ Р·Р°РіРѕР»РѕРІРѕРє + 2 СЂСЏРґРєРё (ETH, BTC), Р°Р»Рµ РЅРµ OLDUSDT
+    # Є заголовок + 2 рядки (ETH, BTC), але не OLDUSDT
     assert rows[0] == ["timestamp", "symbol", "spot_price", "futures_price", "basis_pct", "volume_24h_usd"]
     assert len(rows) == 1 + 2
     syms = {r[1] for r in rows[1:]}

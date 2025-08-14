@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from src.infra.config import load_settings
@@ -44,7 +44,7 @@ def init_db() -> None:
 def _ts_to_db_value(ts: datetime | None) -> str:
     """Зберігаємо час у ISO8601 (UTC, naive)."""
     if ts is None:
-        ts = datetime.utcnow()
+        ts = datetime.now(timezone.utc)
     # sqlite добре працює з текстовими ISO-рядками
     return ts.isoformat(timespec="microseconds")
 
@@ -91,7 +91,7 @@ def save_signal(
 
 def get_signals(last_hours: int = 24, limit: int | None = None) -> List[Dict[str, Any]]:
     """Отримує сигнали за останні last_hours годин, відсортовані за basis_pct (спадно)."""
-    since = datetime.utcnow() - timedelta(hours=last_hours)
+    since = datetime.now(timezone.utc) - timedelta(hours=last_hours)
     q = """
         SELECT symbol, spot_price, futures_price, basis_pct, volume_24h_usd, timestamp
         FROM signals
@@ -145,5 +145,5 @@ def recent_signal_exists(symbol: str, cooldown_sec: int) -> bool:
     last_ts = get_last_signal_ts(symbol)
     if last_ts is None:
         return False
-    cutoff = datetime.utcnow() - timedelta(seconds=int(cooldown_sec))
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=int(cooldown_sec))
     return last_ts >= cutoff
