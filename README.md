@@ -38,7 +38,6 @@ ALERT_THRESHOLD_PCT=1.0
 ALERT_COOLDOWN_SEC=300
 DB_PATH=data/signals.db
 ```
-> Keep `.env` local (git-ignored). Commit only `.env.example` without secrets.
 
 ## Експорт у CSV / CSV Export
 ```powershell
@@ -71,7 +70,8 @@ python .\scripts\export_signals.py --keep 14
 # 🔁 Автоматичний експорт через Windows Task Scheduler / Automatic Export via Windows Task Scheduler
 
 ## UA — Коротко
-Налаштуй планувальник завдань Windows, щоб `scripts/export_signals.py` запускався автоматично (щогодини або щодня). Це гарантує регулярне створення CSV та підтримку історичного архіву без ручних дій.
+Налаштуй планувальник завдань Windows, щоб `scripts/export_signals.py` запускався автоматично (щогодини або щодня).  
+**У репозиторії вже є готовий файл** `launcher_export.cmd`, який можна використовувати без змін для Task Scheduler. Він автоматично визначає шлях до проєкту та створює папку `logs`, якщо її немає.
 
 ### Варіант A — Через інтерфейс (GUI)
 1. Відкрий **Task Scheduler** → *Create Task…*  
@@ -79,27 +79,14 @@ python .\scripts\export_signals.py --keep 14
    - (Опційно) *Run with highest privileges*
 2. **Triggers** → *New…* → *Daily* або *Hourly* (рекомендовано щогодини **:05**).
 3. **Actions** → *New…*  
-   - **Program/script**: `C:\Projects\bybit-arb-bot\.venv\Scripts\python.exe`  
-   - **Add arguments**: `scripts\export_signals.py --last-hours 24 --keep 14`  
+   - **Program/script**: `C:\Projects\bybit-arb-bot\launcher_export.cmd`  
    - **Start in**: `C:\Projects\bybit-arb-bot`
 4. **Conditions** → (опційно) *Wake the computer to run this task*.
 5. **Settings** → дозволити перезапуск при збої, обмежити тривалість.
 6. Збережи й натисни *Run* для перевірки.
 
 ### Варіант B — Через PowerShell
-Створи лончер і задачу:
 ```powershell
-# In project root
-Set-Content -Path .\launcher_export.cmd -Encoding ASCII -Value @'
-@echo off
-setlocal
-cd /d C:\Projectsybit-arb-bot
-C:\Projectsybit-arb-bot\.venv\Scripts\python.exe scripts\export_signals.py --last-hours 24 --keep 14 >> logs\export.log 2>&1
-endlocal
-'@
-
-New-Item -ItemType Directory -Path .\logs -ErrorAction Ignore | Out-Null
-
 # Create hourly task at HH:05 under current user
 schtasks /Create /TN "BybitArbBot CSV Export Hourly" /TR "C:\Projectsybit-arb-bot\launcher_export.cmd" /SC HOURLY /ST 00:05 /F
 ```
@@ -111,12 +98,11 @@ Get-ChildItem .\exports\signals_*.csv | Sort-Object LastWriteTime -Descending | 
 Get-Content .\logs\export.log -Tail 20
 ```
 
-> Поради: використовуйте **повні шляхи**, зберігайте CSV поза git (`exports/` у `.gitignore`), а `.env` — локально.
-
 ---
 
 ## EN — Summary
-Use Windows Task Scheduler to run `scripts/export_signals.py` automatically (hourly/daily). This ensures continuous CSV generation and a rolling history without manual runs.
+Use Windows Task Scheduler to run `scripts/export_signals.py` automatically (hourly/daily).  
+**This repository already includes** `launcher_export.cmd` — a ready-to-use Windows batch file that auto-detects the project path and ensures `logs` exists.
 
 ### Option A — GUI
 1. Open **Task Scheduler** → *Create Task…*  
@@ -124,27 +110,14 @@ Use Windows Task Scheduler to run `scripts/export_signals.py` automatically (hou
    - (Optional) *Run with highest privileges*
 2. **Triggers** → *New…* → *Daily* or *Hourly* (recommended hourly at **:05**).
 3. **Actions** → *New…*  
-   - **Program/script**: `C:\Projects\bybit-arb-bot\.venv\Scripts\python.exe`  
-   - **Add arguments**: `scripts\export_signals.py --last-hours 24 --keep 14`  
+   - **Program/script**: `C:\Projects\bybit-arb-bot\launcher_export.cmd`  
    - **Start in**: `C:\Projects\bybit-arb-bot`
 4. **Conditions** → optionally *Wake the computer to run this task*.
 5. **Settings** → allow retry on failure, set a max run time.
 6. Save and click *Run* to test.
 
 ### Option B — PowerShell
-Create the launcher and the task:
 ```powershell
-# In project root
-Set-Content -Path .\launcher_export.cmd -Encoding ASCII -Value @'
-@echo off
-setlocal
-cd /d C:\Projectsybit-arb-bot
-C:\Projectsybit-arb-bot\.venv\Scripts\python.exe scripts\export_signals.py --last-hours 24 --keep 14 >> logs\export.log 2>&1
-endlocal
-'@
-
-New-Item -ItemType Directory -Path .\logs -ErrorAction Ignore | Out-Null
-
 # Create hourly task at HH:05 under current user
 schtasks /Create /TN "BybitArbBot CSV Export Hourly" /TR "C:\Projectsybit-arb-bot\launcher_export.cmd" /SC HOURLY /ST 00:05 /F
 ```
