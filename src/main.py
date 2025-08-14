@@ -282,7 +282,7 @@ def cmd_alerts_preview(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---------- Funding cache для basis:alert ----------
+# ---------- Funding cache для basis:alert та WS ----------
 _FUND_CACHE: Dict[str, Tuple[float, Optional[float], Optional[float]]] = {}
 _FUND_TTL_SEC = 8 * 60  # 8 хвилин
 
@@ -502,6 +502,43 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
     ws_linear = BybitWS(s.ws_public_url_linear, s.ws_topics_list_linear)
     ws_spot = BybitWS(s.ws_public_url_spot, s.ws_topics_list_spot)
 
+    # --- NEW: cooldown і асинхронне відправлення TG‑алертів із Funding ---
+    last_sent: Dict[str, float] = {}
+    client_funding = BybitRest()
+
+    def _can_send(sym: str) -> bool:
+        cd = max(30, int(getattr(s, "alert_cooldown_sec", 300)))
+        t0 = last_sent.get(sym, 0.0)
+        return (time.time() - t0) >= cd
+
+    def _mark_sent(sym: str) -> None:
+        last_sent[sym] = time.time()
+
+    async def ws_send_alert(sym: str, basis: float) -> None:
+        """
+        Легка текстівка для WS‑алерта, щоб не залежати від внутрішностей QuoteCache.
+        """
+        rate, next_ts = _get_funding_with_cache(client_funding, sym)
+        sign = "+" if basis >= 0 else ""
+        lines = [
+            "*RT Arbitrage Alert*",
+            f"{sym}: basis={sign}{basis:.2f}%",
+        ]
+        # додаємо funding, якщо є що показати
+        if rate is not None or next_ts is not None:
+            lines.append(f"Funding (prev): {_fmt_pct(rate)}")
+            lines.append(f"Next funding: {_fmt_ts(next_ts)}")
+        text = "\n".join(lines)
+
+        if s.enable_alerts and s.telegram.bot_token and s.telegram.alert_chat_id:
+            # не блокуємо WS‑луп
+            await asyncio.to_thread(
+                send_telegram_message, s.telegram.bot_token, s.telegram.alert_chat_id, text
+            )
+            logger.success("WS Telegram alert sent for {}", sym)
+        else:
+            logger.info("WS alert (dry):\n{}", text)
+
     async def refresh_meta_task():
         client = BybitRest()
         while True:
@@ -538,6 +575,10 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
                 if s.rt_log_passes:
                     sign = "+" if basis >= 0 else ""
                     logger.bind(tag="RT").success(f"{rsym} basis={sign}{basis:.2f}%  (passes filters)")
+                # --- NEW: якщо можна — шлемо TG‑алерт (із cooldown) ---
+                if _can_send(sym):
+                    _mark_sent(sym)
+                    await ws_send_alert(sym, basis)
                 break
 
     async def on_message_spot(msg: dict):

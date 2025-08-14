@@ -87,5 +87,38 @@ def format_signal(
     return "\n".join(lines)
 
 
-# Backward‑compat: деякі тести/модулі можуть імпортувати стару назву
+# --- Сумісні назви, які можуть використовуватись у інших частинах коду/тестах ---
+# Старе ім'я, яке могли імпортувати тести/модулі:
 format_signal_markdown = format_signal
+# Те, що зараз просить dev/test_tg_sender.py:
+def format_arbitrage_alert(
+    *,
+    symbol_spot: str,
+    symbol_linear: str,
+    spread_pct: float,
+    spot_price: float,
+    mark_price: float,
+    vol_24h: Optional[float],
+    basis: float,
+    funding_rate: Optional[float] = None,
+    next_funding_time: Optional[float] = None,
+) -> str:
+    # Делегуємо в наш єдиний форматер, щоб уникати дубляжу логіки
+    return format_signal(
+        symbol_spot=symbol_spot,
+        symbol_linear=symbol_linear,
+        spread_pct=spread_pct,
+        spot_price=spot_price,
+        mark_price=mark_price,
+        vol_24h=vol_24h,
+        basis=basis,
+        funding_rate=funding_rate,
+        next_funding_time=next_funding_time,
+    )
+
+
+__all__ = [
+    "format_signal",
+    "format_signal_markdown",
+    "format_arbitrage_alert",
+]
