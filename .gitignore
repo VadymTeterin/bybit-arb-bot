@@ -1,37 +1,43 @@
-# venv
+# Virtual environments
 .venv/
+venv/
 
-# Python
+# Python bytecode & caches
 __pycache__/
 *.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# env
-.env
-
-# logs
-logs/
-
-# OS / editor
-.DS_Store
-.vscode/
-/data/*.db
-/venv/
-/.venv/
-/logs/*.log
-data/*.db
-
-/data/*.db
-seed_signals.py
-seed_signals.py
-
+# Coverage
 .coverage
-app_console.log
-files.txt
+coverage.xml
+htmlcov/
 
-exports/*.csv# CSV exports
+# Environment / secrets
+.env
+.env.backup.*
+.backups/
+
+# Logs
+logs/
+app_console.log
+
+# Data & exports
+data/*.db
 exports/
 *.csv
-.env
-.backups/
-.env.backup.*
+
+# Editor & OS
+.vscode/
+.DS_Store
+
+# Seeds & util scripts
+seed_signals.py
+files.txt
 use-profile.safe.ps1
+
+# Dev snapshots / temp
+dev/tmp/
+!dev/tmp/.gitkeep
+/project-tree.txt
