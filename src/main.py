@@ -489,18 +489,24 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         print("WS is disabled by config (set WS_ENABLED=1 in .env).")
         return 0
 
+    # Всі імпорти та інтеграція — всередині функції (не заважає імпорту модуля)
     try:
         import asyncio
         from src.exchanges.bybit.ws import BybitWS, iter_ticker_entries
         from src.core.cache import QuoteCache
+        from src.ws.multiplexer import WSMultiplexer
+        from src.ws.bridge import publish_bybit_ticker
     except Exception as e:  # noqa: BLE001
         print("WS components are missing. Please add ws.py and cache.py:", str(e))
         return 1
 
+    # Ініціалізація
     cache = QuoteCache()
-
     ws_linear = BybitWS(s.ws_public_url_linear, s.ws_topics_list_linear)
     ws_spot = BybitWS(s.ws_public_url_spot, s.ws_topics_list_spot)
+
+    # WS Multiplexer (integration, non-breaking)
+    mux = WSMultiplexer(name="core")
 
     # --- NEW: cooldown і асинхронне відправлення TG‑алертів із Funding ---
     last_sent: Dict[str, float] = {}
@@ -587,7 +593,8 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
             last = item.get("last")
             if sym and last is not None:
                 bp = await cache.update(sym, spot=last)
-                logger.bind(tag="WS.SPOT").debug(f"{sym} spot={last}")
+                # Publish to multiplexer (optional subscribers)
+                publish_bybit_ticker(mux, "SPOT", item)
                 if not math.isnan(bp):
                     await maybe_log_realtime_pass(sym)
 
@@ -597,7 +604,8 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
             mark = item.get("mark")
             if sym and mark is not None:
                 bp = await cache.update(sym, linear_mark=mark)
-                logger.bind(tag="WS.LINEAR").debug(f"{sym} mark={mark}")
+                # Publish to multiplexer (optional subscribers)
+                publish_bybit_ticker(mux, "LINEAR", item)
                 if not math.isnan(bp):
                     await maybe_log_realtime_pass(sym)
 
