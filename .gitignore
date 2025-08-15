@@ -41,5 +41,6 @@ use-profile.safe.ps1
 dev/tmp/
 !dev/tmp/.gitkeep
 /project-tree.txt
+project-tree.txt
 
 *.bak
