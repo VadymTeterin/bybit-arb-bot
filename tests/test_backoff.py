@@ -1,6 +1,7 @@
 # tests/test_backoff.py
 from src.exchanges.bybit.ws import exp_backoff_with_jitter
 
+
 def test_backoff_monotonic_and_cap():
     # Перевіряємо, що значення в межах очікуваних діапазонів (з урахуванням jitter)
     base = 1.0

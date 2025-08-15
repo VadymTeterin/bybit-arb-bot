@@ -22,11 +22,13 @@ def test_parse_linear_tickers_mark_price_e4():
     msg = {
         "topic": "tickers.ETHUSDT",
         "type": "delta",
-        "data": [{
-            "symbol": "ETHUSDT",
-            "markPriceE4": 345678901,   # 34567.8901
-            "lastPriceE4": 345600000,   # 34560.0000
-        }],
+        "data": [
+            {
+                "symbol": "ETHUSDT",
+                "markPriceE4": 345678901,  # 34567.8901
+                "lastPriceE4": 345600000,  # 34560.0000
+            }
+        ],
     }
     rows = list(iter_ticker_entries(msg))
     assert rows and rows[0]["symbol"] == "ETHUSDT"

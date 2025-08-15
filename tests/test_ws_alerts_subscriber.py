@@ -32,8 +32,24 @@ def test_alerts_subscriber_basic_send(monkeypatch):
     sub.start()
 
     # publish spot then linear
-    mux.publish(WsEvent(source="SPOT", channel="tickers", symbol="ETHUSDT", payload={"symbol": "ETHUSDT", "last": 100.0}, ts=0))
-    mux.publish(WsEvent(source="LINEAR", channel="tickers", symbol="ETHUSDT", payload={"symbol": "ETHUSDT", "mark": 101.0}, ts=0))
+    mux.publish(
+        WsEvent(
+            source="SPOT",
+            channel="tickers",
+            symbol="ETHUSDT",
+            payload={"symbol": "ETHUSDT", "last": 100.0},
+            ts=0,
+        )
+    )
+    mux.publish(
+        WsEvent(
+            source="LINEAR",
+            channel="tickers",
+            symbol="ETHUSDT",
+            payload={"symbol": "ETHUSDT", "mark": 101.0},
+            ts=0,
+        )
+    )
 
     # Python 3.12+: у синхронному тесті немає активного event loop → використовуємо asyncio.run
     asyncio.run(_wait())
@@ -59,12 +75,36 @@ def test_alerts_subscriber_cooldown(monkeypatch):
     sub = AlertsSubscriber(mux, s, send_async=fake_send)
     sub.start()
 
-    mux.publish(WsEvent(source="SPOT", channel="tickers", symbol="BTCUSDT", payload={"symbol": "BTCUSDT", "last": 100.0}, ts=0))
-    mux.publish(WsEvent(source="LINEAR", channel="tickers", symbol="BTCUSDT", payload={"symbol": "BTCUSDT", "mark": 110.0}, ts=0))
+    mux.publish(
+        WsEvent(
+            source="SPOT",
+            channel="tickers",
+            symbol="BTCUSDT",
+            payload={"symbol": "BTCUSDT", "last": 100.0},
+            ts=0,
+        )
+    )
+    mux.publish(
+        WsEvent(
+            source="LINEAR",
+            channel="tickers",
+            symbol="BTCUSDT",
+            payload={"symbol": "BTCUSDT", "mark": 110.0},
+            ts=0,
+        )
+    )
     asyncio.run(_wait())
 
     # second event above threshold but within cooldown
-    mux.publish(WsEvent(source="LINEAR", channel="tickers", symbol="BTCUSDT", payload={"symbol": "BTCUSDT", "mark": 111.0}, ts=0))
+    mux.publish(
+        WsEvent(
+            source="LINEAR",
+            channel="tickers",
+            symbol="BTCUSDT",
+            payload={"symbol": "BTCUSDT", "mark": 111.0},
+            ts=0,
+        )
+    )
     asyncio.run(_wait())
 
     assert len(out) == 1, f"Cooldown failed, got {len(out)} messages"

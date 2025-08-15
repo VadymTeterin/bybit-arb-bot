@@ -2,6 +2,7 @@
 import asyncio
 from src.core.cache import QuoteCache
 
+
 def test_cache_update_and_snapshot():
     cache = QuoteCache()
 

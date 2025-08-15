@@ -30,9 +30,11 @@ class AppSettings(BaseSettings):
     top_n_report: int = 3
 
     # ---- depth-фільтр (із фази 3.4) ----
-    min_depth_usd: float = 1_000_000.0   # мінімальна глибина ($) у межах depth_window_pct
-    depth_window_pct: float = 0.5        # ширина вікна у %, 0.5 => 0.5%
-    min_depth_levels: int = 30           # мінімальна сумарна к-сть рівнів (bid+ask) у вікні
+    min_depth_usd: float = (
+        1_000_000.0  # мінімальна глибина ($) у межах depth_window_pct
+    )
+    depth_window_pct: float = 0.5  # ширина вікна у %, 0.5 => 0.5%
+    min_depth_levels: int = 30  # мінімальна сумарна к-сть рівнів (bid+ask) у вікні
 
     # прапор надсилання алертів
     enable_alerts: bool = True
@@ -64,7 +66,7 @@ class AppSettings(BaseSettings):
 
     # ---- 4.3: realtime wiring ----
     rt_meta_refresh_sec: int = 300  # як часто оновлювати vol24h із REST (сек)
-    rt_log_passes: bool = True      # логувати коли символ проходить пороги в реальному часі
+    rt_log_passes: bool = True  # логувати коли символ проходить пороги в реальному часі
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -82,6 +84,7 @@ class AppSettings(BaseSettings):
         if raw.lstrip().startswith("["):
             try:
                 import json
+
                 arr = json.loads(raw)
                 return [str(x).strip() for x in arr if str(x).strip()]
             except Exception:
@@ -122,4 +125,9 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 TELEGRAM_COOLDOWN_SECONDS = int(os.getenv("TELEGRAM_COOLDOWN_SECONDS", "30"))
 
 # Feature flag for Telegram notifications
-TELEGRAM_ENABLED = os.getenv("TELEGRAM_ENABLED", "0").strip().lower() in ("1", "true", "yes", "y")
+TELEGRAM_ENABLED = os.getenv("TELEGRAM_ENABLED", "0").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "y",
+)

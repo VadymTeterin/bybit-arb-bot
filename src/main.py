@@ -52,7 +52,7 @@ def safe_print(text: str) -> None:
     try:
         print(text)
     except UnicodeEncodeError:
-        enc = (getattr(sys.stdout, "encoding", None) or "utf-8")
+        enc = getattr(sys.stdout, "encoding", None) or "utf-8"
         sys.stdout.buffer.write(text.encode(enc, errors="replace"))
         sys.stdout.buffer.write(b"\n")
 
@@ -212,29 +212,39 @@ def _alerts_allowed(s) -> bool:
     return bool(s.enable_alerts)
 
 
-def _format_alert_text(rows: list[tuple[str, float, float, float, float]], threshold: float, min_vol: float) -> str:
+def _format_alert_text(
+    rows: list[tuple[str, float, float, float, float]], threshold: float, min_vol: float
+) -> str:
     if rows:
         header = f"Top {len(rows)} basis (≥ {threshold:.2f}%, MinVol ${min_vol:,.0f})"
         if _tg_formatters and hasattr(_tg_formatters, "format_basis_top"):
-            txt = _safe_call(getattr(_tg_formatters, "format_basis_top", None), rows, header)
+            txt = _safe_call(
+                getattr(_tg_formatters, "format_basis_top", None), rows, header
+            )
             if isinstance(txt, str) and txt.strip():
                 return txt
         lines = [header]
         for i, (sym, sp, fu, b, vol) in enumerate(rows, 1):
             sign = "+" if b >= 0 else ""
-            lines.append(f"{i}. {sym}: spot={sp:g} fut={fu:g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}")
+            lines.append(
+                f"{i}. {sym}: spot={sp:g} fut={fu:g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}"
+            )
         return "\n".join(lines)
     else:
         header = f"Basis scan: no pairs ≥ {threshold:.2f}% at MinVol ${min_vol:,.0f}."
         if _tg_formatters and hasattr(_tg_formatters, "format_no_candidates"):
-            txt = _safe_call(getattr(_tg_formatters, "format_no_candidates", None), header)
+            txt = _safe_call(
+                getattr(_tg_formatters, "format_no_candidates", None), header
+            )
             if isinstance(txt, str) and txt.strip():
                 return txt
         return header + "\nTry lowering threshold or MinVol."
 
 
 # --------- ПРЕВ'Ю АЛЕРТУ (без відправки) ---------
-def preview_message(symbol: str, spot: float, mark: float, vol: float, threshold: float) -> str:
+def preview_message(
+    symbol: str, spot: float, mark: float, vol: float, threshold: float
+) -> str:
     if spot <= 0 or mark <= 0:
         return "Invalid prices for preview."
     basis = (mark - spot) / spot * 100.0
@@ -250,7 +260,9 @@ def _fmt_ts(ts: float | None) -> str:
     if not ts:
         return "n/a"
     try:
-        return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime(
+            "%Y-%m-%d %H:%M UTC"
+        )
     except Exception:
         return "n/a"
 
@@ -261,7 +273,9 @@ def cmd_alerts_preview(args: argparse.Namespace) -> int:
     spot = float(args.spot)
     mark = float(args.mark)
     vol = float(args.vol)
-    threshold = float(args.threshold if args.threshold is not None else s.alert_threshold_pct)
+    threshold = float(
+        args.threshold if args.threshold is not None else s.alert_threshold_pct
+    )
 
     text = preview_message(symbol, spot, mark, vol, threshold)
     safe_print(text)
@@ -286,7 +300,10 @@ def cmd_alerts_preview(args: argparse.Namespace) -> int:
 _FUND_CACHE: Dict[str, Tuple[float, Optional[float], Optional[float]]] = {}
 _FUND_TTL_SEC = 8 * 60  # 8 хвилин
 
-def _get_funding_with_cache(client: BybitRest, symbol: str) -> tuple[Optional[float], Optional[float]]:
+
+def _get_funding_with_cache(
+    client: BybitRest, symbol: str
+) -> tuple[Optional[float], Optional[float]]:
     now = time.time()
     cached = _FUND_CACHE.get(symbol)
     if cached and (now - cached[0] < _FUND_TTL_SEC):
@@ -309,18 +326,26 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
         return 0
 
     min_vol = float(args.min_vol if args.min_vol is not None else s.min_vol_24h_usd)
-    threshold = float(args.threshold if args.threshold is not None else s.alert_threshold_pct)
+    threshold = float(
+        args.threshold if args.threshold is not None else s.alert_threshold_pct
+    )
     limit = int(args.limit)
 
     if not s.telegram.bot_token or not s.telegram.alert_chat_id:
-        print("Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env")
+        print(
+            "Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env"
+        )
         return 1
 
     rows_pass, _ = _basis_rows(min_vol=min_vol, threshold=threshold)
 
     # опційний cooldown із core.alerts
     if _core_alerts and hasattr(_core_alerts, "apply_cooldown"):
-        cooled = _safe_call(getattr(_core_alerts, "apply_cooldown", None), rows_pass, getattr(s, "alert_cooldown_sec", 0))
+        cooled = _safe_call(
+            getattr(_core_alerts, "apply_cooldown", None),
+            rows_pass,
+            getattr(s, "alert_cooldown_sec", 0),
+        )
         if isinstance(cooled, list):
             rows_pass = cooled
 
@@ -330,7 +355,9 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
     text = _format_alert_text(rows, threshold, min_vol)
 
     # 2) Додаємо Funding ТІЛЬКИ якщо НЕ використовується кастомний форматер rows
-    used_custom_rows_formatter = bool(_tg_formatters and hasattr(_tg_formatters, "format_basis_top"))
+    used_custom_rows_formatter = bool(
+        _tg_formatters and hasattr(_tg_formatters, "format_basis_top")
+    )
     if rows and not used_custom_rows_formatter:
         client = BybitRest()
         lines = []
@@ -349,7 +376,10 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
         if _core_alerts and hasattr(_core_alerts, "on_alert_sent"):
             _safe_call(getattr(_core_alerts, "on_alert_sent", None), rows)
     except requests.HTTPError as e:
-        logger.error("Telegram HTTP error: {}", e.response.text if e.response is not None else str(e))
+        logger.error(
+            "Telegram HTTP error: {}",
+            e.response.text if e.response is not None else str(e),
+        )
     except Exception as e:  # noqa: BLE001
         logger.exception("Telegram send failed: {}", e)
     return 0
@@ -361,11 +391,15 @@ def cmd_tg_send(args: argparse.Namespace) -> int:
         print("Alerts are disabled by config (enable_alerts=false).")
         return 0
     if not s.telegram.bot_token or not s.telegram.alert_chat_id:
-        print("Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env")
+        print(
+            "Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env"
+        )
         return 1
     text = args.text or "Test message from bybit-arb-bot"
     try:
-        res = send_telegram_message(s.telegram.bot_token, s.telegram.alert_chat_id, text)
+        res = send_telegram_message(
+            s.telegram.bot_token, s.telegram.alert_chat_id, text
+        )
         ok = res.get("ok")
         print("Telegram send ok:", ok)
         logger.success("Telegram test sent.")
@@ -396,7 +430,9 @@ def cmd_report_send(args: argparse.Namespace) -> int:
         print("Alerts are disabled by config (enable_alerts=false).")
         return 0
     if not s.telegram.bot_token or not s.telegram.alert_chat_id:
-        print("Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env")
+        print(
+            "Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env"
+        )
         return 1
     hours = int(args.hours)
     limit = int(args.limit) if args.limit is not None else int(s.top_n_report)
@@ -408,7 +444,10 @@ def cmd_report_send(args: argparse.Namespace) -> int:
         print("OK")
         return 0
     except requests.HTTPError as e:
-        print("Telegram HTTP error:", e.response.text if e.response is not None else str(e))
+        print(
+            "Telegram HTTP error:",
+            e.response.text if e.response is not None else str(e),
+        )
         return 2
     except Exception as e:  # noqa: BLE001
         print("Telegram error:", str(e))
@@ -419,10 +458,16 @@ def cmd_report_send(args: argparse.Namespace) -> int:
 def cmd_select_save(args: argparse.Namespace) -> int:
     s = load_settings()
     limit = int(args.limit)
-    threshold = float(args.threshold) if args.threshold is not None else s.alert_threshold_pct
+    threshold = (
+        float(args.threshold) if args.threshold is not None else s.alert_threshold_pct
+    )
     min_vol = float(args.min_vol) if args.min_vol is not None else s.min_vol_24h_usd
     min_price = float(args.min_price) if args.min_price is not None else s.min_price
-    cooldown_sec = int(args.cooldown_sec) if args.cooldown_sec is not None else s.alert_cooldown_sec
+    cooldown_sec = (
+        int(args.cooldown_sec)
+        if args.cooldown_sec is not None
+        else s.alert_cooldown_sec
+    )
 
     from src.core.selector import run_selection
 
@@ -528,12 +573,12 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
                     except Exception:
                         continue
                 await cache.update_vol24h_bulk(combined)
-                logger.bind(tag="RTMETA").info(f"Refreshed vol24h for {len(combined)} symbols")
+                logger.bind(tag="RTMETA").info(
+                    f"Refreshed vol24h for {len(combined)} symbols"
+                )
             except Exception as e:
                 logger.bind(tag="RTMETA").warning(f"Meta refresh failed: {e!r}")
             await asyncio.sleep(max(30, int(s.rt_meta_refresh_sec)))
-
-    import math
 
     async def on_message_spot(msg: dict):
         for item in iter_ticker_entries(msg):
@@ -588,7 +633,9 @@ def main() -> None:
     sub.add_parser("bybit:ping").set_defaults(func=cmd_bybit_ping)
 
     p_top = sub.add_parser("bybit:top")
-    p_top.add_argument("--category", default="spot", choices=["spot", "linear", "inverse", "option"])
+    p_top.add_argument(
+        "--category", default="spot", choices=["spot", "linear", "inverse", "option"]
+    )
     p_top.add_argument("--limit", type=int, default=5)
     p_top.set_defaults(func=cmd_bybit_top)
 
@@ -611,8 +658,18 @@ def main() -> None:
     p_prev.add_argument("--symbol", required=True, type=str)
     p_prev.add_argument("--spot", required=True, type=float)
     p_prev.add_argument("--mark", required=True, type=float)
-    p_prev.add_argument("--vol", type=float, default=0.0, help="Мін. обіг (USD) серед легів для заголовка")
-    p_prev.add_argument("--threshold", type=float, default=None, help="Поріг для заголовка (%, якщо не задано — з .env)")
+    p_prev.add_argument(
+        "--vol",
+        type=float,
+        default=0.0,
+        help="Мін. обіг (USD) серед легів для заголовка",
+    )
+    p_prev.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        help="Поріг для заголовка (%, якщо не задано — з .env)",
+    )
     p_prev.set_defaults(func=cmd_alerts_preview)
 
     # telegram test
@@ -684,9 +741,13 @@ if __name__ == "__main__":
 def try_setup_telegram_sender(alerter: Any) -> None:
     try:
         from src.core.alerts import RealtimeAlerter  # type: ignore
-        if not isinstance(alerter, RealtimeAlerter) or not hasattr(alerter, "set_sender"):
+
+        if not isinstance(alerter, RealtimeAlerter) or not hasattr(
+            alerter, "set_sender"
+        ):
             return
         from src.core.alerts import telegram_sender  # type: ignore
+
         alerter.set_sender(telegram_sender)
         logger.info("Telegram sender wired into RealtimeAlerter.")
     except Exception as e:  # noqa: BLE001

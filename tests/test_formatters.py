@@ -3,6 +3,7 @@
 from src.telegram.formatters import format_signal_markdown
 from datetime import datetime, timezone
 
+
 def test_format_with_and_without_funding():
     # Без funding
     txt = format_signal_markdown(

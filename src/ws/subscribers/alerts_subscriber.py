@@ -60,7 +60,9 @@ class AlertsSubscriber:
                     return
                 ok = await asyncio.to_thread(_sender.send, text)
                 if not ok:
-                    logger.warning("AlertsSubscriber: TelegramSender.send returned False")
+                    logger.warning(
+                        "AlertsSubscriber: TelegramSender.send returned False"
+                    )
 
             self._send_async = _default_send
         else:
@@ -82,13 +84,22 @@ class AlertsSubscriber:
                 logger.exception("AlertsSubscriber handler failed: {}", e)
 
         self._unsubs.append(
-            self._mux.subscribe(handler=_on_evt, source="SPOT", channel="tickers", symbol="*")
+            self._mux.subscribe(
+                handler=_on_evt, source="SPOT", channel="tickers", symbol="*"
+            )
         )
         self._unsubs.append(
-            self._mux.subscribe(handler=_on_evt, source="LINEAR", channel="tickers", symbol="*")
+            self._mux.subscribe(
+                handler=_on_evt, source="LINEAR", channel="tickers", symbol="*"
+            )
         )
-        logger.info("AlertsSubscriber started: threshold={:.2f}% cooldown={}s allow={} deny={}",
-                    self._threshold, self._cooldown, (len(self._allow) or "-"), (len(self._deny) or "-"))
+        logger.info(
+            "AlertsSubscriber started: threshold={:.2f}% cooldown={}s allow={} deny={}",
+            self._threshold,
+            self._cooldown,
+            (len(self._allow) or "-"),
+            (len(self._deny) or "-"),
+        )
 
     def stop(self) -> None:
         """Відписуємося від усіх подій."""

@@ -75,10 +75,15 @@ class BybitWS:
                                 try:
                                     data = json.loads(msg.data)
                                 except Exception:
-                                    logger.bind(tag="WS").warning("Non‑JSON message skipped")
+                                    logger.bind(tag="WS").warning(
+                                        "Non‑JSON message skipped"
+                                    )
                                     continue
                                 await on_message(data)
-                            elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                            elif msg.type in (
+                                aiohttp.WSMsgType.CLOSED,
+                                aiohttp.WSMsgType.ERROR,
+                            ):
                                 raise ConnectionError("WebSocket closed or error state")
                 except asyncio.CancelledError:
                     raise
@@ -103,6 +108,7 @@ class BybitWS:
 # ---------------------------
 #   УТИЛІТИ ПАРСИНГУ TICKERS
 # ---------------------------
+
 
 def _to_float(x) -> Optional[float]:
     if x is None:

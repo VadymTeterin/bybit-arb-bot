@@ -116,6 +116,7 @@ class WSMultiplexer:
                 if s:
                     s.active = False
                     # Ледача відписка: не видаляємо з dict, щоб уникати зсувів під час ітерації
+
         return _unsubscribe
 
     def publish(self, evt: WsEvent) -> int:
