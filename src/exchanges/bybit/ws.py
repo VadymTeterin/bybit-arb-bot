@@ -222,3 +222,7 @@ class BybitPublicWS:
                     attempt += 1
 
         logger.info("WS stopped")
+
+
+# --- Compatibility alias for legacy imports (main.ws:run expects BybitWS) ---
+BybitWS = BybitPublicWS

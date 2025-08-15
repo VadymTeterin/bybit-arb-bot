@@ -31,7 +31,7 @@ except Exception:  # noqa: BLE001
     _core_alerts = None
 
 
-APP_VERSION = "0.4.2"
+APP_VERSION = "0.4.3"
 
 
 def _safe_call(fn, *args, **kwargs):
@@ -57,6 +57,58 @@ def safe_print(text: str) -> None:
         sys.stdout.buffer.write(b"\n")
 
 
+def _csv_list(x: Any) -> List[str]:
+    """
+    Перетворює будь-яке значення на List[str]:
+    - якщо вже list/tuple -> повертаєм трімнуті str
+    - якщо str -> парсимо за комою
+    - інакше -> []
+    """
+    if x is None:
+        return []
+    if isinstance(x, (list, tuple)):
+        return [str(t).strip() for t in x if str(t).strip()]
+    if isinstance(x, str):
+        return [t.strip() for t in x.split(",") if t.strip()]
+    return []
+
+
+def _nested_bybit(s):
+    """
+    Безпечний доступ до вкладених WS-параметрів з підтримкою старих полів.
+    Повертає словник:
+      url_linear, url_spot, topics_linear(list), topics_spot(list), reconnect_max_sec
+    """
+    by = getattr(s, "bybit", None)
+    url_linear = None
+    url_spot = None
+    topics_linear: List[str] = []
+    topics_spot: List[str] = []
+    reconnect_max_sec = getattr(s, "ws_reconnect_max_sec", None)
+
+    if by is not None:
+        url_linear = getattr(by, "ws_public_url_linear", None)
+        url_spot = getattr(by, "ws_public_url_spot", None)
+        topics_linear = _csv_list(getattr(by, "ws_sub_topics_linear", None))
+        topics_spot = _csv_list(getattr(by, "ws_sub_topics_spot", None))
+
+    # fallback на старі плоскі поля (якщо вони ще є в конфігу)
+    url_linear = url_linear or getattr(s, "ws_public_url_linear", None)
+    url_spot = url_spot or getattr(s, "ws_public_url_spot", None)
+    topics_linear = topics_linear or _csv_list(
+        getattr(s, "ws_topics_list_linear", None)
+    )
+    topics_spot = topics_spot or _csv_list(getattr(s, "ws_topics_list_spot", None))
+
+    return {
+        "url_linear": url_linear,
+        "url_spot": url_spot,
+        "topics_linear": topics_linear,
+        "topics_spot": topics_spot,
+        "reconnect_max_sec": reconnect_max_sec,
+    }
+
+
 def cmd_version(_: argparse.Namespace) -> int:
     print(APP_VERSION)
     return 0
@@ -64,28 +116,37 @@ def cmd_version(_: argparse.Namespace) -> int:
 
 def cmd_env(_: argparse.Namespace) -> int:
     s = load_settings()
-    print("ENV:", s.env)
-    print("ALERT_THRESHOLD_PCT:", s.alert_threshold_pct)
-    print("ALERT_COOLDOWN_SEC:", s.alert_cooldown_sec)
-    print("MIN_VOL_24H_USD:", s.min_vol_24h_usd)
-    print("MIN_PRICE:", s.min_price)
-    print("DB_PATH:", s.db_path)
-    print("TG_CHAT_ID:", s.telegram.alert_chat_id or "")
-    print("TELEGRAM_TOKEN set:", bool(s.telegram.bot_token))
-    print("BYBIT_API_KEY set:", bool(s.bybit.api_key))
-    print("ENABLE_ALERTS:", s.enable_alerts)
-    print("ALLOW_SYMBOLS (raw):", s.allow_symbols)
-    print("ALLOW_SYMBOLS (list):", ",".join(s.allow_symbols_list))
-    print("DENY_SYMBOLS (raw):", s.deny_symbols)
-    print("DENY_SYMBOLS (list):", ",".join(s.deny_symbols_list))
-    print("WS_ENABLED:", s.ws_enabled)
-    print("WS_PUBLIC_URL_LINEAR:", s.ws_public_url_linear)
-    print("WS_PUBLIC_URL_SPOT:", s.ws_public_url_spot)
-    print("WS_SUB_TOPICS_LINEAR (list):", ",".join(s.ws_topics_list_linear))
-    print("WS_SUB_TOPICS_SPOT (list):", ",".join(s.ws_topics_list_spot))
-    print("WS_RECONNECT_MAX_SEC:", s.ws_reconnect_max_sec)
-    print("RT_META_REFRESH_SEC:", s.rt_meta_refresh_sec)
-    print("RT_LOG_PASSES:", s.rt_log_passes)
+    # базові
+    print("ENV:", getattr(s, "env", ""))
+    print("ALERT_THRESHOLD_PCT:", getattr(s, "alert_threshold_pct", ""))
+    print("ALERT_COOLDOWN_SEC:", getattr(s, "alert_cooldown_sec", ""))
+    print("MIN_VOL_24H_USD:", getattr(s, "min_vol_24h_usd", ""))
+    print("MIN_PRICE:", getattr(s, "min_price", ""))
+    print("DB_PATH:", getattr(s, "db_path", ""))
+    # telegram
+    tg = getattr(s, "telegram", None)
+    print("TG_CHAT_ID:", getattr(tg, "alert_chat_id", "") if tg else "")
+    print("TELEGRAM_TOKEN set:", bool(getattr(tg, "bot_token", None)) if tg else False)
+    # bybit api
+    by = getattr(s, "bybit", None)
+    print("BYBIT_API_KEY set:", bool(getattr(by, "api_key", None)) if by else False)
+    # flags
+    print("ENABLE_ALERTS:", getattr(s, "enable_alerts", False))
+    print("ALLOW_SYMBOLS (raw):", getattr(s, "allow_symbols", ""))
+    print("ALLOW_SYMBOLS (list):", ",".join(getattr(s, "allow_symbols_list", []) or []))
+    print("DENY_SYMBOLS (raw):", getattr(s, "deny_symbols", ""))
+    print("DENY_SYMBOLS (list):", ",".join(getattr(s, "deny_symbols_list", []) or []))
+    print("WS_ENABLED:", getattr(s, "ws_enabled", False))
+
+    # ws (вкладені або старі поля)
+    ws = _nested_bybit(s)
+    print("WS_PUBLIC_URL_LINEAR:", ws["url_linear"] or "")
+    print("WS_PUBLIC_URL_SPOT:", ws["url_spot"] or "")
+    print("WS_SUB_TOPICS_LINEAR (list):", ",".join(ws["topics_linear"]))
+    print("WS_SUB_TOPICS_SPOT (list):", ",".join(ws["topics_spot"]))
+    print("WS_RECONNECT_MAX_SEC:", ws["reconnect_max_sec"] or "")
+    print("RT_META_REFRESH_SEC:", getattr(s, "rt_meta_refresh_sec", ""))
+    print("RT_LOG_PASSES:", getattr(s, "rt_log_passes", ""))
     return 0
 
 
@@ -102,8 +163,8 @@ def cmd_logtest(_: argparse.Namespace) -> int:
 def cmd_healthcheck(_: argparse.Namespace) -> int:
     try:
         s = load_settings()
-        assert s.alert_threshold_pct > 0
-        assert s.alert_cooldown_sec > 0
+        assert getattr(s, "alert_threshold_pct", 0) > 0
+        assert getattr(s, "alert_cooldown_sec", 0) > 0
         logger.success("Healthcheck OK")
         return 0
     except Exception as exc:  # noqa: BLE001
@@ -151,8 +212,34 @@ def _basis_rows(
     list[tuple[str, float, float, float, float]],
 ]:
     client = BybitRest()
-    spot_map = client.get_spot_map()
-    lin_map = client.get_linear_map()
+
+    # Основний шлях: get_spot_map / get_linear_map
+    try:
+        spot_map = client.get_spot_map()
+        lin_map = client.get_linear_map()
+    except AttributeError:
+        # Fallback через get_tickers(...)
+        spot_rows = client.get_tickers("spot") or []
+        lin_rows = client.get_tickers("linear") or []
+
+        def _map_from_tickers(rows: List[Dict[str, Any]]):
+            m: Dict[str, Dict[str, float]] = {}
+            for r in rows:
+                sym = r.get("symbol")
+                if not sym:
+                    continue
+                price = r.get("lastPrice") or r.get("lastPriceLatest")
+                vol = r.get("turnover24h") or r.get("turnoverUsd")
+                try:
+                    price_f = float(price) if price is not None else 0.0
+                    vol_f = float(vol) if vol is not None else 0.0
+                except Exception:
+                    price_f, vol_f = 0.0, 0.0
+                m[sym] = {"price": price_f, "turnover_usd": vol_f}
+            return m
+
+        spot_map = _map_from_tickers(spot_rows)
+        lin_map = _map_from_tickers(lin_rows)
 
     rows_all: List[tuple[str, float, float, float, float]] = []
     rows_pass: List[tuple[str, float, float, float, float]] = []
@@ -211,7 +298,7 @@ def cmd_basis_scan(args: argparse.Namespace) -> int:
 
 
 def _alerts_allowed(s) -> bool:
-    return bool(s.enable_alerts)
+    return bool(getattr(s, "enable_alerts", False))
 
 
 def _format_alert_text(
@@ -497,8 +584,33 @@ def create_bybit_client() -> BybitRest:
 
 def cmd_price_pair(args: argparse.Namespace) -> int:
     client = create_bybit_client()
-    spot_map = client.get_spot_map()
-    lin_map = client.get_linear_map()
+
+    try:
+        spot_map = client.get_spot_map()
+        lin_map = client.get_linear_map()
+    except AttributeError:
+        # Fallback через get_tickers(...)
+        spot_rows = client.get_tickers("spot") or []
+        lin_rows = client.get_tickers("linear") or []
+
+        def _map_from_tickers(rows: List[Dict[str, Any]]):
+            m: Dict[str, Dict[str, float]] = {}
+            for r in rows:
+                sym = r.get("symbol")
+                if not sym:
+                    continue
+                price = r.get("lastPrice") or r.get("lastPriceLatest")
+                vol = r.get("turnover24h") or r.get("turnoverUsd")
+                try:
+                    price_f = float(price) if price is not None else 0.0
+                    vol_f = float(vol) if vol is not None else 0.0
+                except Exception:
+                    price_f, vol_f = 0.0, 0.0
+                m[sym] = {"price": price_f, "turnover_usd": vol_f}
+            return m
+
+        spot_map = _map_from_tickers(spot_rows)
+        lin_map = _map_from_tickers(lin_rows)
 
     symbols = args.symbol if args.symbol else ["ETHUSDT", "BTCUSDT"]
 
@@ -532,7 +644,7 @@ def cmd_price_pair(args: argparse.Namespace) -> int:
 # ---------- WS:RUN ----------
 def cmd_ws_run(_: argparse.Namespace) -> int:
     s = load_settings()
-    if not s.ws_enabled:
+    if not getattr(s, "ws_enabled", False):
         print("WS is disabled by config (set WS_ENABLED=1 in .env).")
         return 0
 
@@ -548,15 +660,28 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         print("WS components are missing. Please add ws.py and cache.py:", str(e))
         return 1
 
+    # --- сумісність з новим вкладеним конфігом ---
+    ws = _nested_bybit(s)
+    url_linear: Optional[str] = ws["url_linear"]
+    url_spot: Optional[str] = ws["url_spot"]
+    topics_linear: List[str] = ws["topics_linear"]
+    topics_spot: List[str] = ws["topics_spot"]
+
     # Ініціалізація
     cache = QuoteCache()
-    ws_linear = BybitWS(s.ws_public_url_linear, s.ws_topics_list_linear)
-    ws_spot = BybitWS(s.ws_public_url_spot, s.ws_topics_list_spot)
+    ws_linear = (
+        BybitWS(url_linear, topics_linear or ["tickers"]) if url_linear else None
+    )
+    ws_spot = BybitWS(url_spot, topics_spot or ["tickers"]) if url_spot else None
+
+    if not ws_linear and not ws_spot:
+        print("WS config has neither LINEAR nor SPOT endpoints/topics configured.")
+        return 0
 
     # WS Multiplexer
     mux = WSMultiplexer(name="core")
 
-    # Підписник алертів (Step 5.7) — невтручально
+    # Підписник алертів (невтручально)
     alerts_sub = AlertsSubscriber(mux)
     alerts_sub.start()
 
@@ -564,24 +689,37 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         client = BybitRest()
         while True:
             try:
-                spot_map = client.get_spot_map()
-                lin_map = client.get_linear_map()
-                combined = {}
-                common = set(spot_map.keys()) & set(lin_map.keys())
-                for sym in common:
-                    try:
-                        sv = float(spot_map[sym].get("turnover_usd") or 0.0)
-                        lv = float(lin_map[sym].get("turnover_usd") or 0.0)
-                        combined[sym] = min(sv, lv)
-                    except Exception:
-                        continue
+                # Використовуємо універсальний шлях через get_tickers(...)
+                spot_rows = client.get_tickers("spot") or []
+                lin_rows = client.get_tickers("linear") or []
+
+                def _vol_map(rows: List[Dict[str, Any]]) -> Dict[str, float]:
+                    m: Dict[str, float] = {}
+                    for r in rows:
+                        sym = r.get("symbol")
+                        if not sym:
+                            continue
+                        v = r.get("turnover24h") or r.get("turnoverUsd")
+                        try:
+                            m[sym] = float(v) if v is not None else 0.0
+                        except Exception:
+                            m[sym] = 0.0
+                    return m
+
+                spot_vol = _vol_map(spot_rows)
+                lin_vol = _vol_map(lin_rows)
+
+                combined = {
+                    sym: min(spot_vol[sym], lin_vol[sym])
+                    for sym in (set(spot_vol) & set(lin_vol))
+                }
                 await cache.update_vol24h_bulk(combined)
                 logger.bind(tag="RTMETA").info(
                     f"Refreshed vol24h for {len(combined)} symbols"
                 )
             except Exception as e:
                 logger.bind(tag="RTMETA").warning(f"Meta refresh failed: {e!r}")
-            await asyncio.sleep(max(30, int(s.rt_meta_refresh_sec)))
+            await asyncio.sleep(max(30, int(getattr(s, "rt_meta_refresh_sec", 30))))
 
     async def on_message_spot(msg: dict):
         for item in iter_ticker_entries(msg):
@@ -590,7 +728,7 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
             if sym and last is not None:
                 bp = await cache.update(sym, spot=last)
                 publish_bybit_ticker(mux, "SPOT", item)
-                _ = bp  # basis is still computed internally by cache if needed
+                _ = bp  # basis internal if потрібно
 
     async def on_message_linear(msg: dict):
         for item in iter_ticker_entries(msg):
@@ -602,11 +740,13 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
                 _ = bp
 
     async def runner():
-        await asyncio.gather(
-            ws_spot.run(on_message_spot),
-            ws_linear.run(on_message_linear),
-            refresh_meta_task(),
-        )
+        tasks = []
+        if ws_spot:
+            tasks.append(ws_spot.run(on_message_spot))
+        if ws_linear:
+            tasks.append(ws_linear.run(on_message_linear))
+        tasks.append(refresh_meta_task())
+        await asyncio.gather(*tasks)
 
     try:
         asyncio.run(runner())
