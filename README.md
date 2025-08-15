@@ -3,7 +3,7 @@
 > Реальний час • Windows • Telegram Alerts • Без індикаторів (Price Action / Liquidity Filters)
 
 ## Огляд
-UA: Телеграм-бот відстежує спред (basis %) між SPOT та ф’ючерсами (USDT‑перпетуали) на Bybit. Підтримано режим реального часу через WebSocket, фільтри ліквідності, попередній перегляд алертів і експорт сигналів у CSV.  
+UA: Телеграм-бот відстежує спред (basis %) між SPOT та ф’ючерсами (USDT‑перпетуали) на Bybit. Підтримано режим реального часу через WebSocket, фільтри ліквідності, попередній перегляд алертів і експорт сигналів у CSV.
 EN: Telegram bot that tracks the spread (basis %) between SPOT and USDT‑perpetual futures on Bybit. Real‑time via WebSocket, liquidity filters, alert preview, and CSV export included.
 
 ---
@@ -120,7 +120,7 @@ schtasks /Create /TN "BybitArbBot CSV Export Hourly" /TR "C:\Projectsybit-arb-b
 ---
 
 ## WS Multiplexer (Крок 5.6 — мітка, безломний)
-`src/ws/multiplexer.py` — потокобезпечний маршрутизатор подій із підтримкою `*`‑wildcard для `source/channel/symbol`. Не створює мережевих підключень і не залежить від asyncio.  
+`src/ws/multiplexer.py` — потокобезпечний маршрутизатор подій із підтримкою `*`‑wildcard для `source/channel/symbol`. Не створює мережевих підключень і не залежить від asyncio.
 Семантика `stats()` узгоджена з «ледачою відпискою» (поки не викликаємо `clear_inactive()`, кількість підписок відображається стало).
 
 Приклад:
@@ -144,7 +144,7 @@ mux.clear_inactive()
 
 ## Профілі `.env` (локальна утиліта, опційно; Windows)
 
-> Скрипт **не входить у репозиторій** і рекомендовано зберігати локально. Поклади файл `use-profile.safe.ps1` у **корінь проєкту** (поруч із `.env`).  
+> Скрипт **не входить у репозиторій** і рекомендовано зберігати локально. Поклади файл `use-profile.safe.ps1` у **корінь проєкту** (поруч із `.env`).
 > Бекапи `.env` зберігаються у `.\.backups\\env\\` і вже ігноруються git-ом (`.backups/`, `.env.backup.*`).
 
 ### Запуск без зміни політик PowerShell

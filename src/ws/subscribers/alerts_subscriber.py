@@ -4,13 +4,13 @@ from __future__ import annotations
 import asyncio
 import math
 import time
-from typing import Callable, Optional, Dict, Awaitable
+from typing import Awaitable, Callable, Dict, Optional
 
 from loguru import logger
 
-from src.ws.multiplexer import WSMultiplexer, WsEvent
 from src.infra.config import AppSettings, load_settings
 from src.telegram.sender import TelegramSender
+from src.ws.multiplexer import WsEvent, WSMultiplexer
 
 
 class AlertsSubscriber:

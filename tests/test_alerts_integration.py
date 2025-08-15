@@ -1,5 +1,5 @@
-﻿from types import SimpleNamespace
 import importlib
+from types import SimpleNamespace
 
 # Ми тестуємо, що main використовує форматери, якщо вони доступні,
 # і що відправка в Telegram отримує саме відформатований текст.

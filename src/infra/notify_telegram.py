@@ -1,4 +1,4 @@
-﻿from typing import Optional
+from typing import Optional
 
 from src.infra import config
 from src.telegram.sender import TelegramSender

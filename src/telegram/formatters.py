@@ -1,4 +1,4 @@
-﻿# src/telegram/formatters.py
+# src/telegram/formatters.py
 from __future__ import annotations
 
 from datetime import datetime, timezone

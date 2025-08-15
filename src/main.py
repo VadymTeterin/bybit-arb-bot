@@ -4,9 +4,9 @@ from __future__ import annotations
 import argparse
 import sys
 import time
-from pathlib import Path
-from typing import Any, Dict, List, Tuple, Optional
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 from loguru import logger
@@ -144,7 +144,9 @@ def cmd_bybit_top(args: argparse.Namespace) -> int:
     return 0
 
 
-def _basis_rows(min_vol: float, threshold: float) -> tuple[
+def _basis_rows(
+    min_vol: float, threshold: float
+) -> tuple[
     list[tuple[str, float, float, float, float]],
     list[tuple[str, float, float, float, float]],
 ]:
@@ -536,10 +538,11 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
 
     try:
         import asyncio
-        from src.exchanges.bybit.ws import BybitWS, iter_ticker_entries
+
         from src.core.cache import QuoteCache
-        from src.ws.multiplexer import WSMultiplexer
+        from src.exchanges.bybit.ws import BybitWS, iter_ticker_entries
         from src.ws.bridge import publish_bybit_ticker
+        from src.ws.multiplexer import WSMultiplexer
         from src.ws.subscribers.alerts_subscriber import AlertsSubscriber
     except Exception as e:  # noqa: BLE001
         print("WS components are missing. Please add ws.py and cache.py:", str(e))

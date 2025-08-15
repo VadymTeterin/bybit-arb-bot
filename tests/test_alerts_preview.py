@@ -1,4 +1,4 @@
-﻿# tests/test_alerts_preview.py
+# tests/test_alerts_preview.py
 import subprocess
 import sys
 

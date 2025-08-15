@@ -1,7 +1,7 @@
-﻿from typing import Any
+from typing import Any
 
-from src.telegram.formatters import format_arbitrage_alert
 from src.infra.notify_telegram import send_telegram
+from src.telegram.formatters import format_arbitrage_alert
 
 
 def send_arbitrage_alert(signal: Any, enabled: bool = True) -> bool:

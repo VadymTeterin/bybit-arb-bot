@@ -3,9 +3,9 @@ import asyncio
 import re
 from typing import List
 
-from src.ws.multiplexer import WSMultiplexer, WsEvent
-from src.ws.subscribers.alerts_subscriber import AlertsSubscriber
 from src.infra.config import AppSettings
+from src.ws.multiplexer import WsEvent, WSMultiplexer
+from src.ws.subscribers.alerts_subscriber import AlertsSubscriber
 
 
 async def _wait():

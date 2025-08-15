@@ -4,10 +4,9 @@ import asyncio
 import math
 import time
 from dataclasses import dataclass
-from typing import Awaitable, Callable, Optional, Dict
+from typing import Awaitable, Callable, Dict, Optional
 
 from src.telegram.formatters import format_signal
-
 
 SendFunc = Callable[[str], Awaitable[None]]
 

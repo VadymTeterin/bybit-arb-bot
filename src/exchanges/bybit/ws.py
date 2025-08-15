@@ -6,35 +6,158 @@ import json
 import random
 from typing import Awaitable, Callable, Dict, Iterable, Iterator, List, Optional
 
+try:
+    from loguru import logger  # type: ignore
+except Exception:  # pragma: no cover
+    import logging
+
+    logger = logging.getLogger("bybit.ws")
+
 import aiohttp
-from loguru import logger
 
 BackoffFn = Callable[[int], float]
 
 
 def exp_backoff_with_jitter(
-    attempt: int, *, base: float = 1.0, cap: float = 30.0
+    attempt: int,
+    *,
+    base: float = 1.0,
+    factor: float = 2.0,
+    cap: float = 30.0,
 ) -> float:
     """
-    Експоненціальний backoff з легким jitter.
-    attempt: 1,2,3,... -> ~1,2,4,8,... (обмежено cap)
-    Повертає затримку у секундах.
+    Exponential backoff with jitter in the interval [t/2, t],
+    where t = min(cap, base * factor**(attempt-1)).
+    Підтримує виклики з kwargs: base=..., cap=..., factor=...
     """
     if attempt < 1:
         attempt = 1
-    delay = min(cap, base * (2 ** (attempt - 1)))
-    # jitter у [delay/2, delay] -> щоб уникати "thundering herd"
-    jitter = delay * (0.5 * random.random())
-    return delay - jitter
+    upper = min(cap, base * (factor ** (attempt - 1)))
+    if upper <= 0:
+        return 0.0
+    lower = upper * 0.5
+    # рівномірно у [t/2, t]
+    return lower + random.random() * (upper - lower)
 
 
-class BybitWS:
+def _to_float(v, default: Optional[float] = None) -> Optional[float]:
+    if v is None:
+        return default
+    try:
+        return float(v)
+    except Exception:
+        try:
+            return float(str(v).strip())
+        except Exception:
+            return default
+
+
+def _from_e_scaled(val) -> Optional[float]:
+    # Supports fields like "...E8" or "...E4"
+    if val is None:
+        return None
+    s = str(val).strip()
+    try:
+        # plain float will succeed for e.g. "123.45"
+        return float(s)
+    except Exception:
+        pass
+    try:
+        return float(s)
+    except Exception:
+        return None
+
+
+def _pick_first(*vals) -> Optional[float]:
+    for v in vals:
+        if v is None:
+            continue
+        return v
+    return None
+
+
+def _infer_symbol_from_topic(topic: str) -> Optional[str]:
+    # bybit v5 topics look like "tickers.BTCUSDT" or "tickers"
+    if not topic:
+        return None
+    if "." in topic:
+        return topic.split(".", 1)[1].strip().upper() or None
+    return None
+
+
+def iter_ticker_entries(message: Dict) -> Iterator[Dict]:
     """
-    Полегшений клієнт Bybit v5 (public WS).
-    Очікує topics типу: "tickers" або "tickers.BTCUSDT".
+    Normalize Bybit v5 'tickers' message into rows of:
+    { 'symbol': str, 'last': float|None, 'mark': float|None }
+    Accepts both object and array payloads, and E8/E4 integer variants.
+    """
+    topic = str(message.get("topic") or "").strip()
+    data = message.get("data")
+    if data is None:
+        return iter(())  # empty
+    rows: List[Dict] = []
+    if isinstance(data, dict):
+        arr = [data]
+    elif isinstance(data, list):
+        arr = list(data)
+    else:
+        return iter(())
+
+    for item in arr:
+        if not isinstance(item, dict):
+            continue
+        symbol = item.get("symbol") or _infer_symbol_from_topic(topic) or ""
+        symbol = str(symbol).upper()
+
+        # last price
+        last = _to_float(item.get("lastPrice"))
+        if last is None:
+            lp_e8 = item.get("lastPriceE8")
+            if lp_e8 is not None:
+                last = _from_e_scaled(lp_e8)
+                if last is not None:
+                    last /= 1e8
+            else:
+                lp_e4 = item.get("lastPriceE4")
+                if lp_e4 is not None:
+                    last = _from_e_scaled(lp_e4)
+                    if last is not None:
+                        last /= 1e4
+        if last is None:
+            last = _to_float(item.get("lastPriceLatest"))
+
+        # mark price (derivatives)
+        mark = _to_float(item.get("markPrice"))
+        if mark is None:
+            mp_e8 = item.get("markPriceE8")
+            if mp_e8 is not None:
+                mark = _from_e_scaled(mp_e8)
+                if mark is not None:
+                    mark /= 1e8
+            else:
+                mp_e4 = item.get("markPriceE4")
+                if mp_e4 is not None:
+                    mark = _from_e_scaled(mp_e4)
+                    if mark is not None:
+                        mark /= 1e4
+
+        rows.append({"symbol": symbol, "last": last, "mark": mark})
+    return iter(rows)
+
+
+class BybitPublicWS:
+    """
+    Minimal Bybit v5 public WS client (spot/linear).
+    - Connects to given URL
+    - Subscribes to topics list (e.g. ["tickers.BTCUSDT","tickers.ETHUSDT"] or ["tickers"])
+    - Calls on_message for every incoming JSON
     """
 
-    def __init__(self, url: str, topics: Iterable[str]) -> None:
+    def __init__(
+        self,
+        url: str,
+        topics: Iterable[str],
+    ) -> None:
         self.url = url
         self.topics = list(topics)
         self._stop = asyncio.Event()
@@ -42,11 +165,13 @@ class BybitWS:
 
     async def _subscribe(self, ws: aiohttp.ClientWebSocketResponse) -> None:
         if not self.topics:
-            logger.bind(tag="WS").warning("No topics provided; skipping subscribe")
             return
-        payload = {"op": "subscribe", "args": self.topics}
-        await ws.send_str(json.dumps(payload))
-        logger.bind(tag="WS").info(f"Subscribed to {len(self.topics)} topic(s)")
+        msg = {"op": "subscribe", "args": self.topics}
+        await ws.send_str(json.dumps(msg))
+        logger.debug(f"WS subscribe -> {msg}")
+
+    async def stop(self) -> None:
+        self._stop.set()
 
     async def run(
         self,
@@ -55,8 +180,8 @@ class BybitWS:
         heartbeat: int = 30,
     ) -> None:
         """
-        Головний цикл з автоперепідключенням.
-        on_message отримує розпарсений JSON (dict).
+        Main loop with auto-reconnect.
+        on_message receives parsed JSON (dict).
         """
         self._stop.clear()
         attempt = 1
@@ -65,120 +190,35 @@ class BybitWS:
             self._session = session
             while not self._stop.is_set():
                 try:
-                    logger.bind(tag="WS").info(f"Connecting to {self.url}")
                     async with session.ws_connect(self.url, heartbeat=heartbeat) as ws:
-                        attempt = 1  # успіх — скидаємо лічильник
+                        logger.info(f"WS connected: {self.url}")
+                        attempt = 1
                         await self._subscribe(ws)
 
                         async for msg in ws:
+                            if self._stop.is_set():
+                                break
                             if msg.type == aiohttp.WSMsgType.TEXT:
                                 try:
-                                    data = json.loads(msg.data)
+                                    payload = json.loads(msg.data)
                                 except Exception:
-                                    logger.bind(tag="WS").warning(
-                                        "Non‑JSON message skipped"
-                                    )
+                                    logger.warning("WS non-JSON text frame")
                                     continue
-                                await on_message(data)
+                                await on_message(payload)
+                            elif msg.type == aiohttp.WSMsgType.BINARY:
+                                continue
+                            elif msg.type == aiohttp.WSMsgType.ERROR:
+                                logger.error(f"WS error: {ws.exception()}")
+                                break
                             elif msg.type in (
                                 aiohttp.WSMsgType.CLOSED,
-                                aiohttp.WSMsgType.ERROR,
+                                aiohttp.WSMsgType.CLOSING,
                             ):
-                                raise ConnectionError("WebSocket closed or error state")
-                except asyncio.CancelledError:
-                    raise
+                                break
                 except Exception as e:
                     delay = backoff(attempt)
-                    logger.bind(tag="RECONNECT").warning(
-                        f"WS error: {e!r}. Reconnect in {delay:.1f}s (attempt {attempt})"
-                    )
+                    logger.warning(f"WS reconnect in {delay:.2f}s after error: {e!r}")
+                    await asyncio.sleep(delay)
                     attempt += 1
-                    try:
-                        await asyncio.wait_for(self._stop.wait(), timeout=delay)
-                    except asyncio.TimeoutError:
-                        # минув таймаут — пробуємо знову
-                        pass
 
-    async def stop(self) -> None:
-        self._stop.set()
-        if self._session and not self._session.closed:
-            await self._session.close()
-
-
-# ---------------------------
-#   УТИЛІТИ ПАРСИНГУ TICKERS
-# ---------------------------
-
-
-def _to_float(x) -> Optional[float]:
-    if x is None:
-        return None
-    try:
-        return float(x)
-    except Exception:
-        return None
-
-
-def _scale_from_key(key: str) -> float:
-    # ..E4 -> 1e-4, ..E8 -> 1e-8
-    k = key.lower()
-    if k.endswith("e4"):
-        return 1e-4
-    if k.endswith("e8"):
-        return 1e-8
-    return 1.0
-
-
-def _extract_first_number(obj: Dict, keys: List[str]) -> Optional[float]:
-    """
-    Повертає перше знайдене числове значення за списком ключів.
-    Підтримує *_E4/*_E8 (ділення на 1e4/1e8).
-    """
-    for k in keys:
-        if k in obj and obj[k] is not None:
-            val = obj[k]
-            scale = _scale_from_key(k)
-            f = _to_float(val)
-            if f is not None:
-                return f * scale
-    return None
-
-
-def _symbol_from_topic(topic: str) -> Optional[str]:
-    # "tickers.BTCUSDT" -> "BTCUSDT"
-    if not topic:
-        return None
-    parts = topic.split(".")
-    return parts[-1] if len(parts) > 1 else None
-
-
-def iter_ticker_entries(msg: Dict) -> Iterator[Dict[str, Optional[float]]]:
-    """
-    Генерує елементи виду {"symbol": str, "last": float|None, "mark": float|None}
-    з повідомлення Bybit v5 для теми tickers.* (spot/linear).
-    """
-    if not isinstance(msg, dict):
-        return
-    topic = msg.get("topic", "") or ""
-    data = msg.get("data")
-
-    # Деякі повідомлення мають data як список, інші — як dict
-    rows: List[Dict] = []
-    if isinstance(data, list):
-        rows = [d for d in data if isinstance(d, dict)]
-    elif isinstance(data, dict):
-        rows = [data]
-
-    for row in rows:
-        sym = row.get("symbol") or _symbol_from_topic(topic)
-        last = _extract_first_number(row, ["lastPrice", "lastPriceE4", "lastPriceE8"])
-        mark = _extract_first_number(row, ["markPrice", "markPriceE4", "markPriceE8"])
-        if sym:
-            yield {"symbol": sym, "last": last, "mark": mark}
-
-
-__all__ = [
-    "BybitWS",
-    "exp_backoff_with_jitter",
-    "iter_ticker_entries",
-]
+        logger.info("WS stopped")

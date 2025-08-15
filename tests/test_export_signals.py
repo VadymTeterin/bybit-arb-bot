@@ -1,29 +1,21 @@
 from __future__ import annotations
 
 import csv
-
 import sqlite3
-
 from datetime import datetime, timedelta, timezone
-
 from importlib import reload
-
 from pathlib import Path
 
-
-from src.storage import persistence as _persistence
-
 from scripts import export_signals
+from src.storage import persistence as _persistence
 
 
 def _seed(db_path: Path, rows):
-
     con = sqlite3.connect(str(db_path))
 
     cur = con.cursor()
 
     for r in rows:
-
         cur.execute(
             """
 
@@ -41,7 +33,6 @@ def _seed(db_path: Path, rows):
 
 
 def test_export_last_24h(tmp_path, monkeypatch):
-
     # Тимчасова БД і прив'язка шляху через env
 
     db = tmp_path / "t.db"
@@ -109,7 +100,6 @@ def test_export_last_24h(tmp_path, monkeypatch):
     # Перевірка вмісту
 
     with path.open("r", encoding="utf-8", newline="") as f:
-
         reader = csv.reader(f)
 
         rows = list(reader)

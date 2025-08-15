@@ -1,19 +1,12 @@
 from __future__ import annotations
 
 import argparse
-
 import csv
-
 import os
-
 import sqlite3
-
 from datetime import datetime, timedelta, timezone
-
 from pathlib import Path
-
-from typing import Optional, Tuple, List
-
+from typing import List, Optional, Tuple
 
 DEFAULT_DB = "data/signals.db"
 
@@ -21,18 +14,14 @@ ISO_FMT = "%Y-%m-%dT%H:%M:%S.%f"
 
 
 def _ensure_parent_dir(path: Path) -> None:
-
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
 def _parse_iso(s: str) -> datetime:
-
     try:
-
         return datetime.strptime(s, ISO_FMT).replace(tzinfo=timezone.utc)
 
     except ValueError:
-
         return datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
 
 
@@ -43,7 +32,6 @@ def _select_rows(
     until: Optional[str],
     limit: Optional[int],
 ) -> List[Tuple]:
-
     base_sql = """
 
       SELECT symbol, spot_price, futures_price, basis_pct, volume_24h_usd, timestamp
@@ -57,21 +45,17 @@ def _select_rows(
     params: List[object] = []
 
     if since or until:
-
         if since:
-
             where.append("timestamp >= ?")
 
             params.append(since)
 
         if until:
-
             where.append("timestamp <= ?")
 
             params.append(until)
 
     elif last_hours is not None:
-
         cutoff = (
             datetime.now(timezone.utc) - timedelta(hours=int(last_hours))
         ).isoformat()
@@ -87,7 +71,6 @@ def _select_rows(
     limit_sql = " LIMIT ?" if (limit is not None and int(limit) > 0) else ""
 
     if limit_sql:
-
         params.append(int(limit))
 
     sql = base_sql + where_sql + order_sql + limit_sql
@@ -100,19 +83,14 @@ def _select_rows(
 
 
 def _localize_ts(ts: str, tz_name: Optional[str]) -> str:
-
     if not tz_name:
-
         return ts
 
     try:
-
         if tz_name.upper() == "EUROPE/KYIV" or tz_name.lower() == "europe/kyiv":
-
             offset = timedelta(hours=3)  # літній час (спрощено)
 
         elif tz_name.startswith(("+", "-")) and len(tz_name) in (6, 9):
-
             parts = tz_name[1:].split(":")
 
             sign = 1 if tz_name[0] == "+" else -1
@@ -126,7 +104,6 @@ def _localize_ts(ts: str, tz_name: Optional[str]) -> str:
             offset = sign * timedelta(hours=hours, minutes=minutes, seconds=seconds)
 
         else:
-
             return ts
 
         dt_utc = _parse_iso(ts)
@@ -136,7 +113,6 @@ def _localize_ts(ts: str, tz_name: Optional[str]) -> str:
         return dt_local.replace(microsecond=0).isoformat()
 
     except Exception:
-
         return ts
 
 
@@ -150,17 +126,13 @@ def export_signals(
     keep: Optional[int] = None,
     db_path: Optional[str] = None,
 ) -> Path:
-
     if last_hours is not None and (since or until):
-
         raise ValueError("Use either --last-hours OR (--since/--until), not both.")
 
     if last_hours is not None and last_hours <= 0:
-
         raise ValueError("--last-hours must be > 0")
 
     if limit is not None and limit <= 0:
-
         raise ValueError("--limit must be > 0")
 
     db = db_path or os.getenv("DB_PATH", DEFAULT_DB)
@@ -176,7 +148,6 @@ def export_signals(
     _ensure_parent_dir(out_path)
 
     with out_path.open("w", newline="", encoding="utf-8") as f:
-
         w = csv.writer(f)
 
         w.writerow(
@@ -191,13 +162,11 @@ def export_signals(
         )
 
         for symbol, spot, fut, basis, vol, ts in rows:
-
             ts_out = _localize_ts(ts, tz)
 
             w.writerow([ts_out, symbol, spot, fut, basis, vol])
 
     if keep is not None and keep > 0:
-
         stem = out_path.stem
 
         prefix = stem.split("_")[0]
@@ -209,27 +178,22 @@ def export_signals(
         )
 
         for old in all_csv[keep:]:
-
             try:
-
                 old.unlink()
 
             except Exception:
-
                 pass
 
     return out_path
 
 
 def _default_out_name(prefix: str = "signals") -> str:
-
     now = datetime.now(timezone.utc)
 
     return f"{prefix}_{now.strftime('%Y-%m-%d_%H%M')}.csv"
 
 
 def main() -> None:
-
     p = argparse.ArgumentParser(
         description="Export arbitrage signals from SQLite to CSV (Windows-friendly)."
     )
@@ -293,5 +257,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-
     main()

@@ -1,7 +1,8 @@
 import time
+
 import pytest
 
-from src.ws.multiplexer import WSMultiplexer, WsEvent
+from src.ws.multiplexer import WsEvent, WSMultiplexer
 
 
 def make_evt(source="SPOT", channel="book_ticker", symbol="BTCUSDT", payload=None):

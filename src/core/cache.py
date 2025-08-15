@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import math
 from time import time
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, List, Optional, Tuple
 
 
 class QuoteCache:

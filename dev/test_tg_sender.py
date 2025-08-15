@@ -1,4 +1,4 @@
-﻿from src.infra.notify_telegram import TelegramNotifier
+from src.infra.notify_telegram import TelegramNotifier
 from src.telegram.formatters import format_arbitrage_alert
 
 

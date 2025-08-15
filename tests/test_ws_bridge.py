@@ -1,5 +1,5 @@
-from src.ws.multiplexer import WSMultiplexer
 from src.ws.bridge import publish_bybit_ticker
+from src.ws.multiplexer import WSMultiplexer
 
 
 def test_publish_bybit_ticker_delivers_to_matching_subscription():
