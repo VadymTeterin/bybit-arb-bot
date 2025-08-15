@@ -13,11 +13,11 @@ def _fmt_usd(x: Optional[float]) -> str:
     except Exception:
         return "n/a"
     if x >= 1_000_000_000:
-        return f"${x/1_000_000_000:.2f}B"
+        return f"${x / 1_000_000_000:.2f}B"
     if x >= 1_000_000:
-        return f"${x/1_000_000:.2f}M"
+        return f"${x / 1_000_000:.2f}M"
     if x >= 1_000:
-        return f"${x/1_000:.2f}K"
+        return f"${x / 1_000:.2f}K"
     return f"${x:.2f}"
 
 
@@ -39,7 +39,7 @@ def _fmt_pct(x: Optional[float]) -> str:
     if x is None:
         return "n/a"
     try:
-        return f"{float(x)*100:.2f}%"
+        return f"{float(x) * 100:.2f}%"
     except Exception:
         return "n/a"
 

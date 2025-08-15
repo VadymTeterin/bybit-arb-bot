@@ -255,7 +255,7 @@ def preview_message(
 
 
 def _fmt_pct(x: float | None) -> str:
-    return f"{x*100:.2f}%" if x is not None else "n/a"
+    return f"{x * 100:.2f}%" if x is not None else "n/a"
 
 
 def _fmt_ts(ts: float | None) -> str:
