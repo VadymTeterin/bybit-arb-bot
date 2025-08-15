@@ -46,3 +46,7 @@ project-tree.txt
 *.bak
 
 __tmp/
+
+.env.*
+
+!.env.example
