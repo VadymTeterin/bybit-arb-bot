@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from importlib import reload
 
 from src.core import report
@@ -14,9 +14,9 @@ def _seed(db_path):
     # Ініціалізуємо схему
     persistence.init_db()
     # Додаємо 3 записи: один за межами вікна, 2 — свіжі
-    old_ts = datetime.utcnow() - timedelta(hours=30)
-    t1 = datetime.utcnow() - timedelta(hours=2)
-    t2 = datetime.utcnow() - timedelta(hours=1, minutes=30)
+    old_ts = datetime.now(timezone.utc) - timedelta(hours=30)
+    t1 = datetime.now(timezone.utc) - timedelta(hours=2)
+    t2 = datetime.now(timezone.utc) - timedelta(hours=1, minutes=30)
 
     persistence.save_signal("AAAUSDT", 1.0, 1.02, 2.0, 15_000_000, t1)
     persistence.save_signal("BBBUSDT", 2.0, 2.05, 2.5, 25_000_000, t2)

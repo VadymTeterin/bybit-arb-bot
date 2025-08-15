@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple, Optional
+from datetime import datetime, timezone
 
 import requests
 from loguru import logger
@@ -17,33 +19,29 @@ from src.infra.logging import setup_logging
 from src.infra.notify import send_telegram_message
 from src.storage.persistence import init_db
 
-# Опціональна інтеграція з новими модулями (не ламає роботу, якщо їх ще немає / без потрібних функцій)
-try:  # telegram форматування повідомлень
+# Опціональна інтеграція з новими модулями
+try:
     from src.telegram import formatters as _tg_formatters  # type: ignore
 except Exception:  # noqa: BLE001
     _tg_formatters = None
 
-try:  # core alerts (наприклад, cooldown, пост-обробка кандидатів)
+try:
     from src.core import alerts as _core_alerts  # type: ignore
 except Exception:  # noqa: BLE001
     _core_alerts = None
 
 
-APP_VERSION = "0.4.2"  # 4.4: інтеграція core/alerts + telegram/formatters (опціонально)
+APP_VERSION = "0.4.2"
 
 
 def _safe_call(fn, *args, **kwargs):
-    """
-    Викликає функцію, але tolerant до різниць підпису.
-    Повертає None, якщо виклик не вдався або функції немає.
-    """
     if fn is None:
         return None
     try:
         return fn(*args, **kwargs)
     except TypeError:
         try:
-            return fn(*args)  # відкидаємо kwargs, якщо підпис інший
+            return fn(*args)
         except Exception:
             return None
     except Exception:
@@ -51,14 +49,10 @@ def _safe_call(fn, *args, **kwargs):
 
 
 def safe_print(text: str) -> None:
-    """
-    Безпечний друк у консоль із заміною символів, які не влазять у кодування stdout (Windows cp1251 тощо).
-    """
     try:
         print(text)
     except UnicodeEncodeError:
         enc = (getattr(sys.stdout, "encoding", None) or "utf-8")
-        # replace — щоб не падало на символах на кшталт ≥/≈/…; у крайньому випадку побачимо '?'
         sys.stdout.buffer.write(text.encode(enc, errors="replace"))
         sys.stdout.buffer.write(b"\n")
 
@@ -79,21 +73,17 @@ def cmd_env(_: argparse.Namespace) -> int:
     print("TG_CHAT_ID:", s.telegram.alert_chat_id or "")
     print("TELEGRAM_TOKEN set:", bool(s.telegram.bot_token))
     print("BYBIT_API_KEY set:", bool(s.bybit.api_key))
-    # інфо-поля
     print("ENABLE_ALERTS:", s.enable_alerts)
-    # виводимо сирі рядки та вже розпарсені списки
     print("ALLOW_SYMBOLS (raw):", s.allow_symbols)
     print("ALLOW_SYMBOLS (list):", ",".join(s.allow_symbols_list))
     print("DENY_SYMBOLS (raw):", s.deny_symbols)
     print("DENY_SYMBOLS (list):", ",".join(s.deny_symbols_list))
-    # WS-параметри (4.2+)
     print("WS_ENABLED:", s.ws_enabled)
     print("WS_PUBLIC_URL_LINEAR:", s.ws_public_url_linear)
     print("WS_PUBLIC_URL_SPOT:", s.ws_public_url_spot)
     print("WS_SUB_TOPICS_LINEAR (list):", ",".join(s.ws_topics_list_linear))
     print("WS_SUB_TOPICS_SPOT (list):", ",".join(s.ws_topics_list_spot))
     print("WS_RECONNECT_MAX_SEC:", s.ws_reconnect_max_sec)
-    # 4.3
     print("RT_META_REFRESH_SEC:", s.rt_meta_refresh_sec)
     print("RT_LOG_PASSES:", s.rt_log_passes)
     return 0
@@ -158,12 +148,6 @@ def _basis_rows(min_vol: float, threshold: float) -> tuple[
     list[tuple[str, float, float, float, float]],
     list[tuple[str, float, float, float, float]],
 ]:
-    """
-    Повертає (rows_pass, rows_all):
-      - rows_pass: пари, що пройшли фільтри (vol && |basis|>=threshold)
-      - rows_all: усі зіставлені пари для діагностики
-    Кортеж елемента: (symbol, spot_price, fut_price, basis_pct, vol_min)
-    """
     client = BybitRest()
     spot_map = client.get_spot_map()
     lin_map = client.get_linear_map()
@@ -229,16 +213,12 @@ def _alerts_allowed(s) -> bool:
 
 
 def _format_alert_text(rows: list[tuple[str, float, float, float, float]], threshold: float, min_vol: float) -> str:
-    """
-    Використовує src/telegram/formatters якщо доступний, інакше — дефолтне форматування.
-    """
     if rows:
         header = f"Top {len(rows)} basis (≥ {threshold:.2f}%, MinVol ${min_vol:,.0f})"
         if _tg_formatters and hasattr(_tg_formatters, "format_basis_top"):
             txt = _safe_call(getattr(_tg_formatters, "format_basis_top", None), rows, header)
             if isinstance(txt, str) and txt.strip():
                 return txt
-        # дефолт
         lines = [header]
         for i, (sym, sp, fu, b, vol) in enumerate(rows, 1):
             sign = "+" if b >= 0 else ""
@@ -250,20 +230,29 @@ def _format_alert_text(rows: list[tuple[str, float, float, float, float]], thres
             txt = _safe_call(getattr(_tg_formatters, "format_no_candidates", None), header)
             if isinstance(txt, str) and txt.strip():
                 return txt
-        # дефолт
         return header + "\nTry lowering threshold or MinVol."
 
 
 # --------- ПРЕВ'Ю АЛЕРТУ (без відправки) ---------
 def preview_message(symbol: str, spot: float, mark: float, vol: float, threshold: float) -> str:
-    """
-    Формує текст повідомлення для однієї пари, використовуючи форматер (якщо є).
-    """
     if spot <= 0 or mark <= 0:
         return "Invalid prices for preview."
     basis = (mark - spot) / spot * 100.0
     rows = [(symbol, spot, mark, basis, vol)]
     return _format_alert_text(rows, threshold=threshold, min_vol=vol)
+
+
+def _fmt_pct(x: float | None) -> str:
+    return f"{x*100:.2f}%" if x is not None else "n/a"
+
+
+def _fmt_ts(ts: float | None) -> str:
+    if not ts:
+        return "n/a"
+    try:
+        return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    except Exception:
+        return "n/a"
 
 
 def cmd_alerts_preview(args: argparse.Namespace) -> int:
@@ -273,9 +262,44 @@ def cmd_alerts_preview(args: argparse.Namespace) -> int:
     mark = float(args.mark)
     vol = float(args.vol)
     threshold = float(args.threshold if args.threshold is not None else s.alert_threshold_pct)
+
     text = preview_message(symbol, spot, mark, vol, threshold)
     safe_print(text)
+
+    # Додатково: Funding (prev) + Next funding (UTC)
+    try:
+        client = BybitRest()
+        f = client.get_prev_funding(symbol)
+        rate = f.get("funding_rate", None)
+        next_ts = f.get("next_funding_time", None)
+    except Exception:
+        rate, next_ts = None, None
+
+    if rate is not None or next_ts:
+        print(f"Funding (prev): {_fmt_pct(rate)}")
+        print(f"Next funding: {_fmt_ts(next_ts)}")
+
     return 0
+
+
+# ---------- Funding cache для basis:alert та WS ----------
+_FUND_CACHE: Dict[str, Tuple[float, Optional[float], Optional[float]]] = {}
+_FUND_TTL_SEC = 8 * 60  # 8 хвилин
+
+def _get_funding_with_cache(client: BybitRest, symbol: str) -> tuple[Optional[float], Optional[float]]:
+    now = time.time()
+    cached = _FUND_CACHE.get(symbol)
+    if cached and (now - cached[0] < _FUND_TTL_SEC):
+        _, r, n = cached
+        return r, n
+    try:
+        f = client.get_prev_funding(symbol)
+        rate = f.get("funding_rate", None)
+        next_ts = f.get("next_funding_time", None)
+    except Exception:
+        rate, next_ts = None, None
+    _FUND_CACHE[symbol] = (now, rate, next_ts)
+    return rate, next_ts
 
 
 def cmd_basis_alert(args: argparse.Namespace) -> int:
@@ -285,9 +309,7 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
         return 0
 
     min_vol = float(args.min_vol if args.min_vol is not None else s.min_vol_24h_usd)
-    threshold = float(
-        args.threshold if args.threshold is not None else s.alert_threshold_pct
-    )
+    threshold = float(args.threshold if args.threshold is not None else s.alert_threshold_pct)
     limit = int(args.limit)
 
     if not s.telegram.bot_token or not s.telegram.alert_chat_id:
@@ -296,7 +318,7 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
 
     rows_pass, _ = _basis_rows(min_vol=min_vol, threshold=threshold)
 
-    # опціональна пост-обробка кандидатів через core.alerts (наприклад, cooldown)
+    # опційний cooldown із core.alerts
     if _core_alerts and hasattr(_core_alerts, "apply_cooldown"):
         cooled = _safe_call(getattr(_core_alerts, "apply_cooldown", None), rows_pass, getattr(s, "alert_cooldown_sec", 0))
         if isinstance(cooled, list):
@@ -304,13 +326,26 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
 
     rows = rows_pass[:limit]
 
+    # 1) Формуємо основний текст (через форматер або дефолт)
     text = _format_alert_text(rows, threshold, min_vol)
+
+    # 2) Додаємо Funding ТІЛЬКИ якщо НЕ використовується кастомний форматер rows
+    used_custom_rows_formatter = bool(_tg_formatters and hasattr(_tg_formatters, "format_basis_top"))
+    if rows and not used_custom_rows_formatter:
+        client = BybitRest()
+        lines = []
+        for sym, _sp, _fu, _b, _vol in rows:
+            rate, next_ts = _get_funding_with_cache(client, sym)
+            line = f"{sym} — Funding (prev): {_fmt_pct(rate)}; Next: {_fmt_ts(next_ts)}"
+            lines.append(line)
+        if lines:
+            text = text + "\n" + "\n".join(lines)
+
     safe_print(text)
 
     try:
         send_telegram_message(s.telegram.bot_token, s.telegram.alert_chat_id, text)
         logger.success("Telegram alert sent.")
-        # опціонально повідомимо core.alerts про успішну відправку
         if _core_alerts and hasattr(_core_alerts, "on_alert_sent"):
             _safe_call(getattr(_core_alerts, "on_alert_sent", None), rows)
     except requests.HTTPError as e:
@@ -447,25 +482,68 @@ def cmd_price_pair(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---------- WS:RUN (4.3 realtime basis + filters) ----------
+# ---------- WS:RUN ----------
 def cmd_ws_run(_: argparse.Namespace) -> int:
     s = load_settings()
     if not s.ws_enabled:
         print("WS is disabled by config (set WS_ENABLED=1 in .env).")
         return 0
 
+    # Всі імпорти та інтеграція — всередині функції (не заважає імпорту модуля)
     try:
         import asyncio
         from src.exchanges.bybit.ws import BybitWS, iter_ticker_entries
         from src.core.cache import QuoteCache
+        from src.ws.multiplexer import WSMultiplexer
+        from src.ws.bridge import publish_bybit_ticker
     except Exception as e:  # noqa: BLE001
         print("WS components are missing. Please add ws.py and cache.py:", str(e))
         return 1
 
+    # Ініціалізація
     cache = QuoteCache()
-
     ws_linear = BybitWS(s.ws_public_url_linear, s.ws_topics_list_linear)
     ws_spot = BybitWS(s.ws_public_url_spot, s.ws_topics_list_spot)
+
+    # WS Multiplexer (integration, non-breaking)
+    mux = WSMultiplexer(name="core")
+
+    # --- NEW: cooldown і асинхронне відправлення TG‑алертів із Funding ---
+    last_sent: Dict[str, float] = {}
+    client_funding = BybitRest()
+
+    def _can_send(sym: str) -> bool:
+        cd = max(30, int(getattr(s, "alert_cooldown_sec", 300)))
+        t0 = last_sent.get(sym, 0.0)
+        return (time.time() - t0) >= cd
+
+    def _mark_sent(sym: str) -> None:
+        last_sent[sym] = time.time()
+
+    async def ws_send_alert(sym: str, basis: float) -> None:
+        """
+        Легка текстівка для WS‑алерта, щоб не залежати від внутрішностей QuoteCache.
+        """
+        rate, next_ts = _get_funding_with_cache(client_funding, sym)
+        sign = "+" if basis >= 0 else ""
+        lines = [
+            "*RT Arbitrage Alert*",
+            f"{sym}: basis={sign}{basis:.2f}%",
+        ]
+        # додаємо funding, якщо є що показати
+        if rate is not None or next_ts is not None:
+            lines.append(f"Funding (prev): {_fmt_pct(rate)}")
+            lines.append(f"Next funding: {_fmt_ts(next_ts)}")
+        text = "\n".join(lines)
+
+        if s.enable_alerts and s.telegram.bot_token and s.telegram.alert_chat_id:
+            # не блокуємо WS‑луп
+            await asyncio.to_thread(
+                send_telegram_message, s.telegram.bot_token, s.telegram.alert_chat_id, text
+            )
+            logger.success("WS Telegram alert sent for {}", sym)
+        else:
+            logger.info("WS alert (dry):\n{}", text)
 
     async def refresh_meta_task():
         client = BybitRest()
@@ -503,6 +581,10 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
                 if s.rt_log_passes:
                     sign = "+" if basis >= 0 else ""
                     logger.bind(tag="RT").success(f"{rsym} basis={sign}{basis:.2f}%  (passes filters)")
+                # --- NEW: якщо можна — шлемо TG‑алерт (із cooldown) ---
+                if _can_send(sym):
+                    _mark_sent(sym)
+                    await ws_send_alert(sym, basis)
                 break
 
     async def on_message_spot(msg: dict):
@@ -511,7 +593,8 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
             last = item.get("last")
             if sym and last is not None:
                 bp = await cache.update(sym, spot=last)
-                logger.bind(tag="WS.SPOT").debug(f"{sym} spot={last}")
+                # Publish to multiplexer (optional subscribers)
+                publish_bybit_ticker(mux, "SPOT", item)
                 if not math.isnan(bp):
                     await maybe_log_realtime_pass(sym)
 
@@ -521,7 +604,8 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
             mark = item.get("mark")
             if sym and mark is not None:
                 bp = await cache.update(sym, linear_mark=mark)
-                logger.bind(tag="WS.LINEAR").debug(f"{sym} mark={mark}")
+                # Publish to multiplexer (optional subscribers)
+                publish_bybit_ticker(mux, "LINEAR", item)
                 if not math.isnan(bp):
                     await maybe_log_realtime_pass(sym)
 
@@ -632,11 +716,10 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    # логування
     log_dir = Path("./logs")
     setup_logging(log_dir, level="DEBUG")
 
-    # --- ініціалізація SQLite БД на старті ---
+    # ініціалізація SQLite
     try:
         s = load_settings()
         Path(s.db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -651,18 +734,14 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-# --- step-4.5: helper to wire Telegram sender into RealtimeAlerter (when you have an instance) ---
+
+
+# --- step-4.5: helper to wire Telegram sender into RealtimeAlerter ---
 def try_setup_telegram_sender(alerter: Any) -> None:
-    """
-    Якщо доступні core.alerts.telegram_sender та екземпляр RealtimeAlerter,
-    підкидає асинхронний відправник у нього. Безпечно нічого не робить, якщо чогось бракує.
-    """
     try:
-        # перевіряємо, що є RealtimeAlerter і метод set_sender
         from src.core.alerts import RealtimeAlerter  # type: ignore
         if not isinstance(alerter, RealtimeAlerter) or not hasattr(alerter, "set_sender"):
             return
-        # беремо наш async sender з alerts.py (додано вище)
         from src.core.alerts import telegram_sender  # type: ignore
         alerter.set_sender(telegram_sender)
         logger.info("Telegram sender wired into RealtimeAlerter.")

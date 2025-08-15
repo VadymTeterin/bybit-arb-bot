@@ -5,7 +5,7 @@
   * Переконується, що cooldown працює (завдяки recent_signal_exists).
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from src.core import selector
@@ -58,7 +58,7 @@ def test_selector_end_to_end_with_cooldown(monkeypatch):
 
     # Імітуємо БД: AAA — наче вже збережена 2 хв тому (ще під cooldown)
     saved = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     recently_saved = {"AAAUSDT": now - timedelta(seconds=120)}  # 2 хв тому
 
     def fake_init_db():

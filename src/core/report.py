@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from src.storage import persistence
@@ -23,7 +23,7 @@ def format_report(signals: List[Dict[str, Any]], now: Optional[datetime] = None)
         return "No signals for selected period."
 
     if now is None:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
     lines = [f"📊 Arbitrage Report • {now:%Y-%m-%d %H:%M:%S} UTC", ""]
     for i, s in enumerate(signals, 1):
