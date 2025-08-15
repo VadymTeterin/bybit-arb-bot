@@ -13,8 +13,8 @@ EN: Telegram bot that tracks the spread (basis %) between SPOT and USDT‑perpet
 - Фільтри ліквідності: обсяг (24h), глибина ринку
 - Throttling алертів, Telegram‑повідомлення, попередній перегляд форматування
 - SQLite збереження сигналів, звіти, експорт у CSV
-- **WS Multiplexer (Крок 5.6)** — модуль маршрутизації подій із `*`‑wildcard (не змінює чинний 5.5)
-- Легка CLI‑утиліта з командами для діагностики/запуску
+- **WS Multiplexer (Крок 5.6)** — модуль маршрутизації подій із `*`‑wildcard (мітка 5.6 не змінює чинний 5.5)
+- **Інтеграція WS‑мультиплексора в `ws:run` (Крок 5.6 — підкрок)** через міст `src/ws/bridge.py` — `ws:run` публікує тікери у мультиплексор (опційні підписники)
 
 > Платформа розробки: **Windows**. Інструкції для **PowerShell** та VS Code **“Термінал”**.
 
@@ -41,6 +41,7 @@ TELEGRAM__ALERT_CHAT_ID=
 ALERT_THRESHOLD_PCT=1.0
 ALERT_COOLDOWN_SEC=300
 DB_PATH=data/signals.db
+WS_ENABLED=1
 ```
 
 ---
@@ -70,8 +71,8 @@ python -m src.main tg:send --text "Hello from BybitArbBot"
 ```powershell
 python -m src.main ws:run
 ```
-
-> Під час роботи `ws:run` обчислення basis% відбувається на льоту з кешу. Задіяні тротлінг і захист від шуму.
+> Під час роботи `ws:run` обчислення basis% відбувається на льоту з кешу. Задіяні тротлінг і захист від шуму.  
+> **Крок 5.6 (інтеграція):** всередині `ws:run` події SPOT/LINEAR публікуються у `WSMultiplexer` через `publish_bybit_ticker(...)` (див. `src/ws/bridge.py`). Це не змінює поточну поведінку — підписники опційні.
 
 ---
 
@@ -114,26 +115,32 @@ python .\scripts\export_signals.py --keep 14       # ротація CSV
 ### Планувальник завдань Windows
 У репозиторії є `launcher_export.cmd` для Task Scheduler. Приклад створення задачі:
 ```powershell
-schtasks /Create /TN "BybitArbBot CSV Export Hourly" /TR "C:\Projectsybit-arb-bot\launcher_export.cmd" /SC HOURLY /ST 00:05 /F
+schtasks /Create /TN "BybitArbBot CSV Export Hourly" /TR "C:\Projects\bybit-arb-bot\launcher_export.cmd" /SC HOURLY /ST 00:05 /F
 ```
 
 ---
 
-## WS Multiplexer (Крок 5.6 — мітка, безломний)
+## WS Multiplexer (Крок 5.6)
+### Мітка (marker)
 `src/ws/multiplexer.py` — потокобезпечний маршрутизатор подій із підтримкою `*`‑wildcard для `source/channel/symbol`. Не створює мережевих підключень і не залежить від asyncio.  
 Семантика `stats()` узгоджена з «ледачою відпискою» (поки не викликаємо `clear_inactive()`, кількість підписок відображається стало).
+
+### Інтеграція в `ws:run` (підкрок)
+`src/ws/bridge.py` — міст публікації тікерів у мультиплексор. `src/main.py` ініціалізує `WSMultiplexer` та викликає `publish_bybit_ticker(...)` у хендлерах SPOT/LINEAR.
 
 Приклад:
 ```python
 from src.ws.multiplexer import WSMultiplexer, WsEvent
+from src.ws.bridge import publish_bybit_ticker
 import time
 
 mux = WSMultiplexer(name="core")
-unsubscribe = mux.subscribe(handler=lambda e: None, source="SPOT", channel="book_ticker", symbol="BTCUSDT")
+unsubscribe = mux.subscribe(handler=lambda e: None, source="SPOT", channel="tickers", symbol="BTCUSDT")
 
-evt = WsEvent(source="SPOT", channel="book_ticker", symbol="BTCUSDT", payload={"bid": "1"}, ts=time.time())
+evt = WsEvent(source="SPOT", channel="tickers", symbol="BTCUSDT", payload={"last": "50000"}, ts=time.time())
 mux.publish(evt)
 
+publish_bybit_ticker(mux, "SPOT", {"symbol": "BTCUSDT", "last": 50000.0})
 unsubscribe()
 mux.clear_inactive()
 ```
@@ -144,7 +151,7 @@ mux.clear_inactive()
 ```powershell
 pytest -q
 ```
-- Покриття охоплює фільтри ліквідності, кеш котирувань, збереження в БД, форматування алертів, CSV‑експорт і WS‑мультиплексор.
+- Покриття охоплює фільтри ліквідності, кеш котирувань, збереження в БД, форматування алертів, CSV‑експорт, WS‑мультиплексор і міст `ws:bridge`.
 
 ## Стиль коду
 - Форматування: `black`
@@ -158,7 +165,7 @@ src/
   infra/           # логування, конфіги, інтеграції
   storage/         # SQLite, збереження сигналів
   telegram/        # форматери та відправка
-  ws/              # ядро WS + multiplexer (5.6)
+  ws/              # ядро WS + multiplexer (5.6), bridge
 tests/             # pytest
 scripts/           # утиліти, export_signals.py
 exports/, logs/, data/

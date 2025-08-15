@@ -3,11 +3,18 @@
 > Історія змін структурована за фазами і підкроками. Дати подані у форматі YYYY‑MM‑DD (Europe/Kyiv).
 
 ## Phase #5 — Productization & Ops (2025-08-14 → 2025-08-15)
+
 ### Step 5.6 — WS Multiplexer (marker) — 2025-08-15
 - Added: `src/ws/multiplexer.py` — потокобезпечний маршрутизатор подій із підтримкою `*`‑wildcard (source/channel/symbol); без мережевої логіки та без asyncio.
 - Added: `tests/test_ws_multiplexer.py` — subscribe/wildcards/unsubscribe (lazy)/publish‑count/invalid‑input.
 - Changed: `stats()` — семантика «ледачої відписки»: `active_subscriptions == total_subscriptions` до `clear_inactive()`. Додано `active_handlers` для діагностики.
-- Notes: **Marker‑only**. Інтеграцію в `ws:run` виконаємо окремим підкроком. Чинний 5.5 не змінено.
+- Notes: **Marker‑only**. Чинний 5.5 не змінено.
+
+### Step 5.6 — Integration substep (ws:run → WSMultiplexer) — 2025-08-15
+- Integrated: `src/main.py` — `ws:run` публікує `tickers` у WSMultiplexer через `src/ws/bridge.py`.
+- Added: `src/ws/bridge.py` — міст для публікації item‑ів Bybit у мультиплексор.
+- Added: `tests/test_ws_bridge.py` — перевірка доставки подій у підписників.
+- Notes: Без зміни поведінки 5.5; підписники опційні.
 
 ### Step 5.5 — WS baseline & alerts stabilization — 2025-08-14
 - Stabilized: `ws:run` базова конфігурація, узгодження форматерів алертів.
