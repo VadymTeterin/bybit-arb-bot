@@ -1,19 +1,17 @@
-#!/usr/bin/env python3
-"""
-update_project_tree.py
----------------------------------
-Generate a clean text tree of the repository into `project-tree.txt`.
-Windows-friendly. Skips virtualenvs, caches, backups, and heavy/output dirs.
+# scripts/update_project_tree.py
+# Генерує текстове дерево проєкту (Windows PowerShell).
+# Запуск із кореня:
+#   python .\scripts\update_project_tree.py
+# Необов'язково:
+#   python .\scripts\update_project_tree.py --out .\project-tree.txt
 
-Usage (run from repo root):
-  python scripts/update_project_tree.py
-"""
 from __future__ import annotations
 
+import argparse
 import os
 from pathlib import Path
 
-# Directories to skip entirely
+# Каталоги, які пропускаємо
 SKIP_DIRS = {
     ".git",
     ".venv",
@@ -21,13 +19,13 @@ SKIP_DIRS = {
     ".pytest_cache",
     ".ruff_cache",
     ".mypy_cache",
-    ".backups",
     "dev/tmp",
-    "exports",
     "logs",
+    "exports",
+    ".backups",
 }
 
-# Files to skip (globs)
+# Глоб-патерни файлів, які пропускаємо
 SKIP_FILE_GLOBS = {
     "*.pyc",
     "*.pyo",
@@ -39,11 +37,8 @@ SKIP_FILE_GLOBS = {
     "*.db",
 }
 
-OUT_FILE = "project-tree.txt"
-
 
 def should_skip_dir(rel: Path) -> bool:
-    # Skip if starts with any skip dir at any level
     parts = list(rel.parts)
     for i in range(1, len(parts) + 1):
         sub = Path(*parts[:i]).as_posix()
@@ -55,18 +50,17 @@ def should_skip_dir(rel: Path) -> bool:
 def should_skip_file(rel: Path) -> bool:
     name = rel.name
     for pattern in SKIP_FILE_GLOBS:
-        if rel.match(pattern):
-            return True
-        if Path(name).match(pattern):
+        if rel.match(pattern) or Path(name).match(pattern):
             return True
     return False
 
 
 def build_tree(root: Path) -> list[str]:
     lines: list[str] = []
-    lines.append(f"Folder PATH listing\nROOT: {root.resolve()}")
-    # First level: show dotted files in root (like .env) and key files
-    for item in sorted(root.iterdir(), key=lambda p: (p.is_dir() is False, p.name.lower())):
+    lines.append("Folder PATH listing")
+    lines.append(f"ROOT: {root.resolve()}")
+    # Перший рівень: показуємо файли/теки в корені (відсортовано)
+    for item in sorted(root.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
         rel = item.relative_to(root)
         if item.is_dir():
             if should_skip_dir(rel):
@@ -75,9 +69,8 @@ def build_tree(root: Path) -> list[str]:
             for subpath, dirs, files in os.walk(item):
                 sub_rel = Path(subpath).relative_to(root)
                 if should_skip_dir(sub_rel):
-                    dirs[:] = []  # don't descend
+                    dirs[:] = []  # не спускаємося далі
                     continue
-                # sort directories/files for stable output
                 dirs.sort(key=lambda n: n.lower())
                 files.sort(key=lambda n: n.lower())
                 level = len(sub_rel.parts)
@@ -93,7 +86,6 @@ def build_tree(root: Path) -> list[str]:
                         continue
                     lines.append(f"{prefix}{f_rel.as_posix()}")
         else:
-            # file in root
             if should_skip_file(rel):
                 continue
             lines.append(rel.as_posix())
@@ -101,12 +93,27 @@ def build_tree(root: Path) -> list[str]:
 
 
 def main() -> None:
-    here = Path.cwd()
-    out = here / OUT_FILE
-    lines = build_tree(here)
-    text = "\n".join(lines) + "\n"
-    out.write_text(text, encoding="utf-8")
-    print(f"[OK] Wrote {out} ({len(lines)} lines)")
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--out",
+        type=str,
+        default=None,
+        help="Шлях до вихідного файлу (за замовчуванням: dev/tmp/project-tree.txt)",
+    )
+    args = parser.parse_args()
+
+    root = Path.cwd()
+    if args.out:
+        out_path = Path(args.out)
+        if not out_path.is_absolute():
+            out_path = root / out_path
+    else:
+        out_path = root / "dev" / "tmp" / "project-tree.txt"
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = build_tree(root)
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"[OK] Wrote {out_path} ({len(lines)} lines)")
 
 
 if __name__ == "__main__":
