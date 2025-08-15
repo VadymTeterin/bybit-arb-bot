@@ -489,13 +489,13 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         print("WS is disabled by config (set WS_ENABLED=1 in .env).")
         return 0
 
-    # Всі імпорти та інтеграція — всередині функції (не заважає імпорту модуля)
     try:
         import asyncio
         from src.exchanges.bybit.ws import BybitWS, iter_ticker_entries
         from src.core.cache import QuoteCache
         from src.ws.multiplexer import WSMultiplexer
         from src.ws.bridge import publish_bybit_ticker
+        from src.ws.subscribers.alerts_subscriber import AlertsSubscriber
     except Exception as e:  # noqa: BLE001
         print("WS components are missing. Please add ws.py and cache.py:", str(e))
         return 1
@@ -505,45 +505,12 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
     ws_linear = BybitWS(s.ws_public_url_linear, s.ws_topics_list_linear)
     ws_spot = BybitWS(s.ws_public_url_spot, s.ws_topics_list_spot)
 
-    # WS Multiplexer (integration, non-breaking)
+    # WS Multiplexer
     mux = WSMultiplexer(name="core")
 
-    # --- NEW: cooldown і асинхронне відправлення TG‑алертів із Funding ---
-    last_sent: Dict[str, float] = {}
-    client_funding = BybitRest()
-
-    def _can_send(sym: str) -> bool:
-        cd = max(30, int(getattr(s, "alert_cooldown_sec", 300)))
-        t0 = last_sent.get(sym, 0.0)
-        return (time.time() - t0) >= cd
-
-    def _mark_sent(sym: str) -> None:
-        last_sent[sym] = time.time()
-
-    async def ws_send_alert(sym: str, basis: float) -> None:
-        """
-        Легка текстівка для WS‑алерта, щоб не залежати від внутрішностей QuoteCache.
-        """
-        rate, next_ts = _get_funding_with_cache(client_funding, sym)
-        sign = "+" if basis >= 0 else ""
-        lines = [
-            "*RT Arbitrage Alert*",
-            f"{sym}: basis={sign}{basis:.2f}%",
-        ]
-        # додаємо funding, якщо є що показати
-        if rate is not None or next_ts is not None:
-            lines.append(f"Funding (prev): {_fmt_pct(rate)}")
-            lines.append(f"Next funding: {_fmt_ts(next_ts)}")
-        text = "\n".join(lines)
-
-        if s.enable_alerts and s.telegram.bot_token and s.telegram.alert_chat_id:
-            # не блокуємо WS‑луп
-            await asyncio.to_thread(
-                send_telegram_message, s.telegram.bot_token, s.telegram.alert_chat_id, text
-            )
-            logger.success("WS Telegram alert sent for {}", sym)
-        else:
-            logger.info("WS alert (dry):\n{}", text)
+    # Підписник алертів (Step 5.7) — невтручально
+    alerts_sub = AlertsSubscriber(mux)
+    alerts_sub.start()
 
     async def refresh_meta_task():
         client = BybitRest()
@@ -568,35 +535,14 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
 
     import math
 
-    async def maybe_log_realtime_pass(sym: str):
-        rows = await cache.candidates(
-            threshold_pct=s.alert_threshold_pct,
-            min_price=s.min_price,
-            min_vol24h_usd=s.min_vol_24h_usd,
-            allow=s.allow_symbols_list,
-            deny=s.deny_symbols_list,
-        )
-        for rsym, basis in rows[:10]:
-            if rsym == sym:
-                if s.rt_log_passes:
-                    sign = "+" if basis >= 0 else ""
-                    logger.bind(tag="RT").success(f"{rsym} basis={sign}{basis:.2f}%  (passes filters)")
-                # --- NEW: якщо можна — шлемо TG‑алерт (із cooldown) ---
-                if _can_send(sym):
-                    _mark_sent(sym)
-                    await ws_send_alert(sym, basis)
-                break
-
     async def on_message_spot(msg: dict):
         for item in iter_ticker_entries(msg):
             sym = item.get("symbol")
             last = item.get("last")
             if sym and last is not None:
                 bp = await cache.update(sym, spot=last)
-                # Publish to multiplexer (optional subscribers)
                 publish_bybit_ticker(mux, "SPOT", item)
-                if not math.isnan(bp):
-                    await maybe_log_realtime_pass(sym)
+                _ = bp  # basis is still computed internally by cache if needed
 
     async def on_message_linear(msg: dict):
         for item in iter_ticker_entries(msg):
@@ -604,10 +550,8 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
             mark = item.get("mark")
             if sym and mark is not None:
                 bp = await cache.update(sym, linear_mark=mark)
-                # Publish to multiplexer (optional subscribers)
                 publish_bybit_ticker(mux, "LINEAR", item)
-                if not math.isnan(bp):
-                    await maybe_log_realtime_pass(sym)
+                _ = bp
 
     async def runner():
         await asyncio.gather(
