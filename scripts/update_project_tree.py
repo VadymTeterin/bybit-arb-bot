@@ -11,14 +11,20 @@ import argparse
 import os
 from pathlib import Path
 
-# Каталоги, які пропускаємо
-SKIP_DIRS = {
+# Імена тек, які пропускаємо будь-де (на будь-якій глибині)
+SKIP_DIR_NAMES = {
     ".git",
     ".venv",
     "__pycache__",
     ".pytest_cache",
     ".ruff_cache",
     ".mypy_cache",
+    ".idea",
+    ".vscode",
+}
+
+# Конкретні шляхові префікси (від кореня), які пропускаємо повністю
+SKIP_DIR_PATHS = {
     "dev/tmp",
     "logs",
     "exports",
@@ -38,13 +44,19 @@ SKIP_FILE_GLOBS = {
 }
 
 
-def should_skip_dir(rel: Path) -> bool:
-    parts = list(rel.parts)
-    for i in range(1, len(parts) + 1):
-        sub = Path(*parts[:i]).as_posix()
-        if sub in SKIP_DIRS:
+def _is_under_skipped_path(rel_posix: str) -> bool:
+    for p in SKIP_DIR_PATHS:
+        if rel_posix == p or rel_posix.startswith(p + "/"):
             return True
     return False
+
+
+def should_skip_dir(rel: Path) -> bool:
+    # Якщо будь-яка частина шляху — зі списку імен
+    if any(part in SKIP_DIR_NAMES for part in rel.parts):
+        return True
+    # Якщо шлях або його префікс у списку
+    return _is_under_skipped_path(rel.as_posix())
 
 
 def should_skip_file(rel: Path) -> bool:
@@ -52,6 +64,9 @@ def should_skip_file(rel: Path) -> bool:
     for pattern in SKIP_FILE_GLOBS:
         if rel.match(pattern) or Path(name).match(pattern):
             return True
+    # Якщо файл лежить під пропущеним шляхом
+    if _is_under_skipped_path(rel.as_posix()):
+        return True
     return False
 
 
@@ -59,8 +74,9 @@ def build_tree(root: Path) -> list[str]:
     lines: list[str] = []
     lines.append("Folder PATH listing")
     lines.append(f"ROOT: {root.resolve()}")
-    # Перший рівень: показуємо файли/теки в корені (відсортовано)
-    for item in sorted(root.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
+    # Перший рівень: відсортовано, спершу теки, потім файли
+    items = sorted(root.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+    for item in items:
         rel = item.relative_to(root)
         if item.is_dir():
             if should_skip_dir(rel):
@@ -69,17 +85,22 @@ def build_tree(root: Path) -> list[str]:
             for subpath, dirs, files in os.walk(item):
                 sub_rel = Path(subpath).relative_to(root)
                 if should_skip_dir(sub_rel):
-                    dirs[:] = []  # не спускаємося далі
+                    dirs[:] = []  # не спускаємось в пропущені
                     continue
                 dirs.sort(key=lambda n: n.lower())
                 files.sort(key=lambda n: n.lower())
                 level = len(sub_rel.parts)
                 prefix = "  " * level
-                for d in dirs:
+                # теки
+                for d in list(dirs):
                     d_rel = sub_rel / d
                     if should_skip_dir(d_rel):
+                        # також не заходимо в цю теку
+                        if d in dirs:
+                            dirs.remove(d)
                         continue
                     lines.append(f"{prefix}{d_rel.as_posix()}/")
+                # файли
                 for f in files:
                     f_rel = sub_rel / f
                     if should_skip_file(f_rel):
