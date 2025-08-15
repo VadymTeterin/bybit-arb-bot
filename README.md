@@ -1,34 +1,38 @@
 # Bybit Arbitrage Bot
 
-## Опис / Description
-**UA:** Telegram-бот для моніторингу різниці між цінами на спотовому та ф’ючерсному ринках Bybit у режимі реального часу.  
-**EN:** A Telegram bot that monitors spot vs. futures price spreads on Bybit in real time.
+> Реальний час • Windows • Telegram Alerts • Без індикаторів (Price Action / Liquidity Filters)
 
-## Функціонал / Features
-- Bybit REST API & WebSocket API v5
-- Basis % (spot vs futures) calculation
-- Top-N selection by threshold
-- Liquidity filters
-- Telegram alerts
-- SQLite signal history
-- **CSV export of signals**
+## Огляд
+UA: Телеграм-бот відстежує спред (basis %) між SPOT та ф’ючерсами (USDT‑перпетуали) на Bybit. Підтримано режим реального часу через WebSocket, фільтри ліквідності, попередній перегляд алертів і експорт сигналів у CSV.  
+EN: Telegram bot that tracks the spread (basis %) between SPOT and USDT‑perpetual futures on Bybit. Real‑time via WebSocket, liquidity filters, alert preview, and CSV export included.
 
-## Встановлення / Installation
+---
+
+## Можливості (коротко)
+- Basis % (SPOT vs LINEAR) у real‑time та single‑shot скануванні
+- Фільтри ліквідності: обсяг (24h), глибина ринку
+- Throttling алертів, Telegram‑повідомлення, попередній перегляд форматування
+- SQLite збереження сигналів, звіти, експорт у CSV
+- **WS Multiplexer (Крок 5.6)** — модуль маршрутизації подій із `*`‑wildcard (не змінює чинний 5.5)
+- Легка CLI‑утиліта з командами для діагностики/запуску
+
+> Платформа розробки: **Windows**. Інструкції для **PowerShell** та VS Code **“Термінал”**.
+
+---
+
+## Встановлення (Windows PowerShell / VS Code “Термінал”)
 ```powershell
-# Clone the repository
-git clone https://github.com/<your-repo>.git
+git clone https://github.com/<your-repo>/bybit-arb-bot.git
 cd bybit-arb-bot
 
-# Create & activate virtual environment (Windows PowerShell)
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-## Налаштування / Configuration
-Create your `.env` from `.env.example` and fill the values:
+### Налаштування середовища
+Скопіюйте `.env.example` → `.env` і заповніть значення:
 ```env
 BYBIT__API_KEY=
 BYBIT__API_SECRET=
@@ -39,104 +43,126 @@ ALERT_COOLDOWN_SEC=300
 DB_PATH=data/signals.db
 ```
 
-## Експорт у CSV / CSV Export
-```powershell
-# 1) Last 24h to exports/ with default name
-python .\scripts\export_signals.py
+---
 
-# 2) Localize timestamps to Kyiv time (UTC+3 in summer)
+## Запуск: основні сценарії
+### Одноразовий скан спредів (REST)
+```powershell
+python -m src.main basis:scan --threshold 0.5 --min-vol 10000000 --limit 10
+```
+
+### Сигнали у консоль із фільтрами
+```powershell
+python -m src.main basis:alert --threshold 0.8 --min-vol 8000000 --limit 3
+```
+
+### Попередній перегляд форматування алерту
+```powershell
+python -m src.main alerts:preview --symbol BTCUSDT --spot 50000 --mark 50500 --min-vol 1000000 --threshold 0.5
+```
+
+### Відправка тестового повідомлення у Telegram
+```powershell
+python -m src.main tg:send --text "Hello from BybitArbBot"
+```
+
+### Запуск у реальному часі (WebSocket‑ядро)
+```powershell
+python -m src.main ws:run
+```
+
+> Під час роботи `ws:run` обчислення basis% відбувається на льоту з кешу. Задіяні тротлінг і захист від шуму.
+
+---
+
+## Усі CLI‑команди (довідка)
+```text
+version           — показати версію застосунку
+env               — друк активної конфігурації (безпечні поля)
+logtest           — тест логування
+healthcheck       — внутрішня перевірка ядра
+bybit:ping        — пінг до Bybit REST
+bybit:top         — топ‑пари за обсягом/ліквідністю (конфігурується)
+basis:scan        — одноразовий скан спредів
+basis:alert       — скан з виводом/відбором сигналів за порогами
+alerts:preview    — друк відформатованого алерту для перевірки
+tg:send           — надіслати довільний текст у Telegram
+report:print      — друк звіту з БД (SQLite)
+report:send       — відправка звіту у Telegram
+select:save       — збереження добірки сигналів у БД
+price:pair        — швидкий запит ціни для пари
+ws:run            — запуск WS‑ядра (real‑time)
+```
+
+Параметри, що часто використовуються:
+- `--threshold <pct>` — поріг basis% (наприклад, `0.5`)
+- `--min-vol <usd>` — мінімальний обсяг (24h), наприклад `10000000`
+- `--limit <N>` — обмеження кількості результатів
+- `--symbol <TICKER>` — фільтр за символом
+
+---
+
+## Експорт сигналів у CSV (Крок 5.4)
+```powershell
+python .\scripts\export_signals.py                 # останні 24 години
 python .\scripts\export_signals.py --tz Europe/Kyiv
-
-# 3) Exact UTC interval and custom filename
 python .\scripts\export_signals.py --since 2025-08-10T00:00:00 --until 2025-08-14T23:59:59 --out .\exports\signals_aug10-14.csv
-
-# 4) Limit to 100 latest rows
 python .\scripts\export_signals.py --limit 100
-
-# 5) Rotation: keep only 14 latest CSV files (prefix: signals_*)
-python .\scripts\export_signals.py --keep 14
+python .\scripts\export_signals.py --keep 14       # ротація CSV
 ```
 
-**Параметри / Arguments:**
-- `--last-hours N` — default 24h
-- `--since` / `--until` — UTC ISO bounds
-- `--tz` — e.g. `Europe/Kyiv` or `+03:00`
-- `--limit N` — limit rows
-- `--keep N` — rotate old CSVs
-- `--out PATH` — output file path
-
----
-
-# 🔁 Автоматичний експорт через Windows Task Scheduler / Automatic Export via Windows Task Scheduler
-
-## UA — Коротко
-Налаштуй планувальник завдань Windows, щоб `scripts/export_signals.py` запускався автоматично (щогодини або щодня).  
-**У репозиторії вже є готовий файл** `launcher_export.cmd`, який можна використовувати без змін для Task Scheduler. Він автоматично визначає шлях до проєкту та створює папку `logs`, якщо її немає.
-
-### Варіант A — Через інтерфейс (GUI)
-1. Відкрий **Task Scheduler** → *Create Task…*  
-   - Name: `BybitArbBot CSV Export`  
-   - (Опційно) *Run with highest privileges*
-2. **Triggers** → *New…* → *Daily* або *Hourly* (рекомендовано щогодини **:05**).
-3. **Actions** → *New…*  
-   - **Program/script**: `C:\Projects\bybit-arb-bot\launcher_export.cmd`  
-   - **Start in**: `C:\Projects\bybit-arb-bot`
-4. **Conditions** → (опційно) *Wake the computer to run this task*.
-5. **Settings** → дозволити перезапуск при збої, обмежити тривалість.
-6. Збережи й натисни *Run* для перевірки.
-
-### Варіант B — Через PowerShell
+### Планувальник завдань Windows
+У репозиторії є `launcher_export.cmd` для Task Scheduler. Приклад створення задачі:
 ```powershell
-# Create hourly task at HH:05 under current user
 schtasks /Create /TN "BybitArbBot CSV Export Hourly" /TR "C:\Projectsybit-arb-bot\launcher_export.cmd" /SC HOURLY /ST 00:05 /F
 ```
 
-### Перевірка
-```powershell
-schtasks /Run /TN "BybitArbBot CSV Export Hourly"
-Get-ChildItem .\exports\signals_*.csv | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-Get-Content .\logs\export.log -Tail 20
+---
+
+## WS Multiplexer (Крок 5.6 — мітка, безломний)
+`src/ws/multiplexer.py` — потокобезпечний маршрутизатор подій із підтримкою `*`‑wildcard для `source/channel/symbol`. Не створює мережевих підключень і не залежить від asyncio.  
+Семантика `stats()` узгоджена з «ледачою відпискою» (поки не викликаємо `clear_inactive()`, кількість підписок відображається стало).
+
+Приклад:
+```python
+from src.ws.multiplexer import WSMultiplexer, WsEvent
+import time
+
+mux = WSMultiplexer(name="core")
+unsubscribe = mux.subscribe(handler=lambda e: None, source="SPOT", channel="book_ticker", symbol="BTCUSDT")
+
+evt = WsEvent(source="SPOT", channel="book_ticker", symbol="BTCUSDT", payload={"bid": "1"}, ts=time.time())
+mux.publish(evt)
+
+unsubscribe()
+mux.clear_inactive()
 ```
 
 ---
 
-## EN — Summary
-Use Windows Task Scheduler to run `scripts/export_signals.py` automatically (hourly/daily).  
-**This repository already includes** `launcher_export.cmd` — a ready-to-use Windows batch file that auto-detects the project path and ensures `logs` exists.
-
-### Option A — GUI
-1. Open **Task Scheduler** → *Create Task…*  
-   - Name: `BybitArbBot CSV Export`  
-   - (Optional) *Run with highest privileges*
-2. **Triggers** → *New…* → *Daily* or *Hourly* (recommended hourly at **:05**).
-3. **Actions** → *New…*  
-   - **Program/script**: `C:\Projects\bybit-arb-bot\launcher_export.cmd`  
-   - **Start in**: `C:\Projects\bybit-arb-bot`
-4. **Conditions** → optionally *Wake the computer to run this task*.
-5. **Settings** → allow retry on failure, set a max run time.
-6. Save and click *Run* to test.
-
-### Option B — PowerShell
-```powershell
-# Create hourly task at HH:05 under current user
-schtasks /Create /TN "BybitArbBot CSV Export Hourly" /TR "C:\Projectsybit-arb-bot\launcher_export.cmd" /SC HOURLY /ST 00:05 /F
-```
-
-### Verify
-```powershell
-schtasks /Run /TN "BybitArbBot CSV Export Hourly"
-Get-ChildItem .\exports\signals_*.csv | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-Get-Content .\logs\export.log -Tail 20
-```
-
-> Tips: always use **absolute paths**, keep CSV out of git (`exports/` in `.gitignore`), and keep your real `.env` local.
-
----
-
-## Тести / Tests
+## Тести
 ```powershell
 pytest -q
 ```
+- Покриття охоплює фільтри ліквідності, кеш котирувань, збереження в БД, форматування алертів, CSV‑експорт і WS‑мультиплексор.
 
-## Ліцензія / License
+## Стиль коду
+- Форматування: `black`
+- Лінтинг: (за бажанням) `ruff`
+- Принципи: мінімум зайвих змінних, читаємість, модульність.
+
+## Структура проєкту (скорочено)
+```
+src/
+  core/            # обчислення, фільтри, алерти
+  infra/           # логування, конфіги, інтеграції
+  storage/         # SQLite, збереження сигналів
+  telegram/        # форматери та відправка
+  ws/              # ядро WS + multiplexer (5.6)
+tests/             # pytest
+scripts/           # утиліти, export_signals.py
+exports/, logs/, data/
+```
+
+## Ліцензія
 MIT
