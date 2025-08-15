@@ -32,3 +32,6 @@ exports/*.csv# CSV exports
 exports/
 *.csv
 .env
+.backups/
+.env.backup.*
+use-profile.safe.ps1
