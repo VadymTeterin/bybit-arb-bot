@@ -1,0 +1,26 @@
+# src/ws/bridge.py
+from __future__ import annotations
+import time
+from typing import Dict, Any
+from src.ws.multiplexer import WSMultiplexer, WsEvent
+
+def publish_bybit_ticker(mux: WSMultiplexer, source: str, item: Dict[str, Any], *, channel: str = "tickers", ts: float | None = None) -> int:
+    """
+    Легкий міст: публікує item з Bybit tickers у WS-мультиплексор.
+    Не змінює поведінку існуючого ws:run; лише дає можливість підписникам реагувати.
+
+    Returns: кількість викликаних хендлерів.
+    """
+    if mux is None or item is None:
+        return 0
+    sym = (item.get("symbol") or "").upper()
+    if not sym:
+        return 0
+    evt = WsEvent(
+        source=source,
+        channel=channel,
+        symbol=sym,
+        payload=item,
+        ts=(ts if ts is not None else time.time()),
+    )
+    return mux.publish(evt)
