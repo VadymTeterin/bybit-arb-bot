@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -11,29 +12,154 @@ from typing import Any, Dict, List, Optional, Tuple
 import requests
 from loguru import logger
 
-# --- модулі звітів / БД ---
-from src.core.report import format_report, get_top_signals
-from src.exchanges.bybit.rest import BybitRest
-from src.infra.config import load_settings
-from src.infra.logging import setup_logging
-from src.infra.notify import send_telegram_message
-from src.storage.persistence import init_db
+# ---- internal imports at top (to satisfy linters) ----
+from .core.report import format_report, get_top_signals
+from .exchanges.bybit.rest import BybitRest
+from .infra.logging import setup_logging
+from .storage.persistence import init_db
 
-# Опціональна інтеграція з новими модулями
+# Optional Telegram sender: fall back to direct HTTP if infra.telegram is absent
 try:
-    from src.telegram import formatters as _tg_formatters  # type: ignore
+    from .infra.telegram import send_telegram_message  # type: ignore
 except Exception:  # noqa: BLE001
-    _tg_formatters = None
 
+    def send_telegram_message(token: str, chat_id: str, text: str):
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        resp = requests.post(url, data={"chat_id": chat_id, "text": text}, timeout=15)
+        resp.raise_for_status()
+        return resp.json()
+
+
+# Optional/back-compat modules (used if present)
 try:
-    from src.core import alerts as _core_alerts  # type: ignore
+    from .core import alerts as _core_alerts  # type: ignore
 except Exception:  # noqa: BLE001
     _core_alerts = None
 
+try:
+    from .telegram import formatters as _tg_formatters  # type: ignore
+except Exception:  # noqa: BLE001
+    _tg_formatters = None
 
-APP_VERSION = "0.4.3"
+
+APP_VERSION = "0.4.4"
 
 
+# --------------------------------------------------------------------------------------
+# Settings loader that is safe at import-time and test-friendly (monkeypatchable)
+# Tests expect `src.main.load_settings` to exist; they monkeypatch it directly.
+# First, we try to import project settings; if that fails, we build a sane env-based
+# fallback so CLI still works without a `src/settings.py`.
+# --------------------------------------------------------------------------------------
+def _env_bool(name: str, default: bool = False) -> bool:
+    val = os.getenv(name)
+    if val is None:
+        return default
+    return val.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)))
+    except Exception:
+        return default
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(float(os.getenv(name, str(default))))
+    except Exception:
+        return default
+
+
+def _env_csv(name: str) -> List[str]:
+    raw = os.getenv(name, "")
+    return [t.strip() for t in raw.split(",") if t.strip()]
+
+
+def load_settings():
+    """
+    Return settings object. Preferred: delegate to `.settings.load_settings()`.
+    Fallback: construct from environment variables (so CLI/tests still run).
+    """
+    # Try project-defined settings first
+    try:
+        from .settings import load_settings as _ls  # type: ignore
+
+        return _ls()
+    except Exception:
+        pass
+
+    # Env-based minimal settings
+    class _Obj:
+        pass
+
+    s = _Obj()
+    s.env = os.getenv("ENV", "dev")
+    s.alert_threshold_pct = _env_float("ALERT_THRESHOLD_PCT", 1.0)
+    s.alert_cooldown_sec = _env_int("ALERT_COOLDOWN_SEC", 300)
+    s.min_vol_24h_usd = _env_float("MIN_VOL_24H_USD", 10_000_000.0)
+    s.min_price = _env_float("MIN_PRICE", 0.001)
+    s.db_path = os.getenv("DB_PATH", "data/signals.db")
+    s.top_n_report = _env_int("TOP_N_REPORT", 3)
+    s.enable_alerts = _env_bool("ENABLE_ALERTS", True)
+
+    # Allow/deny lists (optional)
+    s.allow_symbols = os.getenv("ALLOW_SYMBOLS", "")
+    s.allow_symbols_list = _env_csv("ALLOW_SYMBOLS")
+    s.deny_symbols = os.getenv("DENY_SYMBOLS", "")
+    s.deny_symbols_list = _env_csv("DENY_SYMBOLS")
+
+    # WS / RT meta (optional)
+    s.ws_enabled = _env_bool("WS_ENABLED", True)
+    s.ws_public_url_linear = os.getenv(
+        "WS_PUBLIC_URL_LINEAR", "wss://stream.bybit.com/v5/public/linear"
+    )
+    s.ws_public_url_spot = os.getenv(
+        "WS_PUBLIC_URL_SPOT", "wss://stream.bybit.com/v5/public/spot"
+    )
+    s.ws_topics_list_linear = _env_csv("WS_SUB_TOPICS_LINEAR")
+    s.ws_topics_list_spot = _env_csv("WS_SUB_TOPICS_SPOT")
+    s.ws_reconnect_max_sec = _env_int("WS_RECONNECT_MAX_SEC", 30)
+    s.rt_meta_refresh_sec = _env_int("RT_META_REFRESH_SEC", 30)
+    s.rt_log_passes = _env_int("RT_LOG_PASSES", 1)
+
+    # Telegram subsection
+    class _T:
+        pass
+
+    tg = _T()
+    tg.token = os.getenv("TELEGRAM__BOT_TOKEN") or os.getenv("TELEGRAM__TOKEN") or ""
+    tg.bot_token = tg.token
+    tg.chat_id = (
+        os.getenv("TELEGRAM__ALERT_CHAT_ID") or os.getenv("TELEGRAM__CHAT_ID") or ""
+    )
+    tg.alert_chat_id = tg.chat_id
+    s.telegram = tg
+
+    # Bybit subsection
+    class _B:
+        pass
+
+    by = _B()
+    by.api_key = os.getenv("BYBIT__API_KEY", "")
+    by.api_secret = os.getenv("BYBIT__API_SECRET", "")
+    by.ws_public_url_linear = s.ws_public_url_linear
+    by.ws_public_url_spot = s.ws_public_url_spot
+    by.ws_sub_topics_linear = (
+        ",".join(s.ws_topics_list_linear) if s.ws_topics_list_linear else ""
+    )
+    by.ws_sub_topics_spot = (
+        ",".join(s.ws_topics_list_spot) if s.ws_topics_list_spot else ""
+    )
+    s.bybit = by
+
+    return s
+
+
+# --------------------------------------------------------------------------------------
+# Helpers
+# --------------------------------------------------------------------------------------
 def _safe_call(fn, *args, **kwargs):
     if fn is None:
         return None
@@ -58,12 +184,6 @@ def safe_print(text: str) -> None:
 
 
 def _csv_list(x: Any) -> List[str]:
-    """
-    Перетворює будь-яке значення на List[str]:
-    - якщо вже list/tuple -> повертаєм трімнуті str
-    - якщо str -> парсимо за комою
-    - інакше -> []
-    """
     if x is None:
         return []
     if isinstance(x, (list, tuple)):
@@ -74,11 +194,6 @@ def _csv_list(x: Any) -> List[str]:
 
 
 def _nested_bybit(s):
-    """
-    Безпечний доступ до вкладених WS-параметрів з підтримкою старих полів.
-    Повертає словник:
-      url_linear, url_spot, topics_linear(list), topics_spot(list), reconnect_max_sec
-    """
     by = getattr(s, "bybit", None)
     url_linear = None
     url_spot = None
@@ -92,7 +207,6 @@ def _nested_bybit(s):
         topics_linear = _csv_list(getattr(by, "ws_sub_topics_linear", None))
         topics_spot = _csv_list(getattr(by, "ws_sub_topics_spot", None))
 
-    # fallback на старі плоскі поля (якщо вони ще є в конфігу)
     url_linear = url_linear or getattr(s, "ws_public_url_linear", None)
     url_spot = url_spot or getattr(s, "ws_public_url_spot", None)
     topics_linear = topics_linear or _csv_list(
@@ -109,28 +223,53 @@ def _nested_bybit(s):
     }
 
 
+# --------------------------------------------------------------------------------------
+# Commands
+# --------------------------------------------------------------------------------------
 def cmd_version(_: argparse.Namespace) -> int:
     print(APP_VERSION)
     return 0
 
 
+def _tg_fields(s):
+    """
+    Read Telegram config from settings or environment:
+      - settings.telegram.token / bot_token
+      - settings.telegram.chat_id / alert_chat_id
+      - ENV: TELEGRAM__BOT_TOKEN / TELEGRAM__TOKEN
+             TELEGRAM__ALERT_CHAT_ID / TELEGRAM__CHAT_ID
+    """
+    tg = getattr(s, "telegram", None)
+    token = (
+        (getattr(tg, "token", None) if tg else None)
+        or (getattr(tg, "bot_token", None) if tg else None)
+        or os.getenv("TELEGRAM__BOT_TOKEN")
+        or os.getenv("TELEGRAM__TOKEN")
+    )
+    chat_id = (
+        (getattr(tg, "chat_id", None) if tg else None)
+        or (getattr(tg, "alert_chat_id", None) if tg else None)
+        or os.getenv("TELEGRAM__ALERT_CHAT_ID")
+        or os.getenv("TELEGRAM__CHAT_ID")
+    )
+    token = token.strip() if isinstance(token, str) and token.strip() else None
+    chat_id = chat_id.strip() if isinstance(chat_id, str) and chat_id.strip() else None
+    return token, chat_id
+
+
 def cmd_env(_: argparse.Namespace) -> int:
     s = load_settings()
-    # базові
     print("ENV:", getattr(s, "env", ""))
     print("ALERT_THRESHOLD_PCT:", getattr(s, "alert_threshold_pct", ""))
     print("ALERT_COOLDOWN_SEC:", getattr(s, "alert_cooldown_sec", ""))
     print("MIN_VOL_24H_USD:", getattr(s, "min_vol_24h_usd", ""))
     print("MIN_PRICE:", getattr(s, "min_price", ""))
     print("DB_PATH:", getattr(s, "db_path", ""))
-    # telegram
-    tg = getattr(s, "telegram", None)
-    print("TG_CHAT_ID:", getattr(tg, "alert_chat_id", "") if tg else "")
-    print("TELEGRAM_TOKEN set:", bool(getattr(tg, "bot_token", None)) if tg else False)
-    # bybit api
+    token, chat_id = _tg_fields(s)
+    print("TG_CHAT_ID:", chat_id or "")
+    print("TELEGRAM_TOKEN set:", bool(token))
     by = getattr(s, "bybit", None)
     print("BYBIT_API_KEY set:", bool(getattr(by, "api_key", None)) if by else False)
-    # flags
     print("ENABLE_ALERTS:", getattr(s, "enable_alerts", False))
     print("ALLOW_SYMBOLS (raw):", getattr(s, "allow_symbols", ""))
     print("ALLOW_SYMBOLS (list):", ",".join(getattr(s, "allow_symbols_list", []) or []))
@@ -138,7 +277,6 @@ def cmd_env(_: argparse.Namespace) -> int:
     print("DENY_SYMBOLS (list):", ",".join(getattr(s, "deny_symbols_list", []) or []))
     print("WS_ENABLED:", getattr(s, "ws_enabled", False))
 
-    # ws (вкладені або старі поля)
     ws = _nested_bybit(s)
     print("WS_PUBLIC_URL_LINEAR:", ws["url_linear"] or "")
     print("WS_PUBLIC_URL_SPOT:", ws["url_spot"] or "")
@@ -213,12 +351,10 @@ def _basis_rows(
 ]:
     client = BybitRest()
 
-    # Основний шлях: get_spot_map / get_linear_map
     try:
         spot_map = client.get_spot_map()
         lin_map = client.get_linear_map()
     except AttributeError:
-        # Fallback через get_tickers(...)
         spot_rows = client.get_tickers("spot") or []
         lin_rows = client.get_tickers("linear") or []
 
@@ -266,37 +402,6 @@ def _basis_rows(
     return rows_pass, rows_all
 
 
-def cmd_basis_scan(args: argparse.Namespace) -> int:
-    s = load_settings()
-    min_vol = float(args.min_vol if args.min_vol is not None else s.min_vol_24h_usd)
-    threshold = float(
-        args.threshold if args.threshold is not None else s.alert_threshold_pct
-    )
-
-    rows_pass, rows_all = _basis_rows(min_vol=min_vol, threshold=threshold)
-
-    header = f"Basis scan (spot vs linear). MinVol=${min_vol:,.0f}, Threshold={threshold:.2f}%"
-    if rows_pass:
-        top = rows_pass[: args.limit]
-        print(f"{header} → showing {len(top)}")
-        for i, (sym, sp, fu, b, vol) in enumerate(top, 1):
-            sign = "+" if b >= 0 else ""
-            print(
-                f"{i:>2}. {sym:<12} spot={sp:<12g} fut={fu:<12g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}"
-            )
-    else:
-        top = rows_all[: args.limit]
-        print(
-            f"{header} → no pairs met the threshold; showing diagnostic top {len(top)} (below threshold)"
-        )
-        for i, (sym, sp, fu, b, vol) in enumerate(top, 1):
-            sign = "+" if b >= 0 else ""
-            print(
-                f"{i:>2}. {sym:<12} spot={sp:<12g} fut={fu:<12g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}"
-            )
-    return 0
-
-
 def _alerts_allowed(s) -> bool:
     return bool(getattr(s, "enable_alerts", False))
 
@@ -330,7 +435,6 @@ def _format_alert_text(
         return header + "\nTry lowering threshold or MinVol."
 
 
-# --------- ПРЕВ'Ю АЛЕРТУ (без відправки) ---------
 def preview_message(
     symbol: str, spot: float, mark: float, vol: float, threshold: float
 ) -> str:
@@ -369,7 +473,6 @@ def cmd_alerts_preview(args: argparse.Namespace) -> int:
     text = preview_message(symbol, spot, mark, vol, threshold)
     safe_print(text)
 
-    # Додатково: Funding (prev) + Next funding (UTC)
     try:
         client = BybitRest()
         f = client.get_prev_funding(symbol)
@@ -385,9 +488,8 @@ def cmd_alerts_preview(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---------- Funding cache для basis:alert та WS ----------
 _FUND_CACHE: Dict[str, Tuple[float, Optional[float], Optional[float]]] = {}
-_FUND_TTL_SEC = 8 * 60  # 8 хвилин
+_FUND_TTL_SEC = 8 * 60  # 8 hours
 
 
 def _get_funding_with_cache(
@@ -419,8 +521,8 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
         args.threshold if args.threshold is not None else s.alert_threshold_pct
     )
     limit = int(args.limit)
-
-    if not s.telegram.bot_token or not s.telegram.alert_chat_id:
+    token, chat_id = _tg_fields(s)
+    if not token or not chat_id:
         print(
             "Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env"
         )
@@ -428,7 +530,6 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
 
     rows_pass, _ = _basis_rows(min_vol=min_vol, threshold=threshold)
 
-    # опційний cooldown із core.alerts
     if _core_alerts and hasattr(_core_alerts, "apply_cooldown"):
         cooled = _safe_call(
             getattr(_core_alerts, "apply_cooldown", None),
@@ -439,11 +540,8 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
             rows_pass = cooled
 
     rows = rows_pass[:limit]
-
-    # 1) Формуємо основний текст (через форматер або дефолт)
     text = _format_alert_text(rows, threshold, min_vol)
 
-    # 2) Додаємо Funding ТІЛЬКИ якщо НЕ використовується кастомний форматер rows
     used_custom_rows_formatter = bool(
         _tg_formatters and hasattr(_tg_formatters, "format_basis_top")
     )
@@ -452,7 +550,7 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
         lines = []
         for sym, _sp, _fu, _b, _vol in rows:
             rate, next_ts = _get_funding_with_cache(client, sym)
-            line = f"{sym} — Funding (prev): {_fmt_pct(rate)}; Next: {_fmt_ts(next_ts)}"
+            line = f"{sym} • Funding (prev): {_fmt_pct(rate)}; Next: {_fmt_ts(next_ts)}"
             lines.append(line)
         if lines:
             text = text + "\n" + "\n".join(lines)
@@ -460,7 +558,7 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
     safe_print(text)
 
     try:
-        send_telegram_message(s.telegram.bot_token, s.telegram.alert_chat_id, text)
+        send_telegram_message(token, chat_id, text)
         logger.success("Telegram alert sent.")
         if _core_alerts and hasattr(_core_alerts, "on_alert_sent"):
             _safe_call(getattr(_core_alerts, "on_alert_sent", None), rows)
@@ -479,16 +577,15 @@ def cmd_tg_send(args: argparse.Namespace) -> int:
     if not _alerts_allowed(s):
         print("Alerts are disabled by config (enable_alerts=false).")
         return 0
-    if not s.telegram.bot_token or not s.telegram.alert_chat_id:
+    token, chat_id = _tg_fields(s)
+    if not token or not chat_id:
         print(
             "Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env"
         )
         return 1
     text = args.text or "Test message from bybit-arb-bot"
     try:
-        res = send_telegram_message(
-            s.telegram.bot_token, s.telegram.alert_chat_id, text
-        )
+        res = send_telegram_message(token, chat_id, text)
         ok = res.get("ok")
         print("Telegram send ok:", ok)
         logger.success("Telegram test sent.")
@@ -502,7 +599,6 @@ def cmd_tg_send(args: argparse.Namespace) -> int:
         return 2
 
 
-# ---------- ЗВІТИ ----------
 def cmd_report_print(args: argparse.Namespace) -> int:
     s = load_settings()
     hours = int(args.hours)
@@ -518,7 +614,8 @@ def cmd_report_send(args: argparse.Namespace) -> int:
     if not _alerts_allowed(s):
         print("Alerts are disabled by config (enable_alerts=false).")
         return 0
-    if not s.telegram.bot_token or not s.telegram.alert_chat_id:
+    token, chat_id = _tg_fields(s)
+    if not token or not chat_id:
         print(
             "Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env"
         )
@@ -528,7 +625,7 @@ def cmd_report_send(args: argparse.Namespace) -> int:
     items = get_top_signals(last_hours=hours, limit=limit)
     text = format_report(items)
     try:
-        send_telegram_message(s.telegram.bot_token, s.telegram.alert_chat_id, text)
+        send_telegram_message(token, chat_id, text)
         logger.success("Report sent to Telegram.")
         print("OK")
         return 0
@@ -543,7 +640,6 @@ def cmd_report_send(args: argparse.Namespace) -> int:
         return 2
 
 
-# ---------- SELECTOR SAVE ----------
 def cmd_select_save(args: argparse.Namespace) -> int:
     s = load_settings()
     limit = int(args.limit)
@@ -558,7 +654,7 @@ def cmd_select_save(args: argparse.Namespace) -> int:
         else s.alert_cooldown_sec
     )
 
-    from src.core.selector import run_selection
+    from .core.selector import run_selection
 
     saved = run_selection(
         min_vol=min_vol,
@@ -577,7 +673,6 @@ def cmd_select_save(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---------- Вивід поточних цін для пари ----------
 def create_bybit_client() -> BybitRest:
     return BybitRest()
 
@@ -589,7 +684,6 @@ def cmd_price_pair(args: argparse.Namespace) -> int:
         spot_map = client.get_spot_map()
         lin_map = client.get_linear_map()
     except AttributeError:
-        # Fallback через get_tickers(...)
         spot_rows = client.get_tickers("spot") or []
         lin_rows = client.get_tickers("linear") or []
 
@@ -641,7 +735,6 @@ def cmd_price_pair(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---------- WS:RUN ----------
 def cmd_ws_run(_: argparse.Namespace) -> int:
     s = load_settings()
     if not getattr(s, "ws_enabled", False):
@@ -651,23 +744,21 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
     try:
         import asyncio
 
-        from src.core.cache import QuoteCache
-        from src.exchanges.bybit.ws import BybitWS, iter_ticker_entries
-        from src.ws.bridge import publish_bybit_ticker
-        from src.ws.multiplexer import WSMultiplexer
-        from src.ws.subscribers.alerts_subscriber import AlertsSubscriber
+        from .core.cache import QuoteCache
+        from .exchanges.bybit.ws import BybitWS, iter_ticker_entries
+        from .ws.bridge import publish_bybit_ticker
+        from .ws.multiplexer import WSMultiplexer
+        from .ws.subscribers.alerts_subscriber import AlertsSubscriber
     except Exception as e:  # noqa: BLE001
         print("WS components are missing. Please add ws.py and cache.py:", str(e))
         return 1
 
-    # --- сумісність з новим вкладеним конфігом ---
     ws = _nested_bybit(s)
     url_linear: Optional[str] = ws["url_linear"]
     url_spot: Optional[str] = ws["url_spot"]
     topics_linear: List[str] = ws["topics_linear"]
     topics_spot: List[str] = ws["topics_spot"]
 
-    # Ініціалізація
     cache = QuoteCache()
     ws_linear = (
         BybitWS(url_linear, topics_linear or ["tickers"]) if url_linear else None
@@ -678,10 +769,8 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         print("WS config has neither LINEAR nor SPOT endpoints/topics configured.")
         return 0
 
-    # WS Multiplexer
     mux = WSMultiplexer(name="core")
 
-    # Підписник алертів (невтручально)
     alerts_sub = AlertsSubscriber(mux)
     alerts_sub.start()
 
@@ -689,7 +778,6 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         client = BybitRest()
         while True:
             try:
-                # Використовуємо універсальний шлях через get_tickers(...)
                 spot_rows = client.get_tickers("spot") or []
                 lin_rows = client.get_tickers("linear") or []
 
@@ -728,7 +816,7 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
             if sym and last is not None:
                 bp = await cache.update(sym, spot=last)
                 publish_bybit_ticker(mux, "SPOT", item)
-                _ = bp  # basis internal if потрібно
+                _ = bp
 
     async def on_message_linear(msg: dict):
         for item in iter_ticker_entries(msg):
@@ -740,16 +828,20 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
                 _ = bp
 
     async def runner():
+        import asyncio as _asyncio
+
         tasks = []
         if ws_spot:
             tasks.append(ws_spot.run(on_message_spot))
         if ws_linear:
             tasks.append(ws_linear.run(on_message_linear))
         tasks.append(refresh_meta_task())
-        await asyncio.gather(*tasks)
+        await _asyncio.gather(*tasks)
 
     try:
-        asyncio.run(runner())
+        import asyncio as _asyncio
+
+        _asyncio.run(runner())
         return 0
     except KeyboardInterrupt:
         print("WS stopped by user.")
@@ -759,20 +851,33 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         return 2
 
 
-# -------------------------------------------------------
+def cmd_basis_scan(args: argparse.Namespace) -> int:
+    s = load_settings()
+    min_vol = float(args.min_vol if args.min_vol is not None else s.min_vol_24h_usd)
+    threshold = float(
+        args.threshold if args.threshold is not None else s.alert_threshold_pct
+    )
+    limit = int(args.limit)
+
+    rows_pass, _ = _basis_rows(min_vol=min_vol, threshold=threshold)
+    rows = rows_pass[:limit]
+    text = _format_alert_text(rows, threshold=threshold, min_vol=min_vol)
+    safe_print(text)
+    return 0
 
 
+# --------------------------------------------------------------------------------------
+# CLI
+# --------------------------------------------------------------------------------------
 def main() -> None:
     parser = argparse.ArgumentParser(prog="bybit-arb-bot")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    # базові команди
     sub.add_parser("version").set_defaults(func=cmd_version)
     sub.add_parser("env").set_defaults(func=cmd_env)
     sub.add_parser("logtest").set_defaults(func=cmd_logtest)
     sub.add_parser("healthcheck").set_defaults(func=cmd_healthcheck)
 
-    # bybit
     sub.add_parser("bybit:ping").set_defaults(func=cmd_bybit_ping)
 
     p_top = sub.add_parser("bybit:top")
@@ -782,21 +887,18 @@ def main() -> None:
     p_top.add_argument("--limit", type=int, default=5)
     p_top.set_defaults(func=cmd_bybit_top)
 
-    # basis scan (консольний)
     p_basis = sub.add_parser("basis:scan")
     p_basis.add_argument("--limit", type=int, default=10)
     p_basis.add_argument("--threshold", type=float, default=None)
     p_basis.add_argument("--min-vol", type=float, default=None)
     p_basis.set_defaults(func=cmd_basis_scan)
 
-    # basis alert (telegram)
     p_alert = sub.add_parser("basis:alert")
     p_alert.add_argument("--limit", type=int, default=3)
     p_alert.add_argument("--threshold", type=float, default=None)
     p_alert.add_argument("--min-vol", type=float, default=None)
     p_alert.set_defaults(func=cmd_basis_alert)
 
-    # alerts:preview (формування повідомлення без надсилання)
     p_prev = sub.add_parser("alerts:preview")
     p_prev.add_argument("--symbol", required=True, type=str)
     p_prev.add_argument("--spot", required=True, type=float)
@@ -805,22 +907,20 @@ def main() -> None:
         "--vol",
         type=float,
         default=0.0,
-        help="Мін. обіг (USD) серед легів для заголовка",
+        help="24h turnover (USD) for the symbol",
     )
     p_prev.add_argument(
         "--threshold",
         type=float,
         default=None,
-        help="Поріг для заголовка (%, якщо не задано — з .env)",
+        help="Basis threshold in %, overrides config if set",
     )
     p_prev.set_defaults(func=cmd_alerts_preview)
 
-    # telegram test
     p_tg = sub.add_parser("tg:send")
     p_tg.add_argument("--text", type=str, default="Test message from bybit-arb-bot")
     p_tg.set_defaults(func=cmd_tg_send)
 
-    # --- звіти ---
     p_rp = sub.add_parser("report:print")
     p_rp.add_argument("--hours", type=int, default=24)
     p_rp.add_argument("--limit", type=int, default=None)
@@ -831,7 +931,6 @@ def main() -> None:
     p_rs.add_argument("--limit", type=int, default=None)
     p_rs.set_defaults(func=cmd_report_send)
 
-    # --- selector save ---
     p_sel = sub.add_parser("select:save")
     p_sel.add_argument("--limit", type=int, default=3)
     p_sel.add_argument("--threshold", type=float, default=None)
@@ -841,21 +940,19 @@ def main() -> None:
         "--cooldown-sec",
         type=int,
         default=None,
-        help="Переважує ALERT_COOLDOWN_SEC з .env",
+        help="Override ALERT_COOLDOWN_SEC from .env",
     )
     p_sel.set_defaults(func=cmd_select_save)
 
-    # --- price:pair ---
     p_pp = sub.add_parser("price:pair")
     p_pp.add_argument(
         "-s",
         "--symbol",
         action="append",
-        help="Може повторюватися: -s ETHUSDT -s BTCUSDT. За замовчуванням: ETHUSDT,BTCUSDT",
+        help="Symbols to show, e.g. ETHUSDT,BTCUSDT (can repeat -s)",
     )
     p_pp.set_defaults(func=cmd_price_pair)
 
-    # --- ws:run ---
     sub.add_parser("ws:run").set_defaults(func=cmd_ws_run)
 
     args = parser.parse_args()
@@ -863,7 +960,6 @@ def main() -> None:
     log_dir = Path("./logs")
     setup_logging(log_dir, level="DEBUG")
 
-    # ініціалізація SQLite
     try:
         s = load_settings()
         Path(s.db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -876,22 +972,21 @@ def main() -> None:
     sys.exit(args.func(args))
 
 
-if __name__ == "__main__":
-    main()
-
-
-# --- step-4.5: helper to wire Telegram sender into RealtimeAlerter ---
 def try_setup_telegram_sender(alerter: Any) -> None:
     try:
-        from src.core.alerts import RealtimeAlerter  # type: ignore
+        from .core.alerts import RealtimeAlerter  # type: ignore
 
         if not isinstance(alerter, RealtimeAlerter) or not hasattr(
             alerter, "set_sender"
         ):
             return
-        from src.core.alerts import telegram_sender  # type: ignore
+        from .core.alerts import telegram_sender  # type: ignore
 
         alerter.set_sender(telegram_sender)
         logger.info("Telegram sender wired into RealtimeAlerter.")
     except Exception as e:  # noqa: BLE001
         logger.warning(f"Failed to wire Telegram sender: {e!r}")
+
+
+if __name__ == "__main__":
+    main()

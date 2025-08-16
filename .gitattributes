@@ -1,4 +1,13 @@
-﻿* text=auto eol=lf
-*.ps1 text eol=crlf
+﻿
+* text=auto eol=lf
+
+# Бінарні — без торкання рядків
+*.png binary
+*.jpg binary
+*.gif binary
+*.pdf binary
+
+# Якщо треба CRLF саме для Windows-скриптів — зроби винятки:
 *.bat text eol=crlf
 *.cmd text eol=crlf
+*.ps1 text eol=crlf
