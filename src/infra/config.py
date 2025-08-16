@@ -8,6 +8,12 @@ from typing import List, Optional
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Autoload .env (stdlib loader lives in src/infra/dotenv_autoload.py)
+from .dotenv_autoload import autoload_env
+
+# Try to load .env as early as possible (idempotent)
+autoload_env()
+
 
 def _csv_list(x: object) -> List[str]:
     """Нормалізувати CSV/список у List[str]."""
@@ -26,10 +32,10 @@ def _csv_list(x: object) -> List[str]:
 class TelegramConfig(BaseModel):
     # ВАЖЛИВО: без alias, щоби працювало TELEGRAM__TOKEN / TELEGRAM__CHAT_ID
     token: Optional[str] = None
-    # chat_id часто зручно зберігати як str (Bot API приймає рядок або int)
+    # chat_id зручно зберігати як str (Bot API приймає рядок або int)
     chat_id: Optional[str] = None
 
-    # Back-compat властивості (main.py/_tg_fields очікує їх на всякий випадок)
+    # Back-compat властивості (main.py/_tg_fields можуть очікувати їх)
     @property
     def bot_token(self) -> Optional[str]:
         return self.token
@@ -43,8 +49,7 @@ class BybitConfig(BaseModel):
     api_key: Optional[str] = None
     api_secret: Optional[str] = None
 
-    # WS параметри з дефолтами (щоб `python -m src.main env` щось показував
-    # навіть без .env)
+    # WS параметри з дефолтами (щоб `python -m src.main env` щось показував навіть без .env)
     ws_public_url_linear: Optional[str] = "wss://stream.bybit.com/v5/public/linear"
     ws_public_url_spot: Optional[str] = "wss://stream.bybit.com/v5/public/spot"
 
@@ -135,29 +140,33 @@ class AppSettings(BaseSettings):
 def load_settings() -> AppSettings:
     """
     Завантажити налаштування з .env / env vars.
-    Містить декілька back-compat містків:
-      - Пласкі TELEGRAM_TOKEN / TG_CHAT_ID (якщо не задано TELEGRAM__TOKEN/CHAT_ID)
+
+    Включає back-compat містки:
+      - Пласкі TELEGRAM_TOKEN / TG_CHAT_ID / TELEGRAM_BOT_TOKEN / TELEGRAM_ALERT_CHAT_ID
+        → у nested telegram.token / telegram.chat_id, якщо ті порожні
       - Підхоплення «пласких» WS-полів на верхньому рівні, якщо вони відсутні у bybit.*
     """
+    # Ідемпотентне автозавантаження (на випадок, якщо імпорт модуля пропущено)
+    autoload_env()
+
     s = AppSettings()
 
     # --- Back-compat для пласких Telegram-перемінних ---
-    # Якщо користувач встановив TELEGRAM_TOKEN/TG_CHAT_ID (без "__"),
-    # підхоплюємо їх, тільки якщо nested значення відсутні.
-    token_flat = os.getenv("TELEGRAM_TOKEN")
-    chat_flat = os.getenv("TG_CHAT_ID")
-    if not s.telegram.token and token_flat:
+    token_flat = (
+        os.getenv("TELEGRAM__TOKEN")
+        or os.getenv("TELEGRAM_TOKEN")
+        or os.getenv("TELEGRAM_BOT_TOKEN")
+    )
+    chat_flat = (
+        os.getenv("TELEGRAM__CHAT_ID")
+        or os.getenv("TELEGRAM_CHAT_ID")
+        or os.getenv("TG_CHAT_ID")
+        or os.getenv("TELEGRAM_ALERT_CHAT_ID")
+    )
+    if not getattr(getattr(s, "telegram", None), "token", None) and token_flat:
         s.telegram.token = token_flat
-    if not s.telegram.chat_id and chat_flat:
+    if not getattr(getattr(s, "telegram", None), "chat_id", None) and chat_flat:
         s.telegram.chat_id = chat_flat
-
-    # Також підтримай альтернативні назви ( BOT_TOKEN / ALERT_CHAT_ID )
-    token_alt = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_alt = os.getenv("TELEGRAM_ALERT_CHAT_ID")
-    if not s.telegram.token and token_alt:
-        s.telegram.token = token_alt
-    if not s.telegram.chat_id and chat_alt:
-        s.telegram.chat_id = chat_alt
 
     # --- Back-compat для WS-полів (верхній рівень vs. bybit.*) ---
     # 1) URL-и
@@ -167,9 +176,9 @@ def load_settings() -> AppSettings:
         s.ws_public_url_spot = s.bybit.ws_public_url_spot
 
     # 2) Топіки
-    if not s.ws_sub_topics_linear and s.bybit.ws_sub_topics_linear is not None:
+    if s.ws_sub_topics_linear is None and s.bybit.ws_sub_topics_linear is not None:
         s.ws_sub_topics_linear = s.bybit.ws_sub_topics_linear
-    if not s.ws_sub_topics_spot and s.bybit.ws_sub_topics_spot is not None:
+    if s.ws_sub_topics_spot is None and s.bybit.ws_sub_topics_spot is not None:
         s.ws_sub_topics_spot = s.bybit.ws_sub_topics_spot
 
     return s

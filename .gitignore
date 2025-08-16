@@ -42,11 +42,18 @@ dev/tmp/
 !dev/tmp/.gitkeep
 /project-tree.txt
 project-tree.txt
+tree.txt
 
 *.bak
 
 __tmp/
 
 .env.*
+.env1
 
 !.env.example
+
+# Local artifacts
+*.patch
+.env.test
+*.zip
