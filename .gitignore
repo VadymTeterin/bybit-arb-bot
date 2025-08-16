@@ -57,3 +57,33 @@ __tmp/
 *.patch
 .env.test
 *.zip
+
+src/infra/dotenv_autoload_*.py
+!src/infra/dotenv_autoload.py
+# --- Python venvs & bytecode
+.venv/
+venv/
+**/__pycache__/
+*.py[cod]
+
+# --- Tool caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# --- Local env files & backups
+.env
+.env.*
+!.env.example
+.backups/
+.backups/**
+
+# --- Logs & temp artifacts
+*.log
+tree.txt
+
+# --- OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
