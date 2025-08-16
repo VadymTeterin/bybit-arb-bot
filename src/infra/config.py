@@ -2,130 +2,147 @@
 from __future__ import annotations
 
 import os
-from typing import List, Literal
+from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-__all__ = [
-    "TelegramSettings",
-    "BybitSettings",
-    "AppSettings",
-    "load_settings",
-]
+
+def _csv_to_list(s: Optional[str]) -> list[str]:
+    """Split comma-separated string into list, tolerating None/empty."""
+    if not s:
+        return []
+    parts = [p.strip() for p in s.split(",")]
+    return [p for p in parts if p]
 
 
-class TelegramSettings(BaseModel):
-    bot_token: str = ""
-    alert_chat_id: str = ""
-    report_chat_id: str = ""
-    enabled: bool = True
-    cooldown_seconds: int = 30
-
-
-class BybitSettings(BaseModel):
-    # API keys (допускаємо BYBIT__API_KEY або BYBIT_API_KEY через load_settings())
-    api_key: str = Field(default="", validation_alias="BYBIT__API_KEY")
-    api_secret: str = Field(default="", validation_alias="BYBIT__API_SECRET")
-
-    # Public WS (linear / spot)
-    ws_public_url_linear: str = "wss://stream.bybit.com/v5/public/linear"
-    ws_public_url_spot: str = "wss://stream.bybit.com/v5/public/spot"
-
-    # Топіки підписки (CSV): "tickers" або "tickers.BTCUSDT,tickers.ETHUSDT"
-    ws_sub_topics_linear: str = "tickers"
-    ws_sub_topics_spot: str = "tickers"
-
-    ws_reconnect_max_sec: int = 30
+class TelegramConfig(BaseModel):
+    token: Optional[str] = Field(default=None, alias="TELEGRAM_TOKEN")
+    chat_id: Optional[int] = Field(default=None, alias="TG_CHAT_ID")
 
 
 class AppSettings(BaseSettings):
+    # ====== Base config ======
+    env: str = Field(default="dev", alias="ENV")
+
+    alert_threshold_pct: float = Field(default=0.5, alias="ALERT_THRESHOLD_PCT")
+    alert_cooldown_sec: int = Field(default=180, alias="ALERT_COOLDOWN_SEC")
+
+    min_vol_24h_usd: float = Field(default=500_000.0, alias="MIN_VOL_24H_USD")
+    min_price: float = Field(default=0.001, alias="MIN_PRICE")
+
+    db_path: str = Field(default="data/signals.db", alias="DB_PATH")
+
+    enable_alerts: bool = Field(default=True, alias="ENABLE_ALERTS")
+
+    # --- RAW strings from env (не списки!) ---
+    allow_symbols_raw: Optional[str] = Field(default=None, alias="ALLOW_SYMBOLS")
+    deny_symbols_raw: Optional[str] = Field(default=None, alias="DENY_SYMBOLS")
+
+    # ====== WS / Realtime ======
+    ws_enabled: bool = Field(default=True, alias="WS_ENABLED")
+
+    # Нові BYBIT__*; є й legacy fallback через властивості нижче
+    bybit_ws_public_url_linear: Optional[str] = Field(
+        default=None, alias="BYBIT__WS_PUBLIC_URL_LINEAR"
+    )
+    bybit_ws_public_url_spot: Optional[str] = Field(
+        default=None, alias="BYBIT__WS_PUBLIC_URL_SPOT"
+    )
+
+    bybit_ws_sub_topics_linear_raw: Optional[str] = Field(
+        default=None, alias="BYBIT__WS_SUB_TOPICS_LINEAR"
+    )
+    bybit_ws_sub_topics_spot_raw: Optional[str] = Field(
+        default=None, alias="BYBIT__WS_SUB_TOPICS_SPOT"
+    )
+
+    ws_reconnect_max_sec: Optional[int] = Field(
+        default=30, alias="WS_RECONNECT_MAX_SEC"
+    )
+    rt_meta_refresh_sec: Optional[int] = Field(default=30, alias="RT_META_REFRESH_SEC")
+    rt_log_passes: int = Field(default=1, alias="RT_LOG_PASSES")
+
+    # Nested
+    telegram: TelegramConfig = Field(default_factory=TelegramConfig)
+
+    # ====== Private computed attrs (щоб settings-джерела їх НЕ чіпали) ======
+    _allow_symbols: List[str] = PrivateAttr(default_factory=list)
+    _deny_symbols: List[str] = PrivateAttr(default_factory=list)
+    _topics_linear: List[str] = PrivateAttr(default_factory=list)
+    _topics_spot: List[str] = PrivateAttr(default_factory=list)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=False,
-        env_nested_delimiter="__",  # підтримка BYBIT__API_KEY і т.п.
-        extra="ignore",  # не падати, якщо в .env є зайві ключі
+        env_nested_delimiter="__",  # TELEGRAM__*, BYBIT__*, ...
+        extra="ignore",
     )
 
-    # Загальне
-    env: Literal["dev", "prod", "test"] = "dev"
+    # ---------- Build/normalize ----------
+    @model_validator(mode="after")
+    def _normalize(self) -> "AppSettings":
+        # CSV -> lists, без JSON
+        self._allow_symbols = _csv_to_list(self.allow_symbols_raw)
+        self._deny_symbols = _csv_to_list(self.deny_symbols_raw)
 
-    # Алгоритмічні пороги / фільтри
-    alert_threshold_pct: float = 1.0
-    alert_cooldown_sec: int = 300
-    min_vol_24h_usd: float = 10_000_000
-    min_price: float = 0.001
-    db_path: str = "data/signals.db"
-    top_n_report: int = 3
-    enable_alerts: bool = True  # очікується тестами
+        self._topics_linear = _csv_to_list(self.bybit_ws_sub_topics_linear_raw)
+        self._topics_spot = _csv_to_list(self.bybit_ws_sub_topics_spot_raw)
 
-    # Allow / Deny lists (CSV/JSON)
-    allow_symbols: str = ""
-    deny_symbols: str = ""
+        # Legacy fallbacks для топіків, якщо нові не задані
+        if not self._topics_linear:
+            self._topics_linear = _csv_to_list(os.getenv("WS_SUB_TOPICS_LINEAR"))
+        if not self._topics_spot:
+            self._topics_spot = _csv_to_list(os.getenv("WS_SUB_TOPICS_SPOT"))
 
-    # Експорт сигналів (очікується тестами)
-    export_last_hours: int = 24
-    export_dir: str = "exports"
-    export_keep: int = 0
+        return self
 
-    # Діагностика реального часу (очікується тестами)
-    rt_log_passes: int = 1
-
-    # Telegram та Bybit (вкладені)
-    telegram: TelegramSettings = TelegramSettings()
-    bybit: BybitSettings = BybitSettings()
-
-    # Глобальний перемикач WS у додатку
-    ws_enabled: bool = True
-
-    # ---- helpers ----
-    def _split_csv(self, s: str) -> List[str]:
-        if not s:
-            return []
-        return [x.strip() for x in s.replace(";", ",").split(",") if x.strip()]
+    # ---------- Public properties ----------
+    # Нові "канонічні" проперті
+    @property
+    def allow_symbols(self) -> List[str]:
+        return self._allow_symbols
 
     @property
+    def deny_symbols(self) -> List[str]:
+        return self._deny_symbols
+
+    # Бек-сумісні назви, які очікують старі місця коду/тести
+    @property
     def allow_symbols_list(self) -> List[str]:
-        return [x.upper() for x in self._split_csv(self.allow_symbols)]
+        return self._allow_symbols
 
     @property
     def deny_symbols_list(self) -> List[str]:
-        return [x.upper() for x in self._split_csv(self.deny_symbols)]
+        return self._deny_symbols
+
+    # Back-compat: очікується в main.ws:run
+    @property
+    def ws_public_url_linear(self) -> Optional[str]:
+        return self.bybit_ws_public_url_linear or os.getenv("WS_PUBLIC_URL_LINEAR")
+
+    @property
+    def ws_public_url_spot(self) -> Optional[str]:
+        return self.bybit_ws_public_url_spot or os.getenv("WS_PUBLIC_URL_SPOT")
+
+    @property
+    def ws_topics_list_linear(self) -> List[str]:
+        return list(self._topics_linear)
+
+    @property
+    def ws_topics_list_spot(self) -> List[str]:
+        return list(self._topics_spot)
+
+    # Зручні дзеркала для друку
+    @property
+    def telegram_token(self) -> Optional[str]:
+        return self.telegram.token
+
+    @property
+    def tg_chat_id(self) -> Optional[int]:
+        return self.telegram.chat_id
 
 
 def load_settings() -> AppSettings:
-    """
-    Завантажуємо налаштування з .env з подвійною сумісністю:
-    - Вкладені ключі BYBIT__* (рекомендовано).
-    - Плоскі WS_* (якщо такі вже є у .env) — мапимо їх у BybitSettings.
-    """
-    # Back-compat: приймаємо BYBIT_API_KEY/SECRET і прокидаємо їх у нові назви BYBIT__*
-    if not os.getenv("BYBIT__API_KEY") and os.getenv("BYBIT_API_KEY"):
-        os.environ["BYBIT__API_KEY"] = os.getenv("BYBIT_API_KEY", "")
-    if not os.getenv("BYBIT__API_SECRET") and os.getenv("BYBIT_API_SECRET"):
-        os.environ["BYBIT__API_SECRET"] = os.getenv("BYBIT_API_SECRET", "")
-
-    s = AppSettings()
-
-    # Back-compat для плоских WS_ змінних:
-    s.bybit.ws_public_url_linear = os.getenv(
-        "WS_PUBLIC_URL_LINEAR", s.bybit.ws_public_url_linear
-    )
-    s.bybit.ws_public_url_spot = os.getenv(
-        "WS_PUBLIC_URL_SPOT", s.bybit.ws_public_url_spot
-    )
-    s.bybit.ws_sub_topics_linear = os.getenv(
-        "WS_SUB_TOPICS_LINEAR", s.bybit.ws_sub_topics_linear
-    )
-    s.bybit.ws_sub_topics_spot = os.getenv(
-        "WS_SUB_TOPICS_SPOT", s.bybit.ws_sub_topics_spot
-    )
-    try:
-        s.bybit.ws_reconnect_max_sec = int(
-            os.getenv("WS_RECONNECT_MAX_SEC", s.bybit.ws_reconnect_max_sec)
-        )
-    except Exception:
-        pass
-
-    return s
+    """Factory used across the project."""
+    return AppSettings()
