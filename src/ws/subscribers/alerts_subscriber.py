@@ -15,13 +15,13 @@ from src.ws.multiplexer import WsEvent, WSMultiplexer
 
 class AlertsSubscriber:
     """
-    WS → (spot/linear) → compute basis → Telegram
+    WS РІвЂ вЂ™ (spot/linear) РІвЂ вЂ™ compute basis РІвЂ вЂ™ Telegram
 
-    Невтручальний підписник мультиплексора:
-    - слухає події від Bybit (джерела "SPOT"/"LINEAR", канал "tickers")
-    - тримає останні ціни для символів
-    - рахує basis% та застосовує cooldown + allow/deny + min_price
-    - відправляє коротке повідомлення в Telegram (асинхронно, без блокування event loop)
+    Р СњР ВµР Р†РЎвЂљРЎР‚РЎС“РЎвЂЎР В°Р В»РЎРЉР Р…Р С‘Р в„– Р С—РЎвЂ“Р Т‘Р С—Р С‘РЎРѓР Р…Р С‘Р С” Р СРЎС“Р В»РЎРЉРЎвЂљР С‘Р С—Р В»Р ВµР С”РЎРѓР С•РЎР‚Р В°:
+    - РЎРѓР В»РЎС“РЎвЂ¦Р В°РЎвЂќ Р С—Р С•Р Т‘РЎвЂ“РЎвЂ” Р Р†РЎвЂ“Р Т‘ Bybit (Р Т‘Р В¶Р ВµРЎР‚Р ВµР В»Р В° "SPOT"/"LINEAR", Р С”Р В°Р Р…Р В°Р В» "tickers")
+    - РЎвЂљРЎР‚Р С‘Р СР В°РЎвЂќ Р С•РЎРѓРЎвЂљР В°Р Р…Р Р…РЎвЂ“ РЎвЂ РЎвЂ“Р Р…Р С‘ Р Т‘Р В»РЎРЏ РЎРѓР С‘Р СР Р†Р С•Р В»РЎвЂ“Р Р†
+    - РЎР‚Р В°РЎвЂ¦РЎС“РЎвЂќ basis% РЎвЂљР В° Р В·Р В°РЎРѓРЎвЂљР С•РЎРѓР С•Р Р†РЎС“РЎвЂќ cooldown + allow/deny + min_price
+    - Р Р†РЎвЂ“Р Т‘Р С—РЎР‚Р В°Р Р†Р В»РЎРЏРЎвЂќ Р С”Р С•РЎР‚Р С•РЎвЂљР С”Р Вµ Р С—Р С•Р Р†РЎвЂ“Р Т‘Р С•Р СР В»Р ВµР Р…Р Р…РЎРЏ Р Р† Telegram (Р В°РЎРѓР С‘Р Р…РЎвЂ¦РЎР‚Р С•Р Р…Р Р…Р С•, Р В±Р ВµР В· Р В±Р В»Р С•Р С”РЎС“Р Р†Р В°Р Р…Р Р…РЎРЏ event loop)
     """
 
     def __init__(
@@ -50,9 +50,11 @@ class AlertsSubscriber:
         # Telegram sender (sync) wrapped into async call via to_thread
         if send_async is None:
             _sender = TelegramSender(
-                token=self._s.telegram.bot_token,
-                chat_id=self._s.telegram.alert_chat_id,
-                cooldown_s=max(10, min(self._cooldown, 120)),  # локальний запобіжник
+                token=self._s.telegram.token,
+                chat_id=self._s.telegram.chat_id,
+                cooldown_s=max(
+                    10, min(self._cooldown, 120)
+                ),  # Р В»Р С•Р С”Р В°Р В»РЎРЉР Р…Р С‘Р в„– Р В·Р В°Р С—Р С•Р В±РЎвЂ“Р В¶Р Р…Р С‘Р С”
             )
 
             async def _default_send(text: str) -> None:
@@ -74,8 +76,8 @@ class AlertsSubscriber:
     # --------------------------- Public API ---------------------------
 
     def start(self) -> None:
-        """Підписуємося на події мультиплексора."""
-        self.stop()  # на випадок повторного виклику
+        """Р СџРЎвЂ“Р Т‘Р С—Р С‘РЎРѓРЎС“РЎвЂќР СР С•РЎРѓРЎРЏ Р Р…Р В° Р С—Р С•Р Т‘РЎвЂ“РЎвЂ” Р СРЎС“Р В»РЎРЉРЎвЂљР С‘Р С—Р В»Р ВµР С”РЎРѓР С•РЎР‚Р В°."""
+        self.stop()  # Р Р…Р В° Р Р†Р С‘Р С—Р В°Р Т‘Р С•Р С” Р С—Р С•Р Р†РЎвЂљР С•РЎР‚Р Р…Р С•Р С–Р С• Р Р†Р С‘Р С”Р В»Р С‘Р С”РЎС“
 
         def _on_evt(evt: WsEvent) -> None:
             try:
@@ -102,7 +104,7 @@ class AlertsSubscriber:
         )
 
     def stop(self) -> None:
-        """Відписуємося від усіх подій."""
+        """Р вЂ™РЎвЂ“Р Т‘Р С—Р С‘РЎРѓРЎС“РЎвЂќР СР С•РЎРѓРЎРЏ Р Р†РЎвЂ“Р Т‘ РЎС“РЎРѓРЎвЂ“РЎвЂ¦ Р С—Р С•Р Т‘РЎвЂ“Р в„–."""
         for u in self._unsubs:
             try:
                 u()
@@ -143,7 +145,7 @@ class AlertsSubscriber:
         else:
             return
 
-        # обчислити basis, якщо є обидві ціни
+        # Р С•Р В±РЎвЂЎР С‘РЎРѓР В»Р С‘РЎвЂљР С‘ basis, РЎРЏР С”РЎвЂ°Р С• РЎвЂќ Р С•Р В±Р С‘Р Т‘Р Р†РЎвЂ“ РЎвЂ РЎвЂ“Р Р…Р С‘
         sp = self._last_spot.get(sym)
         mk = self._last_mark.get(sym)
         if sp is None or mk is None:
@@ -166,8 +168,8 @@ class AlertsSubscriber:
 
         self._last_sent_ts[sym] = now
 
-        # Надіслати: якщо є running loop — плануємо задачу,
-        # якщо ні (наприклад, unit-тест) — виконуємо одразу через asyncio.run(...)
+        # Р СњР В°Р Т‘РЎвЂ“РЎРѓР В»Р В°РЎвЂљР С‘: РЎРЏР С”РЎвЂ°Р С• РЎвЂќ running loop РІР‚вЂќ Р С—Р В»Р В°Р Р…РЎС“РЎвЂќР СР С• Р В·Р В°Р Т‘Р В°РЎвЂЎРЎС“,
+        # РЎРЏР С”РЎвЂ°Р С• Р Р…РЎвЂ“ (Р Р…Р В°Р С—РЎР‚Р С‘Р С”Р В»Р В°Р Т‘, unit-РЎвЂљР ВµРЎРѓРЎвЂљ) РІР‚вЂќ Р Р†Р С‘Р С”Р С•Р Р…РЎС“РЎвЂќР СР С• Р С•Р Т‘РЎР‚Р В°Р В·РЎС“ РЎвЂЎР ВµРЎР‚Р ВµР В· asyncio.run(...)
         try:
             loop = asyncio.get_running_loop()
             loop.create_task(self._send(sym, basis_pct))
