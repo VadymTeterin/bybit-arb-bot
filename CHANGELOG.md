@@ -5,32 +5,33 @@
 ## Phase #5 — Productization & Ops (2025-08-14 → 2025-08-16)
 
 ### Step 5.8 — WS multiplexer + Bybit (integration & ops) — 2025-08-16
-- **Integrated:** `ws:run` працює через **WSMultiplexer** з мостом Bybit:
+- **Integrated:** `ws:run` працює через **WSMultiplexer** з мостом Bybit.
   - `src/ws/multiplexer.py` — маршрутизація подій (wildcards: source/channel/symbol).
   - `src/ws/bridge.py` — міст із Bybit WS у мультиплексор.
   - `src/ws/subscribers/alerts_subscriber.py` — підписник, що шле алерти (cooldown/threshold/allow/deny).
 - **Changed:** `src/main.py`
-  - meta-refresh тепер через **Bybit v5 `get_tickers('spot'|'linear')`** (оновлення `vol24h`), без залежності від `get_spot_map()`/`get_linear_map()`.
-  - додано сумісність для імпорту: **`BybitWS = BybitPublicWS`** (legacy alias).
-- **Fixed (Windows/Repo hygiene):**
-  - `.gitattributes` для нормалізації EOL.
-  - оновлено `.gitignore`, припинено трекати `__tmp/` артефакти.
-- **Tooling:**
-  - додано **`.pre-commit-config.yaml`**: `ruff`, `ruff-format`, `isort`, `end-of-file-fixer`, `trailing-whitespace`.
-- **CI:**
-  - **GitHub Actions** workflow `CI` — `pre-commit` + `pytest` (Python 3.12).
-- **Docs:**
-  - `docs/STEP-5.8-WS-MUX.md` — інструкції запуску WS (PowerShell), змінні `BYBIT__WS_*`, FAQ.
+  - meta-refresh через **Bybit v5 `get_tickers('spot'|'linear')`** (оновлення `vol24h`).
+  - сумісність для імпорту: **`BybitWS = BybitPublicWS`** (legacy alias).
+- **New (this step): stdlib .env autoload**
+  - `src/infra/dotenv_autoload.py` — простий loader `.env` без зовнішніх бібліотек (UTF-8/BOM-safe, `export`/лапки, inline `#` коментарі, `${VAR}` експансія).
+  - `src/infra/config.py` — виклик `autoload_env()` під час імпорту та всередині `load_settings()`; back-compat містки:
+    - `TELEGRAM__TOKEN | TELEGRAM_TOKEN | TELEGRAM_BOT_TOKEN → telegram.token`
+    - `TELEGRAM__CHAT_ID | TELEGRAM_CHAT_ID | TG_CHAT_ID | TELEGRAM_ALERT_CHAT_ID → telegram.chat_id`
+  - **Tests:** `tests/test_env_autoload.py`, `tests/test_settings_back_compat.py`.
+  - **Docs:** README/Інструкція оновлені (нові ключі, приклади PowerShell).
+- **Repo hygiene:**
+  - Оновлено `.gitignore` (venv/caches/logs/.env.*, *.patch, *.zip); прибрано випадкові артефакти.
+  - `pre-commit` (ruff/format/isort) зелений на коміті.
 - **Status:**
-  - локально **57/57 tests passed**; `ws:run` з’єднується зі `spot` і `linear`; у логах регулярне **“Refreshed vol24h for 314 symbols”**.
-- **Branches/PR:**
-  - `step-5.8-ws-mux → step-5.8-RT` — **merged**.
-  - `step-5.8-ws-run` — підготовлено для PR у `step-5.8-RT` (правки `ws:run`, alias, docs).
+  - локально **tests passed**; `ws:run` з’єднується з `spot` і `linear`.
+- **Next (5.8 підзадачі):**
+  - RT-мітка чату (`step-5.8-RT`).
+  - WS reconnect/health (`step-5.8-ws-reconnect`).
 
 ### Step 5.6 — WS Multiplexer (marker) — 2025-08-15
 - Added: `src/ws/multiplexer.py` — потокобезпечний маршрутизатор подій із підтримкою `*`-wildcard (source/channel/symbol); без мережевої логіки та без asyncio.
 - Added: `tests/test_ws_multiplexer.py` — subscribe/wildcards/unsubscribe (lazy)/publish-count/invalid-input.
-- Changed: `stats()` — семантика «ледачої відписки»: `active_subscriptions == total_subscriptions` до `clear_inactive()`. Додано `active_handlers` для діагностики.
+- Changed: `stats()` — семантика «ледачої відписки». Додано `active_handlers` для діагностики.
 - Notes: **Marker-only**. Чинний 5.5 не змінено.
 
 ### Step 5.6 — Integration substep (ws:run → WSMultiplexer) — 2025-08-15
