@@ -7,7 +7,8 @@
       "recv_window_ms": 5000,
       "base_url_public": "https://api.bybit.com",
       "base_url_private": "https://api.bybit.com",
-      "testnet": false
+      "testnet": false,
+      "default_category": "spot"
     }
   },
   "secrets": {
