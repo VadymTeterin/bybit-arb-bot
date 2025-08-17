@@ -45,7 +45,10 @@ def parse_ticker(payload: Dict[str, Any], symbol_req: str) -> Ticker:
     bid = float(t.get("bid1Price") or 0.0)
     ask = float(t.get("ask1Price") or 0.0)
     last = float(t.get("lastPrice") or 0.0)
-    ts = _to_dt(t.get("updateTime") or result.get("ts") or 0)
+
+    # Fallback for testnet/v5 where updateTime/result.ts may be missing:
+    raw_ts = t.get("updateTime") or result.get("ts") or payload.get("time") or 0
+    ts = _to_dt(raw_ts)
 
     return Ticker(
         symbol=normalize_symbol(symbol_req), bid=bid, ask=ask, last=last, ts=ts
