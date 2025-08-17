@@ -2,28 +2,82 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Iterable, List, Literal, Optional
+from typing import Any, Dict, Optional
 
-from exchanges.contracts import ITradingClient, Position
+from exchanges.contracts import ITradingClient  # ✅ наслідуємо контракт
 
 from ._http import SignedHTTPClient
-from .types import BybitConfig, MarketType
+from .symbol_mapper import to_bybit_symbol
+from .types import BybitConfig
+
+
+def _ensure_str_num(x: float | int | str | None) -> Optional[str]:
+    if x is None:
+        return None
+    # Bybit очікує числа як рядки
+    return str(x)
+
+
+def _side_to_bybit(side: str) -> str:
+    s = side.strip().lower()
+    if s == "buy":
+        return "Buy"
+    if s == "sell":
+        return "Sell"
+    raise ValueError(f"Unsupported side: {side!r}")
+
+
+def _type_to_bybit(order_type: str) -> str:
+    t = order_type.strip().lower()
+    if t == "limit":
+        return "Limit"
+    if t == "market":
+        return "Market"
+    raise ValueError(f"Unsupported order type: {order_type!r}")
+
+
+def _market_to_category(market: str, default_category: str) -> str:
+    """
+    market: "spot" або "perp" (перп = linear), для зворотної сумісності.
+    Якщо market не заданий, беремо cfg.default_category.
+    """
+    m = (market or "").strip().lower()
+    if m in ("", None):
+        return default_category
+    if m == "spot":
+        return "spot"
+    if m in ("perp", "linear"):
+        return "linear"
+    # залишимо дефолт, щоб не ламати потік
+    return default_category
 
 
 class BybitTradingClient(ITradingClient):
-    def __init__(self, cfg: BybitConfig):
+    """
+    Приватний клієнт для створення/скасування ордерів (Bybit v5).
+    Працює і для spot, і для linear (перпети).
+    """
+
+    def __init__(
+        self,
+        cfg: BybitConfig,
+        http_client: Optional[SignedHTTPClient] = None,  # інжект для тестів
+    ):
         self.cfg = cfg
-        api_key = os.getenv("BYBIT_API_KEY", "")
-        api_secret = os.getenv("BYBIT_API_SECRET", "")
-        if not api_key or not api_secret:
-            self.http: Optional[SignedHTTPClient] = None
+        if http_client is not None:
+            self.http: Optional[SignedHTTPClient] = http_client
         else:
-            self.http = SignedHTTPClient(
-                base_url=cfg.base_url_private,
-                api_key=api_key,
-                api_secret=api_secret,
-                recv_window_ms=cfg.recv_window_ms,
-            )
+            api_key = os.getenv("BYBIT_API_KEY", "")
+            api_secret = os.getenv("BYBIT_API_SECRET", "")
+            if not api_key or not api_secret:
+                self.http = None
+            else:
+                self.http = SignedHTTPClient(
+                    base_url=cfg.base_url_private,
+                    api_key=api_key,
+                    api_secret=api_secret,
+                    recv_window_ms=cfg.recv_window_ms,
+                )
 
     async def _ensure_http(self) -> SignedHTTPClient:
         if self.http is None:
@@ -32,67 +86,83 @@ class BybitTradingClient(ITradingClient):
             )
         return self.http
 
-    def _category_for_market(self, market: MarketType) -> str:
-        if market == "perp":
-            return "linear"  # USDT-перпи
-        return "spot"
-
     async def create_order(
         self,
+        *,
         symbol: str,
-        side: Literal["buy", "sell"],
-        type: Literal["limit", "market"],
+        side: str,  # "buy" | "sell"
+        type: str,  # "limit" | "market"
         qty: float,
         price: Optional[float] = None,
-        reduce_only: bool = False,
-        market: MarketType = "spot",
-        extra: Optional[Dict[str, Any]] = None,
+        market: str = "spot",  # "spot" | "perp" (alias "linear")
+        time_in_force: str = "GTC",
+        order_link_id: Optional[str] = None,
+        reduce_only: Optional[bool] = None,  # для перпів
     ) -> Dict[str, Any]:
+        """
+        POST /v5/order/create
+        Мінімальний набір полів для spot/linear.
+        """
         http = await self._ensure_http()
-        category = self._category_for_market(market)
-        body: Dict[str, Any] = {
+
+        category = _market_to_category(market, self.cfg.default_category)
+        bybit_side = _side_to_bybit(side)
+        bybit_type = _type_to_bybit(type)
+
+        if bybit_type == "Limit" and price is None:
+            raise ValueError("price is required for limit orders")
+
+        payload: Dict[str, Any] = {
             "category": category,
-            "symbol": symbol.replace("/", ""),  # BYBIT очікує BTCUSDT
-            "side": "Buy" if side == "buy" else "Sell",
-            "orderType": "Limit" if type == "limit" else "Market",
-            "qty": str(qty),
-            "reduceOnly": reduce_only,
+            "symbol": to_bybit_symbol(symbol),
+            "side": bybit_side,
+            "orderType": bybit_type,
+            "qty": _ensure_str_num(qty),
+            "timeInForce": time_in_force,
         }
         if price is not None:
-            body["price"] = str(price)
-        if extra:
-            body.update(extra)
-        # v5: POST /v5/order/create
-        data = await http.post("/v5/order/create", json=body)
-        return {
-            "status": "submitted",
-            "exchange": "bybit",
-            "result": data.get("result"),
-        }
+            payload["price"] = _ensure_str_num(price)
+        if order_link_id:
+            payload["orderLinkId"] = order_link_id
+        if reduce_only is not None:
+            payload["reduceOnly"] = bool(reduce_only)
+
+        # HTTPClient/SignedHTTPClient вже робить валідацію retCode
+        data = await http.post("/v5/order/create", json=payload)
+        return data
 
     async def cancel_order(
-        self, symbol: str, order_id: str, market: MarketType = "spot"
+        self,
+        *,
+        symbol: str,
+        order_id: Optional[str] = None,
+        order_link_id: Optional[str] = None,
+        market: str = "spot",
     ) -> Dict[str, Any]:
+        """
+        POST /v5/order/cancel
+        Потрібен або orderId, або orderLinkId.
+        """
         http = await self._ensure_http()
-        category = self._category_for_market(market)
-        body: Dict[str, Any] = {
+
+        if not order_id and not order_link_id:
+            raise ValueError("order_id or order_link_id is required")
+
+        category = _market_to_category(market, self.cfg.default_category)
+
+        payload: Dict[str, Any] = {
             "category": category,
-            "symbol": symbol.replace("/", ""),
-            "orderId": order_id,
+            "symbol": to_bybit_symbol(symbol),
         }
-        data = await http.post("/v5/order/cancel", json=body)
-        return {
-            "status": "cancel_submitted",
-            "exchange": "bybit",
-            "result": data.get("result"),
-        }
+        if order_id:
+            payload["orderId"] = order_id
+        if order_link_id:
+            payload["orderLinkId"] = order_link_id
 
-    async def get_positions(
-        self, symbols: Optional[Iterable[str]] = None
-    ) -> List[Position]:
-        # Для spot позицій нема; для перпів: /v5/position/list (category=linear)
-        return []
+        data = await http.post("/v5/order/cancel", json=payload)
+        return data
 
-    async def set_leverage(self, symbol: str, leverage: float) -> None:
-        # Для перпів: /v5/position/set-leverage — додамо на кроці трейдингу
-        return None
+    async def close(self) -> None:
+        """Закриває внутрішній HTTP-клієнт, якщо він створений."""
+        if self.http is not None:
+            await self.http.close()
