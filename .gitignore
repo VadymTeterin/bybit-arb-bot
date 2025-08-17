@@ -123,3 +123,5 @@ Thumbs.db
 .idea/
 .vscode/
 # === End project ignores ===
+
+bybit.secrets.env
