@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from exchanges.contracts import (
     Candle,
@@ -14,6 +14,7 @@ from exchanges.contracts import (
 
 from ._http import HTTPClient
 from .errors import map_error
+from .rate_limiter import AsyncTokenBucket
 from .symbol_mapper import normalize_symbol, to_bybit_symbol
 from .types import BybitConfig, Interval
 
@@ -32,7 +33,6 @@ _INTERVAL_MAP: Dict[Interval, str] = {
 
 
 def parse_ticker(payload: Dict[str, Any], symbol_req: str) -> Ticker:
-    """Парсинг відповіді /v5/market/tickers (spot)."""
     if int(payload.get("retCode", -1)) != 0:
         raise map_error(payload.get("retCode"), payload.get("retMsg", "unknown error"))
 
@@ -53,7 +53,6 @@ def parse_ticker(payload: Dict[str, Any], symbol_req: str) -> Ticker:
 
 
 def parse_order_book(payload: Dict[str, Any], symbol_req: str) -> OrderBook:
-    """Парсинг відповіді /v5/market/orderbook (spot)."""
     if int(payload.get("retCode", -1)) != 0:
         raise map_error(payload.get("retCode"), payload.get("retMsg", "unknown error"))
 
@@ -71,7 +70,6 @@ def parse_order_book(payload: Dict[str, Any], symbol_req: str) -> OrderBook:
 def parse_candles(
     payload: Dict[str, Any], symbol_req: str, interval: Interval
 ) -> List[Candle]:
-    """Парсинг відповіді /v5/market/kline (spot)."""
     if int(payload.get("retCode", -1)) != 0:
         raise map_error(payload.get("retCode"), payload.get("retMsg", "unknown error"))
 
@@ -79,11 +77,10 @@ def parse_candles(
     lst = result.get("list") or []
     out: List[Candle] = []
     for row in lst:
-        # BYBIT format: [startTime, open, high, low, close, volume, turnover]
         open_time = _to_dt(row[0])
         open_ = float(row[1])
         high = float(row[2])
-        low = float(row[3])  # <- замінили 'l' на 'low' (ruff E741)
+        low = float(row[3])
         close = float(row[4])
         volume = float(row[5])
         out.append(
@@ -102,14 +99,20 @@ def parse_candles(
 
 
 class BybitPublicClient(IExchangePublic):
-    def __init__(self, cfg: BybitConfig):
+    def __init__(
+        self,
+        cfg: BybitConfig,
+        limiter: Optional[AsyncTokenBucket] = None,
+        http_client: Optional[HTTPClient] = None,  # тестовий інжект
+    ):
         self.cfg = cfg
-        self.http = HTTPClient(cfg.base_url_public)
+        self.limiter = limiter or AsyncTokenBucket(rate_per_sec=10, burst=20)
+        self.http = http_client or HTTPClient(cfg.base_url_public, limiter=self.limiter)
 
     @property
     def _category(self) -> str:
-        # На цьому підкроці працюємо зі spot. Пізніше можна буде розширити.
-        return "spot"
+        # Використовуємо дефолт з конфігу; якщо треба перпи — встановлюємо "linear"
+        return self.cfg.default_category
 
     async def get_ticker(self, symbol: str) -> Ticker:
         params = {
