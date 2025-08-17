@@ -1,55 +1,30 @@
-# scripts/smoke_bybit_ws.py
-from __future__ import annotations
-
 import asyncio
 import os
-from typing import List
 
-from exchanges.bybit.ws_public import BybitWsPublic, WsConfig
-from exchanges.contracts import Ticker
+from exchanges.bybit.ws_public import BybitWsPublic
 
 
-def _env(name: str, default: str) -> str:
-    v = os.getenv(name)
-    return v if v else default
+def _print_ticker(t) -> None:
+    # Формат виводу залишив таким, як у прикладах вище
+    print(
+        f"WS Ticker: Ticker(symbol='{t.symbol}', bid={t.bid}, "
+        f"ask={t.ask}, last={t.last}, ts={t.ts})"
+    )
 
 
 async def main() -> None:
-    # категорія з env (spot|linear)
-    category = _env("BYBIT_DEFAULT_CATEGORY", "spot").lower()
+    symbol = os.getenv("BYBIT_SYMBOL", "BTCUSDT")
 
-    # демонстраційний список символів
-    symbols: List[str] = ["BTCUSDT"]
+    ws = BybitWsPublic(symbol, on_ticker=_print_ticker)
 
-    # збираємо тікери перші кілька подій і завершуємо
-    got: List[Ticker] = []
-
-    def on_ticker(t: Ticker) -> None:
-        print(f"WS Ticker: {t}")  # noqa: T201
-        got.append(t)
-
-    cfg = WsConfig(category=category, symbols=tuple(symbols))
-    ws = BybitWsPublic(cfg, on_ticker=on_ticker)
-
-    # запускаємо і чекаємо перших 3-5 повідомлень або таймаут 15с
     task = asyncio.create_task(ws.run())
     try:
-        for _ in range(15):
-            await asyncio.sleep(1.0)
-            if len(got) >= 3:
-                break
+        # Дефолтно ~9 сек, можна змінити через BYBIT_SMOKE_DURATION
+        await asyncio.sleep(float(os.getenv("BYBIT_SMOKE_DURATION", "9")))
     finally:
-        await ws.close()
-        await asyncio.sleep(0.1)
-        task.cancel()
-        with contextlib.suppress(Exception):
-            await task
-
-    if not got:
-        print("No WS tickers received (try again or check network).")  # noqa: T201
+        await ws.stop()
+        await task
 
 
 if __name__ == "__main__":
-    import contextlib
-
     asyncio.run(main())
