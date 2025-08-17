@@ -1,0 +1,17 @@
+{
+  "exchanges": {
+    "bybit": {
+      "enabled": true,
+      "ws_enabled": false,
+      "perp_enabled": true,
+      "recv_window_ms": 5000,
+      "base_url_public": "https://api.bybit.com",
+      "base_url_private": "https://api.bybit.com",
+      "testnet": false
+    }
+  },
+  "secrets": {
+    "BYBIT_API_KEY": "set-in-env",
+    "BYBIT_API_SECRET": "set-in-env"
+  }
+}
