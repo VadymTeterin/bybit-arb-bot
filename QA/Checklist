@@ -1,0 +1,8 @@
+## 6- Suggested CHANGELOG entry (append to `CHANGELOG.md`)
+
+```markdown
+### Step-5.8.3
+- Add Bybit v5 WS normalizer (`src/ws/normalizers/bybit_v5.py`).
+- Add generic WS reconnect policy (`src/ws/reconnect.py`).
+- Tests for normalizer and reconnect policy.
+- Docs for wiring WS → MUX (`docs/STEP-5.8.3-WS-BYBIT-MUX.md`).
