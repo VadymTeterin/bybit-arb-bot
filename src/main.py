@@ -47,9 +47,6 @@ APP_VERSION = "0.4.4"
 
 # --------------------------------------------------------------------------------------
 # Settings loader that is safe at import-time and test-friendly (monkeypatchable)
-# Tests expect `src.main.load_settings` to exist; they monkeypatch it directly.
-# First, we try to import project settings; if that fails, we build a sane env-based
-# fallback so CLI still works without a `src/settings.py`.
 # --------------------------------------------------------------------------------------
 def _env_bool(name: str, default: bool = False) -> bool:
     val = os.getenv(name)
@@ -747,7 +744,10 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         from .core.cache import QuoteCache
         from .exchanges.bybit.ws import BybitWS, iter_ticker_entries
         from .ws.bridge import publish_bybit_ticker
-        from .ws.multiplexer import WSMultiplexer
+        from .ws.multiplexer import WsEvent, WSMultiplexer
+
+        # NEW: normalized event factory
+        from .ws.normalizers.bybit_v5 import normalize
         from .ws.subscribers.alerts_subscriber import AlertsSubscriber
     except Exception as e:  # noqa: BLE001
         print("WS components are missing. Please add ws.py and cache.py:", str(e))
@@ -809,23 +809,56 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
                 logger.bind(tag="RTMETA").warning(f"Meta refresh failed: {e!r}")
             await asyncio.sleep(max(30, int(getattr(s, "rt_meta_refresh_sec", 30))))
 
+    # ----------------------------
+    # on_message handlers
+    # ----------------------------
     async def on_message_spot(msg: dict):
+        # 1) Publish normalized event (channel usually 'ticker'); keep it distinct
+        try:
+            evt_norm = normalize(msg)
+            mux.publish(
+                WsEvent(
+                    source="SPOT",
+                    channel=str(evt_norm.get("channel") or "other"),
+                    symbol=str(evt_norm.get("symbol") or ""),
+                    payload=evt_norm.get("data") or {},
+                    ts=evt_norm.get("ts_ms") or 0,
+                )
+            )
+        except Exception as e:
+            logger.debug(f"normalize(msg) failed (SPOT): {e!r}")
+
+        # 2) Compatibility path for existing subscribers: publish 'tickers' events per symbol
         for item in iter_ticker_entries(msg):
             sym = item.get("symbol")
             last = item.get("last")
             if sym and last is not None:
-                bp = await cache.update(sym, spot=last)
+                _ = await cache.update(sym, spot=last)
                 publish_bybit_ticker(mux, "SPOT", item)
-                _ = bp
 
     async def on_message_linear(msg: dict):
+        # 1) Publish normalized event
+        try:
+            evt_norm = normalize(msg)
+            mux.publish(
+                WsEvent(
+                    source="LINEAR",
+                    channel=str(evt_norm.get("channel") or "other"),
+                    symbol=str(evt_norm.get("symbol") or ""),
+                    payload=evt_norm.get("data") or {},
+                    ts=evt_norm.get("ts_ms") or 0,
+                )
+            )
+        except Exception as e:
+            logger.debug(f"normalize(msg) failed (LINEAR): {e!r}")
+
+        # 2) Compatibility path for existing subscribers
         for item in iter_ticker_entries(msg):
             sym = item.get("symbol")
             mark = item.get("mark")
             if sym and mark is not None:
-                bp = await cache.update(sym, linear_mark=mark)
+                _ = await cache.update(sym, linear_mark=mark)
                 publish_bybit_ticker(mux, "LINEAR", item)
-                _ = bp
 
     async def runner():
         import asyncio as _asyncio

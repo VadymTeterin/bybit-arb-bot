@@ -15,29 +15,47 @@ except Exception:  # pragma: no cover
 
 import aiohttp
 
-BackoffFn = Callable[[int], float]
+# Reconnect/heartbeat helpers (project-wide, exchange-agnostic)
+from src.ws.reconnect import ReconnectPolicy
 
 
 def exp_backoff_with_jitter(
     attempt: int,
     *,
-    base: float = 1.0,
+    base: float = 0.5,
     factor: float = 2.0,
-    cap: float = 30.0,
+    cap: Optional[float] = None,
+    max_delay: Optional[float] = None,
+    jitter: float = 0.1,
 ) -> float:
     """
-    Exponential backoff with jitter in the interval [t/2, t],
-    where t = min(cap, base * factor**(attempt-1)).
-    Підтримує виклики з kwargs: base=..., cap=..., factor=...
+    Legacy-compatible exponential backoff with jitter.
+
+    - Tests may call with 'cap=' -> accept as alias for max delay.
+    - attempt is 1-based: attempt=1 -> base, attempt=2 -> base*factor, ...
+
+    We also clamp jittered value to NEVER exceed the target (legacy tests expect v <= target).
     """
-    if attempt < 1:
-        attempt = 1
-    upper = min(cap, base * (factor ** (attempt - 1)))
-    if upper <= 0:
-        return 0.0
-    lower = upper * 0.5
-    # рівномірно у [t/2, t]
-    return lower + random.random() * (upper - lower)
+    # Resolve cap/max_delay
+    if cap is not None and max_delay is not None:
+        max_d = min(cap, max_delay)
+    else:
+        max_d = (
+            cap
+            if cap is not None
+            else (max_delay if max_delay is not None else float("inf"))
+        )
+
+    k = max(0, int(attempt) - 1)  # 1-based -> 0-based exponent
+    nominal = base * (factor**k)  # 1, 2, 4, 8, ...
+    clipped = min(max_d, nominal)
+
+    span = max(0.0, jitter) * clipped
+    jittered = clipped + random.uniform(-span, span)
+
+    # IMPORTANT: do not overshoot the target (upper clamp)
+    delay = min(clipped, jittered)
+    return max(0.0, delay)
 
 
 def _to_float(v, default: Optional[float] = None) -> Optional[float]:
@@ -58,26 +76,13 @@ def _from_e_scaled(val) -> Optional[float]:
         return None
     s = str(val).strip()
     try:
-        # plain float will succeed for e.g. "123.45"
-        return float(s)
-    except Exception:
-        pass
-    try:
         return float(s)
     except Exception:
         return None
 
 
-def _pick_first(*vals) -> Optional[float]:
-    for v in vals:
-        if v is None:
-            continue
-        return v
-    return None
-
-
 def _infer_symbol_from_topic(topic: str) -> Optional[str]:
-    # bybit v5 topics look like "tickers.BTCUSDT" or "tickers"
+    # Bybit v5 topics look like "tickers.BTCUSDT" or just "tickers"
     if not topic:
         return None
     if "." in topic:
@@ -94,7 +99,7 @@ def iter_ticker_entries(message: Dict) -> Iterator[Dict]:
     topic = str(message.get("topic") or "").strip()
     data = message.get("data")
     if data is None:
-        return iter(())  # empty
+        return iter(())
     rows: List[Dict] = []
     if isinstance(data, dict):
         arr = [data]
@@ -151,13 +156,10 @@ class BybitPublicWS:
     - Connects to given URL
     - Subscribes to topics list (e.g. ["tickers.BTCUSDT","tickers.ETHUSDT"] or ["tickers"])
     - Calls on_message for every incoming JSON
+    - Uses ReconnectPolicy (exponential backoff with jitter) between reconnects
     """
 
-    def __init__(
-        self,
-        url: str,
-        topics: Iterable[str],
-    ) -> None:
+    def __init__(self, url: str, topics: Iterable[str]) -> None:
         self.url = url
         self.topics = list(topics)
         self._stop = asyncio.Event()
@@ -176,15 +178,15 @@ class BybitPublicWS:
     async def run(
         self,
         on_message: Callable[[dict], Awaitable[None]],
-        backoff: BackoffFn = exp_backoff_with_jitter,
+        *,
         heartbeat: int = 30,
     ) -> None:
         """
-        Main loop with auto-reconnect.
+        Main loop with auto-reconnect using ReconnectPolicy.
         on_message receives parsed JSON (dict).
         """
         self._stop.clear()
-        attempt = 1
+        policy = ReconnectPolicy()  # base=0.5, factor=2.0, max=30.0 by default
 
         async with aiohttp.ClientSession() as session:
             self._session = session
@@ -192,7 +194,7 @@ class BybitPublicWS:
                 try:
                     async with session.ws_connect(self.url, heartbeat=heartbeat) as ws:
                         logger.info(f"WS connected: {self.url}")
-                        attempt = 1
+                        policy.reset()  # successful connect
                         await self._subscribe(ws)
 
                         async for msg in ws:
@@ -204,7 +206,19 @@ class BybitPublicWS:
                                 except Exception:
                                     logger.warning("WS non-JSON text frame")
                                     continue
+
+                                # reset backoff on any valid message
+                                policy.reset()
+
+                                # Some Bybit servers send pong frames as JSON
+                                if isinstance(payload, dict) and (
+                                    str(payload.get("op", "")).lower() == "pong"
+                                    or str(payload.get("event", "")).lower() == "pong"
+                                ):
+                                    continue
+
                                 await on_message(payload)
+
                             elif msg.type == aiohttp.WSMsgType.BINARY:
                                 continue
                             elif msg.type == aiohttp.WSMsgType.ERROR:
@@ -215,14 +229,15 @@ class BybitPublicWS:
                                 aiohttp.WSMsgType.CLOSING,
                             ):
                                 break
+
                 except Exception as e:
-                    delay = backoff(attempt)
+                    # Exponential backoff between reconnect attempts
+                    delay = policy.next_delay()
                     logger.warning(f"WS reconnect in {delay:.2f}s after error: {e!r}")
                     await asyncio.sleep(delay)
-                    attempt += 1
 
         logger.info("WS stopped")
 
 
-# --- Compatibility alias for legacy imports (main.ws:run expects BybitWS) ---
+# Compatibility alias
 BybitWS = BybitPublicWS
