@@ -125,3 +125,8 @@ Thumbs.db
 # === End project ignores ===
 
 bybit.secrets.env
+_tmp/**
+_tmp/
+tmp/
+tmp/**
+t -q
