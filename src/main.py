@@ -816,6 +816,18 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         # 1) Publish normalized event (channel usually 'ticker'); keep it distinct
         try:
             evt_norm = normalize(msg)
+            # OBS: lightweight debug counter for normalized events
+            _data = evt_norm.get("data")
+            _items = (
+                1
+                if isinstance(_data, dict)
+                else (len(_data) if isinstance(_data, list) else 0)
+            )
+            logger.bind(tag="WS").debug(
+                f"SPOT normalized: channel={evt_norm.get('channel')} "
+                f"symbol={evt_norm.get('symbol')} items={_items}"
+            )
+
             mux.publish(
                 WsEvent(
                     source="SPOT",
@@ -840,6 +852,18 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         # 1) Publish normalized event
         try:
             evt_norm = normalize(msg)
+            # OBS: lightweight debug counter for normalized events
+            _data = evt_norm.get("data")
+            _items = (
+                1
+                if isinstance(_data, dict)
+                else (len(_data) if isinstance(_data, list) else 0)
+            )
+            logger.bind(tag="WS").debug(
+                f"LINEAR normalized: channel={evt_norm.get('channel')} "
+                f"symbol={evt_norm.get('symbol')} items={_items}"
+            )
+
             mux.publish(
                 WsEvent(
                     source="LINEAR",
