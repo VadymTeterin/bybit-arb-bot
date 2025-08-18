@@ -1,15 +1,15 @@
+from __future__ import annotations
+
 import asyncio
 import contextlib
 import json
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, Dict, Optional
-
-import websockets
+from typing import Any, Callable, Optional
 
 
-# Простий тип для уніфікованого тікера
+# ---- Модель тікера ---------------------------------------------------------
 @dataclass
 class Ticker:
     symbol: str
@@ -19,191 +19,314 @@ class Ticker:
     ts: datetime
 
 
-def _to_ms_ts(x: Any) -> Optional[int]:
-    """Допоміжно: приймає int/str ms, повертає int або None."""
-    if x is None:
-        return None
+def _pair_from_bybit_symbol(sym: str) -> str:
+    # "BTCUSDT" -> "BTC/USDT", "BTCUSD" -> "BTC/USD"
+    if len(sym) > 4 and sym.endswith("USDT"):
+        return f"{sym[:-4]}/USDT"
+    if len(sym) > 3 and sym.endswith("USD"):
+        return f"{sym[:-3]}/USD"
+    return sym
+
+
+def _to_float(x: Any) -> float:
+    if x is None or x == "":
+        return 0.0
     try:
-        return int(x)
+        return float(x)
     except Exception:
+        return 0.0
+
+
+def _dt_from_ms(ms: int | float | None) -> datetime:
+    if not ms:
+        return datetime.fromtimestamp(0, tz=timezone.utc)
+    return datetime.fromtimestamp(float(ms) / 1000.0, tz=timezone.utc)
+
+
+# ---- Парсер WS-повідомлень tickers ----------------------------------------
+def parse_ws_ticker(payload: dict[str, Any]) -> Optional[Ticker]:
+    """
+    Підтримує два формати data:
+      1) list[dict] (type: snapshot)
+      2) dict       (type: delta)
+
+    ВАЖЛИВО: у проді Bybit часто шле topic як "tickers.BTCUSDT".
+             Приймаємо як "tickers", так і "tickers.*".
+    """
+    topic = str(payload.get("topic", ""))
+    if not (topic == "tickers" or topic.startswith("tickers.")):
         return None
 
-
-def _ms_to_dt(ms: int) -> datetime:
-    return datetime.fromtimestamp(ms / 1000.0, tz=timezone.utc)
-
-
-def _norm_symbol(s: str) -> str:
-    # "BTCUSDT" -> "BTC/USDT"
-    if "/" in s:
-        return s
-    if len(s) >= 6 and s.endswith("USDT"):
-        return f"{s[:-4]}/USDT"
-    if len(s) >= 6 and s.endswith("USDC"):
-        return f"{s[:-4]}/USDC"
-    # загальний випадок: останні 3-4 символи як котирувана валюта
-    return f"{s[:-3]}/{s[-3:]}"
-
-
-def parse_ws_ticker(payload: Dict[str, Any]) -> Optional[Ticker]:
-    """
-    Уніфікує Bybit WS v5 `tickers` (spot/linear) у Ticker.
-    Підтримує і список у `data`, і словник.
-    """
     data = payload.get("data")
-    if data is None:
-        return None
-
-    rec: Dict[str, Any]
     if isinstance(data, list):
         if not data:
             return None
-        rec = data[0]
-        bid = rec.get("bid1Price")
-        ask = rec.get("ask1Price")
-        last = rec.get("lastPrice")
+        d = data[0]
+        symbol = _pair_from_bybit_symbol(str(d.get("symbol", "")))
+        # snapshot (spot): bid1Price/ask1Price/lastPrice
+        bid = _to_float(d.get("bid1Price"))
+        ask = _to_float(d.get("ask1Price"))
+        last = _to_float(d.get("lastPrice"))
+        ts = _dt_from_ms(d.get("updateTime") or payload.get("ts"))
+        return Ticker(symbol=symbol, bid=bid, ask=ask, last=last, ts=ts)
+
+    if isinstance(data, dict):
+        d = data
+        symbol = _pair_from_bybit_symbol(str(d.get("symbol", "")))
+        # delta (деривативи/спот мають різні ключі)
+        bid = _to_float(d.get("bidPrice") or d.get("bid1Price"))
+        ask = _to_float(d.get("askPrice") or d.get("ask1Price"))
+        last = _to_float(d.get("price") or d.get("lastPrice"))
+        ts = _dt_from_ms(d.get("updateTime") or payload.get("ts"))
+        return Ticker(symbol=symbol, bid=bid, ask=ask, last=last, ts=ts)
+
+    return None
+
+
+# ---- Парсер топу книги (orderbook.1.*) ------------------------------------
+def parse_ws_orderbook_top(
+    payload: dict[str, Any],
+) -> Optional[tuple[str, float, float, datetime]]:
+    """
+    Витягає best bid/ask з orderbook.1.<SYMBOL>
+    Формати:
+      snapshot: data: [ { "s": "BTCUSDT", "b": [["65000","0.1"], ...], "a": [["65010","0.2"], ...] } ]
+      delta:    data: { "s": "BTCUSDT", "b": [["65001","0.1"]], "a": [["65009","0.1"]] }
+    Повертає: (symbol_pair, best_bid, best_ask, ts)
+    """
+    topic = str(payload.get("topic", ""))
+    if not topic.startswith("orderbook."):
+        return None
+
+    data = payload.get("data")
+    if isinstance(data, list):
+        if not data:
+            return None
+        d = data[0]
     elif isinstance(data, dict):
-        rec = data
-        bid = rec.get("bidPrice") or rec.get("bid1Price")
-        ask = rec.get("askPrice") or rec.get("ask1Price")
-        last = rec.get("price") or rec.get("lastPrice")
+        d = data
     else:
         return None
 
-    sym = rec.get("symbol") or payload.get("symbol")
-    if not sym:
-        return None
+    raw_sym = str(d.get("s") or d.get("symbol") or "")
+    symbol = _pair_from_bybit_symbol(raw_sym) if raw_sym else ""
 
-    # таймстемп: пріоритет updateTime, інакше верхній ts
-    ms = _to_ms_ts(rec.get("updateTime"))
-    if ms is None:
-        ms = _to_ms_ts(payload.get("ts"))
-    if ms is None:
-        return None
+    def _first_price(levels: Any) -> float:
+        # очікуємо [["price","qty"], ...]
+        if (
+            isinstance(levels, list)
+            and levels
+            and isinstance(levels[0], list)
+            and levels[0]
+        ):
+            return _to_float(levels[0][0])
+        return 0.0
 
-    def f2(x: Any) -> float:
-        try:
-            return float(x)
-        except Exception:
-            return 0.0
+    best_bid = _first_price(d.get("b"))
+    best_ask = _first_price(d.get("a"))
+    ts = _dt_from_ms(payload.get("ts") or d.get("ts") or d.get("u"))
 
-    return Ticker(
-        symbol=_norm_symbol(sym),
-        bid=f2(bid),
-        ask=f2(ask),
-        last=f2(last),
-        ts=_ms_to_dt(ms),
-    )
+    if not symbol or (best_bid == 0.0 and best_ask == 0.0):
+        # іноді може прилетіти лише одна сторона — все одно повернемо, щоб оновити частково
+        pass
 
-
-@dataclass
-class WsPublicConfig:
-    category: str = os.getenv("BYBIT_DEFAULT_CATEGORY", "spot") or "spot"
-    # інтервали/таймаути
-    ping_interval_s: float = 20.0
-    read_timeout_s: float = 30.0
-    retry_backoff_s: float = 3.0
-
-    # Явний URL (інакше побудується з PUBLIC_URL)
-    url: Optional[str] = None
+    return symbol or "", best_bid, best_ask, ts
 
 
-def _build_ws_url(cfg: WsPublicConfig) -> str:
-    """Будуємо WS endpoint з урахуванням testnet/mainnet та категорії."""
-    if cfg.url:
-        return cfg.url
-
-    http_base = os.getenv("BYBIT_PUBLIC_URL", "https://api.bybit.com").lower()
-    is_testnet = "testnet" in http_base
-    host = "wss://stream-testnet.bybit.com" if is_testnet else "wss://stream.bybit.com"
-
-    cat = cfg.category.lower()
-    # дозволені шляхи: spot | linear | inverse | option | spread
-    return f"{host}/v5/public/{cat}"
+# ---- WS клієнт (public) ----------------------------------------------------
+_OnTicker = Optional[Callable[[Ticker], Any]]
 
 
 class _WsPublic:
     """
-    Легкий Bybit WS v5 клієнт лише для топіка `tickers`.
-    Викликає on_ticker(Ticker) при кожному апдейті.
+    Легковаговий WS-клієнт Bybit (public v5) для потоків:
+      - tickers.<SYMBOL>
+      - orderbook.1.<SYMBOL> (опційно, щоб мати реальні bid/ask на testnet)
+    Плавне завершення через stop()/close().
     """
 
     def __init__(
         self,
-        symbol: str = "BTCUSDT",
-        *,
-        cfg: Optional[WsPublicConfig] = None,
-        on_ticker: Optional[Callable[[Ticker], Awaitable[None] | None]] = None,
+        symbol: str,
+        on_ticker: _OnTicker = None,
+        category: Optional[str] = None,
+        read_timeout_s: float = 30.0,
+        retry_backoff_s: float = 5.0,
+        ping_interval_s: float = 20.0,
+        use_orderbook_top: Optional[bool] = None,
     ) -> None:
-        self._cfg = cfg or WsPublicConfig()
-        self._url = _build_ws_url(self._cfg)
-        self._symbol = symbol
-        self._on_ticker = on_ticker
+        self.symbol = symbol
+        self.on_ticker = on_ticker
+        self.category = (
+            category or os.getenv("BYBIT_DEFAULT_CATEGORY", "spot") or "spot"
+        ).lower()
 
-    async def _subscribe(self, ws: websockets.WebSocketClientProtocol) -> None:
-        sub = {
-            "op": "subscribe",
-            "args": [f"tickers.{self._symbol}"],
-        }
-        await ws.send(json.dumps(sub))
+        # Визначаємо testnet/mainnet за REST-URL з env
+        public_url = os.getenv("BYBIT_PUBLIC_URL", "https://api.bybit.com")
+        is_testnet = "testnet" in public_url.lower()
 
-    async def _ping_loop(self, ws: websockets.WebSocketClientProtocol) -> None:
-        while True:
-            await asyncio.sleep(self._cfg.ping_interval_s)
+        host = (
+            "wss://stream-testnet.bybit.com" if is_testnet else "wss://stream.bybit.com"
+        )
+        self._url = f"{host}/v5/public/{self.category}"
+
+        self._read_timeout_s = read_timeout_s
+        self._retry_backoff_s = retry_backoff_s
+        self._ping_interval_s = ping_interval_s
+
+        if use_orderbook_top is None:
+            # За замовчуванням вмикаємо на testnet (де tickers часто без bid/ask)
+            env_flag = os.getenv("BYBIT_WS_USE_ORDERBOOK_TOP")
+            self._use_ob = (env_flag == "1") if env_flag is not None else True
+        else:
+            self._use_ob = bool(use_orderbook_top)
+
+        self._stop_event = asyncio.Event()
+        self._ws: Any = None
+        self._ping_task: Optional[asyncio.Task] = None
+
+        # останній відомий last (щоб у тікері з ордербука не було 0.0)
+        self._last_price: float = 0.0
+        self._last_ts: datetime = _dt_from_ms(None)
+
+    async def _ping_loop(self) -> None:
+        # Власний ping, бо ping_interval=None у websockets
+        while not self._stop_event.is_set():
+            await asyncio.sleep(self._ping_interval_s)
+            if self._ws is not None:
+                with contextlib.suppress(Exception):
+                    await self._ws.send(json.dumps({"op": "ping"}))
+
+    async def _cancel_ping_task(self) -> None:
+        """Скасувати і коректно дочекатися ping-loop, подавивши CancelledError."""
+        t = self._ping_task
+        self._ping_task = None
+        if t:
+            t.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await t
+
+    async def _wait_sub_ack(self, ws, timeout: float = 5.0) -> None:
+        """
+        Коротке очікування ACK після subscribe.
+        Якщо під час очікування прилітають події — одразу обробляємо.
+        """
+        end = asyncio.get_event_loop().time() + timeout
+        while not self._stop_event.is_set() and asyncio.get_event_loop().time() < end:
             try:
-                await ws.ping()
-            except Exception:
+                raw = await asyncio.wait_for(ws.recv(), timeout=0.5)
+            except asyncio.TimeoutError:
+                continue
+
+            msg = json.loads(raw)
+            # ACK Bybit: {"op":"subscribe","success":true,...} або retCode=0
+            if msg.get("op") == "subscribe" and (
+                msg.get("success") is True or msg.get("retCode") == 0
+            ):
                 return
 
+            # Може прилетіти перший тікер/ордербук ще до ACK
+            await self._handle_message(msg)
+
+    async def _handle_message(self, msg: dict[str, Any]) -> None:
+        # tickers
+        t = parse_ws_ticker(msg)
+        if t:
+            self._last_price = t.last or self._last_price
+            self._last_ts = t.ts or self._last_ts
+            if self.on_ticker:
+                if asyncio.iscoroutinefunction(self.on_ticker):  # type: ignore[arg-type]
+                    await self.on_ticker(t)  # type: ignore[misc]
+                else:
+                    self.on_ticker(t)
+            return
+
+        # orderbook top
+        ob = parse_ws_orderbook_top(msg)
+        if ob:
+            symbol, best_bid, best_ask, ts = ob
+            if not symbol:
+                return
+            out = Ticker(
+                symbol=symbol,
+                bid=best_bid,
+                ask=best_ask,
+                last=self._last_price,  # підставляємо останній last з tickers
+                ts=ts or self._last_ts,
+            )
+            if self.on_ticker:
+                if asyncio.iscoroutinefunction(self.on_ticker):  # type: ignore[arg-type]
+                    await self.on_ticker(out)  # type: ignore[misc]
+                else:
+                    self.on_ticker(out)
+
     async def run(self) -> None:
-        """
-        Нескінченний цикл з перепідключенням.
-        Закриття (1000 OK) та скасування – без стек-трейсів.
-        """
+        import websockets
+
         attempt = 0
-        while True:
+        while not self._stop_event.is_set():
             try:
-                async with websockets.connect(self._url, ping_interval=None) as ws:
-                    await self._subscribe(ws)
-                    ping_task = asyncio.create_task(self._ping_loop(ws))
+                async with websockets.connect(
+                    self._url,
+                    ping_interval=None,  # самі пінгуємо
+                    close_timeout=3,
+                    max_queue=None,
+                ) as ws:
+                    self._ws = ws
 
-                    try:
-                        while True:
-                            raw = await asyncio.wait_for(
-                                ws.recv(), timeout=self._cfg.read_timeout_s
-                            )
-                            try:
-                                msg = json.loads(raw)
-                            except Exception:
-                                continue
+                    args = [f"tickers.{self.symbol}"]
+                    if self._use_ob:
+                        args.append(f"orderbook.1.{self.symbol}")
 
-                            t = parse_ws_ticker(msg)
-                            if t and self._on_ticker:
-                                res = self._on_ticker(t)
-                                if asyncio.iscoroutine(res):
-                                    await res
-                    finally:
-                        # Акуратно зупиняємо пінг-луп
-                        if not ping_task.done():
-                            ping_task.cancel()
-                        with contextlib.suppress(asyncio.CancelledError, Exception):
-                            await ping_task
+                    sub = {"op": "subscribe", "args": args}
+                    await ws.send(json.dumps(sub))
 
-                    attempt = 0  # вдале підключення – скинемо бекоф
-            except websockets.exceptions.ConnectionClosedOK:
-                # Нормальне закриття сервером – перезапустимо цикл
-                pass
-            except asyncio.CancelledError:
-                # Грейсфул шутдаун – без стек-трейса
+                    # зачекаємо коротко на ACK (не блокує отримання перших повідомлень)
+                    await self._wait_sub_ack(ws, timeout=5.0)
+
+                    # пінг-потік
+                    self._ping_task = asyncio.create_task(self._ping_loop())
+
+                    # прийом повідомлень
+                    while not self._stop_event.is_set():
+                        raw = await asyncio.wait_for(
+                            ws.recv(), timeout=self._read_timeout_s
+                        )
+                        msg = json.loads(raw)
+                        await self._handle_message(msg)
+
+                # нормальне закриття сокета — виходимо з циклу
                 break
-            except Exception:
-                # Інші помилки – дамо невеликий бекоф і повторимо
-                await asyncio.sleep(
-                    min(60.0, (attempt + 1) * self._cfg.retry_backoff_s)
-                )
+
+            except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
                 attempt += 1
+                await self._cancel_ping_task()
+                await asyncio.sleep(min(60.0, attempt * self._retry_backoff_s))
+                continue
+
+            except Exception:
+                attempt += 1
+                await self._cancel_ping_task()
+                await asyncio.sleep(min(60.0, attempt * self._retry_backoff_s))
+                continue
+
+            finally:
+                await self._cancel_ping_task()
+                self._ws = None
+
+    async def stop(self) -> None:
+        """Плавно зупиняє клієнт: сигнал, зупинка пінгу, закриття сокета."""
+        self._stop_event.set()
+        await self._cancel_ping_task()
+        with contextlib.suppress(Exception):
+            if self._ws is not None:
+                await asyncio.wait_for(self._ws.close(), timeout=2)
+
+    # Сумісність: підтримати close() як синонім stop()
+    async def close(self) -> None:  # noqa: D401
+        await self.stop()
 
 
-# API-аліаси, щоб не ламати існуючі імпорти
-BybitWsPublic = _WsPublic
-BybitPublicWS = _WsPublic
+# Публічний клас (експорт)
+class BybitWsPublic(_WsPublic):
+    pass
