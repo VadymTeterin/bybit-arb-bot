@@ -20,7 +20,7 @@ from .storage.persistence import init_db
 
 # Optional Telegram sender: fall back to direct HTTP if infra.telegram is absent
 try:
-    from .infra.telegram import send_telegram_message  # type: ignore
+    from .infra import send_telegram_message  # type: ignore
 except Exception:  # noqa: BLE001
 
     def send_telegram_message(token: str, chat_id: str, text: str):
@@ -42,7 +42,7 @@ except Exception:  # noqa: BLE001
     _tg_formatters = None
 
 
-APP_VERSION = "0.4.4"
+APP_VERSION = "0.4.6"
 
 
 # --------------------------------------------------------------------------------------
@@ -282,6 +282,11 @@ def cmd_env(_: argparse.Namespace) -> int:
     print("WS_RECONNECT_MAX_SEC:", ws["reconnect_max_sec"] or "")
     print("RT_META_REFRESH_SEC:", getattr(s, "rt_meta_refresh_sec", ""))
     print("RT_LOG_PASSES:", getattr(s, "rt_log_passes", ""))
+    # Debug/diagnostic WS logging knobs
+    print("WS_DEBUG_NORMALIZED:", _env_bool("WS_DEBUG_NORMALIZED", False))
+    print("WS_DEBUG_FILTER_CHANNELS:", os.getenv("WS_DEBUG_FILTER_CHANNELS", "ticker"))
+    print("WS_DEBUG_FILTER_SYMBOLS:", os.getenv("WS_DEBUG_FILTER_SYMBOLS", ""))
+    print("WS_DEBUG_SAMPLE_MS:", _env_int("WS_DEBUG_SAMPLE_MS", 1000))
     return 0
 
 
@@ -774,6 +779,55 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
     alerts_sub = AlertsSubscriber(mux)
     alerts_sub.start()
 
+    # --- NEW: toggle + filter + sampling for normalized debug counters ---
+    debug_norm = _env_bool("WS_DEBUG_NORMALIZED", False)
+    # Comma-separated channels to show (default 'ticker'); leave empty to show all
+    _channels_env = os.getenv("WS_DEBUG_FILTER_CHANNELS", "ticker")
+    debug_channels = set(_csv_list(_channels_env)) if _channels_env else set()
+    # Optional list of symbols to show (e.g. "BTCUSDT,ETHUSDT")
+    debug_symbols = set(_csv_list(os.getenv("WS_DEBUG_FILTER_SYMBOLS", "")))
+    # Minimal interval between repeated logs for the same (source,channel,symbol)
+    debug_sample_ms = _env_int("WS_DEBUG_SAMPLE_MS", 1000)
+    _last_log: Dict[Tuple[str, str, str], float] = {}
+
+    if debug_norm:
+        logger.bind(tag="WS").info(
+            "WS debug enabled: channels=%s symbols=%s sample_ms=%s",
+            ",".join(sorted(debug_channels)) if debug_channels else "*",
+            ",".join(sorted(debug_symbols)) if debug_symbols else "*",
+            debug_sample_ms,
+        )
+
+    def _debug_log_normalized(source: str, evt_norm: dict) -> None:
+        """Lightweight anti-spam logger for normalized events (filter + sampling)."""
+        if not debug_norm:
+            return
+        channel = str(evt_norm.get("channel") or "")
+        symbol = str(evt_norm.get("symbol") or "")
+        if not channel or channel == "other":
+            return  # ignore non-ticker / unknown normalized channels
+        if not symbol:
+            return  # drop events without symbol in debug stream
+        if debug_channels and channel not in debug_channels:
+            return
+        if debug_symbols and symbol not in debug_symbols:
+            return
+        data = evt_norm.get("data")
+        items = (
+            1
+            if isinstance(data, dict)
+            else (len(data) if isinstance(data, list) else 0)
+        )
+        key = (source, channel, symbol)
+        now = time.monotonic()
+        last = _last_log.get(key, 0.0)
+        if (now - last) * 1000.0 < max(0, debug_sample_ms):
+            return  # sampling: skip too-frequent repeats
+        _last_log[key] = now
+        logger.bind(tag="WS").debug(
+            f"{source} normalized: channel={channel} symbol={symbol} items={items}"
+        )
+
     async def refresh_meta_task():
         client = BybitRest()
         while True:
@@ -816,18 +870,7 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         # 1) Publish normalized event (channel usually 'ticker'); keep it distinct
         try:
             evt_norm = normalize(msg)
-            # OBS: lightweight debug counter for normalized events
-            _data = evt_norm.get("data")
-            _items = (
-                1
-                if isinstance(_data, dict)
-                else (len(_data) if isinstance(_data, list) else 0)
-            )
-            logger.bind(tag="WS").debug(
-                f"SPOT normalized: channel={evt_norm.get('channel')} "
-                f"symbol={evt_norm.get('symbol')} items={_items}"
-            )
-
+            _debug_log_normalized("SPOT", evt_norm)  # filtered + sampled
             mux.publish(
                 WsEvent(
                     source="SPOT",
@@ -852,18 +895,7 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         # 1) Publish normalized event
         try:
             evt_norm = normalize(msg)
-            # OBS: lightweight debug counter for normalized events
-            _data = evt_norm.get("data")
-            _items = (
-                1
-                if isinstance(_data, dict)
-                else (len(_data) if isinstance(_data, list) else 0)
-            )
-            logger.bind(tag="WS").debug(
-                f"LINEAR normalized: channel={evt_norm.get('channel')} "
-                f"symbol={evt_norm.get('symbol')} items={_items}"
-            )
-
+            _debug_log_normalized("LINEAR", evt_norm)  # filtered + sampled
             mux.publish(
                 WsEvent(
                     source="LINEAR",
@@ -1015,7 +1047,9 @@ def main() -> None:
     args = parser.parse_args()
 
     log_dir = Path("./logs")
-    setup_logging(log_dir, level="DEBUG")
+    # --- UPDATED: LOG_LEVEL from env (default INFO to reduce noise) ---
+    log_level = os.getenv("LOG_LEVEL", "INFO")
+    setup_logging(log_dir, level=log_level)
 
     try:
         s = load_settings()
