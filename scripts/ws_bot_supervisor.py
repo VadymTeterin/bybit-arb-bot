@@ -1,21 +1,10 @@
 # scripts/ws_bot_supervisor.py
 """
 Supervised runner: WS stream(s) + Telegram /status bot with auto-restart (exponential backoff).
-All components run in ONE asyncio process and share the same MetricsRegistry instance.
+Loads .env on start to populate environment variables.
 
 Run:
     python -m scripts.ws_bot_supervisor
-
-Env:
-    WS_ENABLED=1
-    TELEGRAM__BOT_TOKEN=<token>            # required to run Telegram bot
-    TELEGRAM__ALERT_CHAT_ID=<chat_id>      # optional allowlisted chat (int)
-
-Debug (optional):
-    WS_DEBUG_NORMALIZED=1
-    WS_DEBUG_FILTER_CHANNELS=ticker
-    WS_DEBUG_FILTER_SYMBOLS=BTCUSDT,ETHUSDT
-    WS_DEBUG_SAMPLE_MS=1000
 """
 
 from __future__ import annotations
@@ -26,15 +15,18 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from dotenv import load_dotenv  # NEW
 from loguru import logger
 
 from src.infra.logging import setup_logging
-from src.main import load_settings  # reuse your settings loader
+from src.main import load_settings
 from src.ws.backoff import ExponentialBackoff
 from src.ws.health import MetricsRegistry
 
+# Load .env once (non-fatal if missing)
+load_dotenv(override=False)
 
-# --------- small utils (kept local to avoid extra imports) ----------
+
 def _csv_list(x: Any) -> List[str]:
     if x is None:
         return []
@@ -99,12 +91,7 @@ def _nested_bybit(s):
     }
 
 
-# ------------------------- supervised loops ----------------------------------
 async def ws_spot_loop(ws_url: str, topics: List[str], shared, metrics, debug):
-    """
-    WS spot loop with auto-restart.
-    `shared` is a dict with: cache, mux, publisher, iter_ticker_entries, normalize
-    """
     bo = ExponentialBackoff(base=1.0, factor=2.0, cap=30.0)
     while True:
         try:
@@ -164,7 +151,7 @@ async def ws_spot_loop(ws_url: str, topics: List[str], shared, metrics, debug):
 
             logger.info("SPOT loop: connecting to {}", ws_url)
             bo.reset()
-            await ws.run(on_message_spot)  # this returns on close/exception
+            await ws.run(on_message_spot)
             logger.warning(
                 "SPOT loop ended without exception (socket closed). Reconnecting..."
             )
@@ -289,9 +276,6 @@ async def meta_refresh_loop(shared, refresh_sec: int):
 
 
 async def bot_polling_loop(metrics, allow_chat: Optional[int]):
-    """
-    aiogram polling loop with auto-restart on network errors.
-    """
     bo = ExponentialBackoff(base=1.0, factor=2.0, cap=30.0)
     token = _get_token()
     if not token:
@@ -316,12 +300,11 @@ async def bot_polling_loop(metrics, allow_chat: Optional[int]):
                 if allow_chat is not None and msg.chat.id != allow_chat:
                     await msg.answer("Access denied: this chat is not allowlisted.")
                     return
-                text = (
+                await msg.answer(
                     "Hi! I'm the WS status bot running in the *same process* as the supervised WS stream.\n"
                     "Commands:\n"
                     "• /status — show current WS metrics (uptime & counters)\n"
                 )
-                await msg.answer(text)
 
             @dp.message(Command("status"))
             async def status_handler(msg: Message):
@@ -353,7 +336,6 @@ async def bot_polling_loop(metrics, allow_chat: Optional[int]):
             await asyncio.sleep(delay)
 
 
-# ------------------------------ entrypoint -----------------------------------
 async def main() -> None:
     setup_logging(log_dir=Path("./logs"), level=os.getenv("LOG_LEVEL", "INFO"))
 
@@ -362,7 +344,6 @@ async def main() -> None:
     ws_enabled = bool(getattr(s, "ws_enabled", True))
     allow_chat = _allowed_chat_id()
 
-    # shared components (persist across restarts of individual loops)
     from src.core.cache import QuoteCache
     from src.exchanges.bybit.ws import iter_ticker_entries
     from src.ws.bridge import publish_bybit_ticker
@@ -377,7 +358,6 @@ async def main() -> None:
 
     metrics = MetricsRegistry.get()
 
-    # debug knobs for normalized flow
     debug = {
         "enabled": _env_bool("WS_DEBUG_NORMALIZED", False),
         "channels": set(_csv_list(os.getenv("WS_DEBUG_FILTER_CHANNELS", "ticker"))),
@@ -397,7 +377,6 @@ async def main() -> None:
 
     tasks: List[asyncio.Task] = []
 
-    # WS loops
     if ws_enabled:
         if ws_cfg["url_spot"]:
             tasks.append(
@@ -434,7 +413,6 @@ async def main() -> None:
             )
         )
 
-    # Telegram loop
     if _get_token():
         tasks.append(
             asyncio.create_task(
@@ -450,7 +428,6 @@ async def main() -> None:
 
     logger.success("Supervisor started: {} task(s). Ctrl+C to stop.", len(tasks))
     try:
-        # return_exceptions=True ensures other loops keep running if one fails
         results = await asyncio.gather(*tasks, return_exceptions=True)
         for r in results:
             if isinstance(r, Exception):

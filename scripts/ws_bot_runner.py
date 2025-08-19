@@ -1,21 +1,10 @@
 # scripts/ws_bot_runner.py
 """
 Run WebSocket streaming and Telegram /status bot in a single asyncio process.
-- WS handlers increment MetricsRegistry counters.
-- Telegram /status reads the same MetricsRegistry (same process).
+Loads .env on start to populate environment variables.
 
 Run:
     python -m scripts.ws_bot_runner
-
-Env:
-    WS_ENABLED=1                          # to run WS (optional; defaults True in settings)
-    TELEGRAM__BOT_TOKEN=<token>           # required to run Telegram bot
-    TELEGRAM__ALERT_CHAT_ID=<chat_id>     # optional allowlisted chat (int)
-    # Debug knobs (optional):
-    WS_DEBUG_NORMALIZED=1
-    WS_DEBUG_FILTER_CHANNELS=ticker
-    WS_DEBUG_FILTER_SYMBOLS=BTCUSDT,ETHUSDT
-    WS_DEBUG_SAMPLE_MS=1000
 """
 
 from __future__ import annotations
@@ -25,14 +14,17 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from dotenv import load_dotenv  # NEW: load .env
 from loguru import logger
 
 from src.infra.logging import setup_logging
 from src.main import load_settings  # reuse settings loader
 from src.ws.health import MetricsRegistry
 
+# Load .env once at import time (non-fatal if missing)
+load_dotenv(override=False)
 
-# --- Utils (mirrored locally to avoid importing internals) --------------------
+
 def _csv_list(x: Any) -> List[str]:
     if x is None:
         return []
@@ -100,25 +92,20 @@ def _get_token() -> Optional[str]:
     return tok or None
 
 
-# --- Main async runner --------------------------------------------------------
 async def main() -> None:
-    # logging (Path is required by setup_logging)
     setup_logging(log_dir=Path("./logs"), level=os.getenv("LOG_LEVEL", "INFO"))
 
-    # settings
     s = load_settings()
     ws_cfg = _nested_bybit(s)
     ws_enabled = bool(getattr(s, "ws_enabled", True))
     metrics = MetricsRegistry.get()
 
-    # optional WS debug knobs
     debug_norm = _env_bool("WS_DEBUG_NORMALIZED", False)
     debug_channels = set(_csv_list(os.getenv("WS_DEBUG_FILTER_CHANNELS", "ticker")))
     debug_symbols = set(_csv_list(os.getenv("WS_DEBUG_FILTER_SYMBOLS", "")))
     debug_sample_ms = _env_int("WS_DEBUG_SAMPLE_MS", 1000)
     _last_log: Dict[Tuple[str, str, str], float] = {}
 
-    # Try imports of WS components
     try:
         from src.core.cache import QuoteCache
         from src.exchanges.bybit.ws import BybitWS, iter_ticker_entries
@@ -132,16 +119,14 @@ async def main() -> None:
         logger.warning("WS components unavailable: {}", e)
         ws_available = False
 
-    # Telegram bot (optional)
     token = _get_token()
-    allow_chat = _allowed_chat_id()
+    allow_chat = _allowed_chat_id()  # now actually used in handlers
     bot_available = token is not None
     if not bot_available:
         logger.warning("Telegram token is not set. /status bot will not run.")
 
     tasks: List[asyncio.Task] = []
 
-    # --- WS setup (if available & enabled) ---
     if ws_available and ws_enabled:
         cache = QuoteCache()
         ws_linear = (
@@ -165,7 +150,7 @@ async def main() -> None:
         def _debug_log_normalized(source: str, evt_norm: dict) -> None:
             if not debug_norm:
                 return
-            import time as _t  # local to avoid global import at module import
+            import time as _t
 
             channel = str(evt_norm.get("channel") or "")
             symbol = str(evt_norm.get("symbol") or "")
@@ -194,7 +179,6 @@ async def main() -> None:
             )
 
         async def on_message_spot(msg: dict):
-            # Publish normalized event + increment metrics
             try:
                 evt_norm = normalize(msg)
                 _debug_log_normalized("SPOT", evt_norm)
@@ -210,8 +194,6 @@ async def main() -> None:
                 metrics.inc_spot()
             except Exception as e:
                 logger.debug(f"normalize(msg) failed (SPOT): {e!r}")
-
-            # Compatibility path
             for item in iter_ticker_entries(msg):
                 sym = item.get("symbol")
                 last = item.get("last")
@@ -220,7 +202,6 @@ async def main() -> None:
                     publish_bybit_ticker(mux, "SPOT", item)
 
         async def on_message_linear(msg: dict):
-            # Publish normalized event + increment metrics
             try:
                 evt_norm = normalize(msg)
                 _debug_log_normalized("LINEAR", evt_norm)
@@ -236,8 +217,6 @@ async def main() -> None:
                 metrics.inc_linear()
             except Exception as e:
                 logger.debug(f"normalize(msg) failed (LINEAR): {e!r}")
-
-            # Compatibility path
             for item in iter_ticker_entries(msg):
                 sym = item.get("symbol")
                 mark = item.get("mark")
@@ -282,7 +261,6 @@ async def main() -> None:
                     logger.bind(tag="RTMETA").warning(f"Meta refresh failed: {e!r}")
                 await asyncio.sleep(max(30, int(getattr(s, "rt_meta_refresh_sec", 30))))
 
-        # Schedule WS tasks
         if ws_spot:
             tasks.append(
                 asyncio.create_task(ws_spot.run(on_message_spot), name="ws_spot")
@@ -293,10 +271,8 @@ async def main() -> None:
             )
         tasks.append(asyncio.create_task(refresh_meta_task(), name="rt_meta"))
 
-    # --- Telegram bot setup (if token provided) ---
     if bot_available:
         try:
-            # aiogram v3 imports
             from aiogram import Bot, Dispatcher
             from aiogram.client.default import DefaultBotProperties
             from aiogram.enums import ParseMode
@@ -305,10 +281,8 @@ async def main() -> None:
         except Exception as e:  # noqa: BLE001
             logger.error("aiogram is not available: {}", e)
         else:
-            # aiogram 3.7+: parse_mode via DefaultBotProperties
             bot = Bot(
-                token=token,
-                default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN),
+                token=token, default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN)
             )
             dp = Dispatcher()
 
@@ -317,12 +291,11 @@ async def main() -> None:
                 if allow_chat is not None and msg.chat.id != allow_chat:
                     await msg.answer("Access denied: this chat is not allowlisted.")
                     return
-                text = (
+                await msg.answer(
                     "Hi! I'm the WS status bot running in the *same process* as the WS stream.\n"
                     "Commands:\n"
                     "• /status — show current WS metrics (uptime & counters)\n"
                 )
-                await msg.answer(text)
 
             @dp.message(Command("status"))
             async def status_handler(msg: Message):
