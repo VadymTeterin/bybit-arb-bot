@@ -1,132 +1,138 @@
-# Bybit Arbitrage Bot
+# BYBIT Arbitrage Bot (Windows)
 
-> Реальний час • Windows • Telegram Alerts • Без індикаторів (Price Action / Liquidity Filters)
+> Telegram‑бот для моніторингу базису між **Spot** та **Futures** на Bybit із алертами в Telegram.
+> Платформа розробки: **Windows 11**. Команди наводимо для **PowerShell** та VS Code **«Термінал»**.
 
-## Огляд
-UA: Телеграм-бот відстежує спред (basis %) між SPOT та ф’ючерсами (USDT‑перпетуали) на Bybit. Підтримано режим реального часу через WebSocket, фільтри ліквідності, попередній перегляд алертів і експорт сигналів у CSV.
-EN: Telegram bot that tracks the spread (basis %) between SPOT and USDT‑perpetual futures on Bybit. Real‑time via WebSocket, liquidity filters, alert preview, and CSV export included.
+## Основне
+- Скани різниці **spot vs futures** (basis %) і вибір **топ‑3** пар вище порогу.
+- Фільтри ліквідності: 24h обсяг, мінімальна ціна, глибина.
+- Алерти в Telegram (тротлінг/cooldown).
+- Історія сигналів у SQLite/Parquet.
+- **WebSocket (v5)**: стрім цін + нормалізація + лічильники подій (SPOT/LINEAR).
+- **Windows‑лаунчер:** `launcher_export.cmd` (див. нижче).
 
----
+## Вимоги
+- Python **3.11+** (Windows)
+- Інтернет з’єднання
+- PowerShell або VS Code «Термінал»
 
-## Можливості (коротко)
-- Basis % (SPOT vs LINEAR) у real‑time та single‑shot скануванні
-- Фільтри ліквідності: обсяг (24h), глибина ринку
-- Throttling алертів, Telegram‑повідомлення, попередній перегляд форматування
-- SQLite збереження сигналів, звіти, експорт у CSV
-- **WS Multiplexer (Крок 5.6)** — модуль маршрутизації подій із `*`‑wildcard (не змінює чинний 5.5)
-- Легка CLI‑утиліта з командами для діагностики/запуску
+## Швидкий старт (PowerShell)
+> ⚠️ Секрети в `.env` не показуйте на скрінах.
 
-> Платформа розробки: **Windows**. Інструкції для **PowerShell** та VS Code **“Термінал”**.
-
----
-
-## Встановлення (Windows PowerShell / VS Code “Термінал”)
 ```powershell
-git clone https://github.com/<your-repo>/bybit-arb-bot.git
-cd bybit-arb-bot
+# Активувати venv
+& .\.venv\Scripts\Activate.ps1
 
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
+# Встановити залежності
 pip install -r requirements.txt
+
+# Скопіювати приклад змінних оточення
+Copy-Item .env.example .env
+
+# Заповнити .env (BYBIT_API_KEY, BYBIT_API_SECRET, TG_BOT_TOKEN, TG_CHAT_ID, ...)
+
+# Перевірити середовище
+python -m src.main env
+
+# Прогнати тести
+pytest -q
 ```
 
-### Налаштування середовища
-Скопіюйте `.env.example` → `.env` і заповніть значення:
-```env
-BYBIT__API_KEY=
-BYBIT__API_SECRET=
-TELEGRAM__TOKEN=
-TELEGRAM__CHAT_ID=
+## .env (приклад полів)
+```
+BYBIT_API_KEY=
+BYBIT_API_SECRET=
+TG_BOT_TOKEN=
+TG_CHAT_ID=
 ALERT_THRESHOLD_PCT=1.0
 ALERT_COOLDOWN_SEC=300
-DB_PATH=data/signals.db
+MIN_VOL_24H_USD=10000000
+MIN_PRICE=0.001
+WS_ENABLED=True
+WS_PUBLIC_URL_LINEAR=wss://stream.bybit.com/v5/public/linear
+WS_PUBLIC_URL_SPOT=wss://stream.bybit.com/v5/public/spot
+WS_SUB_TOPICS_LINEAR=tickers.BTCUSDT,tickers.ETHUSDT
+WS_SUB_TOPICS_SPOT=tickers.BTCUSDT,tickers.ETHUSDT
+WS_RECONNECT_MAX_SEC=30
 ```
 
-#### Автозавантаження `.env`
-З **Кроку 5.8** `src/infra/config.py` автоматично викликає `autoload_env()` (stdlib), тож `.env` підхоплюється без `python-dotenv` та без PowerShell‑хелперів. Якщо потрібно, можна вказати альтернативний шлях файлу через `ENV_FILE`.
+## Запуск (CLI)
+Всі команди виконуються так: `python -m src.main <команда> [аргументи]`
 
-#### Back‑compat містки (на перехідний період)
-Якщо у вашому середовищі залишилися старі назви ключів — вони автоматично мапляться у nested‑конфіг:
-
-| Старий ключ                                 | Новий ключ (nested)                    |
-|---------------------------------------------|----------------------------------------|
-| `TELEGRAM_TOKEN`, `TELEGRAM_BOT_TOKEN`      | `TELEGRAM__TOKEN` → `telegram.token`   |
-| `TELEGRAM_CHAT_ID`, `TG_CHAT_ID`, `TELEGRAM_ALERT_CHAT_ID` | `TELEGRAM__CHAT_ID` → `telegram.chat_id` |
-
-> Під час друку `python -m src.main env` ці значення відображаються у секції `telegram`.
-
----
-
-## Запуск: основні сценарії
-### Одноразовий скан спредів (REST)
 ```powershell
-python -m src.main basis:scan --threshold 0.5 --min-vol 10000000 --limit 10
-```
+# Довідка
+python -m src.main -h
 
-### Сигнали у консоль із фільтрами
-```powershell
-python -m src.main basis:alert --threshold 0.8 --min-vol 8000000 --limit 3
-```
+# Перевірка ENV
+python -m src.main env
 
-### Попередній перегляд форматування алерту
-```powershell
-python -m src.main alerts:preview --symbol BTCUSDT --spot 50000 --mark 50500 --min-vol 1000000 --threshold 0.5
-```
+# Пошук топ-3 сигналів і вивід у консоль
+python -m src.main basis:alert --limit 3 --threshold 1.0 --min-vol 10000000
 
-### Відправка тестового повідомлення у Telegram
-```powershell
-python -m src.main tg:send --text "Hello from BybitArbBot"
-```
+# Звіт за годину
+python -m src.main report:print --hours 1 --limit 10
 
-### Запуск у реальному часі (WebSocket‑ядро)
-```powershell
+# WebSocket (стрім/нормалізація)
 python -m src.main ws:run
+
+# NEW: прев’ю алерта без відправки у Telegram (Step 5.8.3)
+python -m src.main alerts:preview --symbol BTCUSDT --spot 50000 --mark 50500
+python -m src.main alerts:preview --symbol ETHUSDT --spot 2500 --mark 2525 --vol 12000000 --threshold 0.5
 ```
 
-> Під час роботи `ws:run` обчислення basis% відбувається на льоту з кешу. Задіяні тротлінг і захист від шуму.
+## Windows‑лаунчер `launcher_export.cmd`
+Файл у корені репозиторію. Призначення:
+- Гарантує перехід у директорію проекту: `cd /d %~dp0`.
+- Створює `logs\` якщо її нема: `if not exist logs mkdir logs`.
+- Віддає пріоритет `.venv\Scripts\python.exe`.
+- Містить явне посилання на `scripts\export_signals.py`.
+- **Без аргументів** запускає експорт із логуванням у `logs\export.log`:
+  ```
+  %PY_EXE% "%EXPORT_SCRIPT%" >> logs\export.log 2>&1
+  ```
+- **З аргументами** прокидає їх у `python -m src.main`.
 
----
-
-## Експорт сигналів у CSV (Крок 5.4)
+Приклади:
 ```powershell
-python .\scripts\export_signals.py                 # останні 24 години
-python .\scripts\export_signals.py --tz Europe/Kyiv
-python .\scripts\export_signals.py --since 2025-08-10T00:00:00 --until 2025-08-14T23:59:59 --out .\exports\signals_aug10-14.csv
-python .\scripts\export_signals.py --limit 100
-python .\scripts\export_signals.py --keep 14       # ротація CSV
+# Прев’ю алерта (через лаунчер)
+.\launcher_export.cmd alerts:preview --symbol BTCUSDT --spot 50000 --mark 50500
+
+# Без аргументів (створить logs\ та виконає export_signals.py; лог -> logs\export.log)
+.\launcher_export.cmd
 ```
 
-### Планувальник завдань Windows
-У репозиторії є `launcher_export.cmd` для Task Scheduler. Приклад створення задачі:
+## Якість коду та тести
 ```powershell
-schtasks /Create /TN "BybitArbBot CSV Export Hourly" /TR "C:\Projectsybit-arb-bot\launcher_export.cmd" /SC HOURLY /ST 00:05 /F
-```
-
----
-
-## Тести та форматування
-```powershell
+ruff check .
+ruff format .
+isort .
+black .
 pytest -q
-pre-commit run -a
 ```
 
-## Усунення несправностей (FAQ)
-- **`token=None` у Telegram:** перевірте, що у `.env` використано `TELEGRAM__TOKEN` та `TELEGRAM__CHAT_ID`, або що присутні старі ключі з таблиці (бек‑міст підхопить їх).
-- **`.env` не підхоплюється:** задайте повний шлях у `ENV_FILE`, перевірте, що файл збережений у UTF‑8 (BOM допускається).
+## CI
+- GitHub Actions: тести, лінтинг, форматування.
+- Додатковий workflow **Verify Windows Launcher** перевіряє наявність і структуру `launcher_export.cmd` (див. `.github/workflows/verify-launcher.yml`).
 
-## Структура проєкту (скорочено)
-```text
+## Структура (скорочено)
+```
 src/
-  core/            # обчислення, фільтри, алерти
-  infra/           # логування, конфіги, інтеграції (dotenv_autoload, settings)
-  storage/         # SQLite, збереження сигналів
-  telegram/        # форматери та відправка
-  ws/              # ядро WS + multiplexer (5.6)
-tests/             # pytest
-scripts/           # утиліти, export_signals.py
-exports/, logs/, data/
+  main.py
+  ws/
+    backoff.py        # Step 5.8.4 (бекоф)
+    health.py         # Step 5.8.4 (метрики WS)
+  telegram/
+    bot.py
+    formatters.py
+scripts/
+  export_signals.py
+  ws_health_cli.py    # тимчасовий health‑CLI
+tests/
+  test_backoff.py     # Step 5.8.4
+  test_ws_health.py   # Step 5.8.4
+  test_launcher_cmd.py
+launcher_export.cmd
+.env.example
+README.md
+CHANGELOG.md
 ```
-
-## Ліцензія
-MIT
