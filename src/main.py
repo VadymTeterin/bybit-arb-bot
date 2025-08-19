@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import time
@@ -17,6 +18,7 @@ from .core.report import format_report, get_top_signals
 from .exchanges.bybit.rest import BybitRest
 from .infra.logging import setup_logging
 from .storage.persistence import init_db
+from .ws.health import MetricsRegistry  # NEW: WS health metrics
 
 # Optional Telegram sender: fall back to direct HTTP if infra.telegram is absent
 try:
@@ -955,6 +957,19 @@ def cmd_basis_scan(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- NEW: ws:health command ---
+def cmd_ws_health(args: argparse.Namespace) -> int:
+    """
+    Print current WS health metrics as JSON. Optional --reset to zero counters.
+    """
+    reg = MetricsRegistry.get()
+    if getattr(args, "reset", False):
+        reg.reset()
+    data = reg.snapshot()
+    print(json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
 # --------------------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------------------
@@ -1043,6 +1058,13 @@ def main() -> None:
     p_pp.set_defaults(func=cmd_price_pair)
 
     sub.add_parser("ws:run").set_defaults(func=cmd_ws_run)
+
+    # NEW: WS health metrics
+    p_wh = sub.add_parser("ws:health")
+    p_wh.add_argument(
+        "--reset", action="store_true", help="Reset counters before print"
+    )
+    p_wh.set_defaults(func=cmd_ws_health)
 
     args = parser.parse_args()
 
