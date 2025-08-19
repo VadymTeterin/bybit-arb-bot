@@ -134,9 +134,9 @@ def normalize(raw: Dict[str, Any]) -> Dict[str, Any]:
                 {
                     "price": _safe_float(t.get("p")) or _safe_float(t.get("price")),
                     "qty": _safe_float(t.get("v")) or _safe_float(t.get("qty")),
-                    "side": "sell"
-                    if (t.get("m") is True)
-                    else "buy",  # Bybit: m=True means taker is sell
+                    "side": (
+                        "sell" if (t.get("m") is True) else "buy"
+                    ),  # Bybit: m=True means taker is sell
                     "trade_id": str(t.get("i") or t.get("tradeId") or ""),
                     "ts_ms": int(t.get("T") or t.get("ts") or ts),
                 }
