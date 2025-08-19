@@ -1,48 +1,72 @@
 # Changelog
 
-> Історія змін структурована за фазами і підкроками. Дати подані у форматі YYYY‑MM‑DD (Europe/Kyiv).
+> Історія змін структурована за фазами і підкроками. Дати подані у форматі YYYY-MM-DD (Europe/Kyiv).
 
-## Phase #5 — Productization & Ops (2025-08-14 → 2025-08-15)
+## Phase #5 — Productization & Ops (2025-08-14 → 2025-08-16)
+
+### Step 5.8 — WS multiplexer + Bybit (integration & ops) — 2025-08-16
+- **Integrated:** `ws:run` працює через **WSMultiplexer** з мостом Bybit.
+  - `src/ws/multiplexer.py` — маршрутизація подій (wildcards: source/channel/symbol).
+  - `src/ws/bridge.py` — міст із Bybit WS у мультиплексор.
+  - `src/ws/subscribers/alerts_subscriber.py` — підписник, що шле алерти (cooldown/threshold/allow/deny).
+- **Changed:** `src/main.py`
+  - meta-refresh через **Bybit v5 `get_tickers('spot'|'linear')`** (оновлення `vol24h`).
+  - сумісність для імпорту: **`BybitWS = BybitPublicWS`** (legacy alias).
+- **New (this step): stdlib .env autoload**
+  - `src/infra/dotenv_autoload.py` — простий loader `.env` без зовнішніх бібліотек (UTF-8/BOM-safe, `export`/лапки, inline `#` коментарі, `${VAR}` експансія).
+  - `src/infra/config.py` — виклик `autoload_env()` під час імпорту та всередині `load_settings()`; back-compat містки:
+    - `TELEGRAM__TOKEN | TELEGRAM_TOKEN | TELEGRAM_BOT_TOKEN → telegram.token`
+    - `TELEGRAM__CHAT_ID | TELEGRAM_CHAT_ID | TG_CHAT_ID | TELEGRAM_ALERT_CHAT_ID → telegram.chat_id`
+  - **Tests:** `tests/test_env_autoload.py`, `tests/test_settings_back_compat.py`.
+  - **Docs:** README/Інструкція оновлені (нові ключі, приклади PowerShell).
+- **Repo hygiene:**
+  - Оновлено `.gitignore` (venv/caches/logs/.env.*, *.patch, *.zip); прибрано випадкові артефакти.
+  - `pre-commit` (ruff/format/isort) зелений на коміті.
+- **Status:**
+  - локально **tests passed**; `ws:run` з’єднується з `spot` і `linear`.
+- **Next (5.8 підзадачі):**
+  - RT-мітка чату (`step-5.8-RT`).
+  - WS reconnect/health (`step-5.8-ws-reconnect`).
 
 ### Step 5.6 — WS Multiplexer (marker) — 2025-08-15
-- Added: `src/ws/multiplexer.py` — потокобезпечний маршрутизатор подій із підтримкою `*`‑wildcard (source/channel/symbol); без мережевої логіки та без asyncio.
-- Added: `tests/test_ws_multiplexer.py` — subscribe/wildcards/unsubscribe (lazy)/publish‑count/invalid‑input.
-- Changed: `stats()` — семантика «ледачої відписки»: `active_subscriptions == total_subscriptions` до `clear_inactive()`. Додано `active_handlers` для діагностики.
-- Notes: **Marker‑only**. Чинний 5.5 не змінено.
+- Added: `src/ws/multiplexer.py` — потокобезпечний маршрутизатор подій із підтримкою `*`-wildcard (source/channel/symbol); без мережевої логіки та без asyncio.
+- Added: `tests/test_ws_multiplexer.py` — subscribe/wildcards/unsubscribe (lazy)/publish-count/invalid-input.
+- Changed: `stats()` — семантика «ледачої відписки». Додано `active_handlers` для діагностики.
+- Notes: **Marker-only**. Чинний 5.5 не змінено.
 
 ### Step 5.6 — Integration substep (ws:run → WSMultiplexer) — 2025-08-15
 - Integrated: `src/main.py` — `ws:run` публікує `tickers` у WSMultiplexer через `src/ws/bridge.py`.
-- Added: `src/ws/bridge.py` — міст для публікації item‑ів Bybit у мультиплексор.
+- Added: `src/ws/bridge.py` — міст для публікації item-ів Bybit у мультиплексор.
 - Added: `tests/test_ws_bridge.py` — перевірка доставки подій у підписників.
 - Notes: Без зміни поведінки 5.5; підписники опційні.
 
 ### Step 5.5 — WS baseline & alerts stabilization — 2025-08-14
 - Stabilized: `ws:run` базова конфігурація, узгодження форматерів алертів.
-- Fixed: дрібні неточності CLI‑довідки, перевірка входів для прев’ю алертів.
+- Fixed: дрібні неточності CLI-довідки, перевірка входів для прев’ю алертів.
 - Tests: доповнення для стабільності функціонала 5.5.
 
 ### Step 5.4 — CSV Export & Scheduling — 2025-08-14
 - Added: `scripts/export_signals.py` — експорт сигналів у CSV (локалізація часу, межі за інтервалом, `--limit`, ротація `--keep`).
-- Added: `launcher_export.cmd` — універсальний Windows‑лаунчер для Планувальника завдань.
+- Added: `launcher_export.cmd` — універсальний Windows-лаунчер для Планувальника завдань.
 - Docs: інструкції UA/EN у README (VS Code “Термінал”, PowerShell).
 
 ### Step 5.3 — Docs & CLI polish — 2025-08-14
 - Changed: рефакторинг документації, уніфікація структури Phase/Step, приклади PowerShell.
-- Improved: опис CLI‑команд та параметрів.
+- Improved: опис CLI-команд та параметрів.
 
 ---
 
 ## Phase #4 — Realtime & Stability (2025-08-13 → 2025-08-14)
 ### Step 4.2 — WS parsing + cache update — 2025-08-13
-- Implemented: парсинг WS‑повідомлень (SPOT/LINEAR), нормалізація чисел, оновлення `QuoteCache`.
+- Implemented: парсинг WS-повідомлень (SPOT/LINEAR), нормалізація чисел, оновлення `QuoteCache`.
 
 ### Step 4.3 — Basis calc in realtime — 2025-08-13
-- Real‑time: обчислення basis% при оновленні кешу; застосування фільтрів ліквідності (vol, depth).
+- Real-time: обчислення basis% при оновленні кешу; застосування фільтрів ліквідності (vol, depth).
 
 ### Step 4.4 — WS alert throttling — 2025-08-13
 - Added: cooldown per symbol, форматований алерт у Telegram при події.
 
-### Step 4.5 — Auto‑reconnect & healthcheck — 2025-08-13
+### Step 4.5 — Auto-reconnect & healthcheck — 2025-08-13
 - Added: автоматичний перепідключення WS і healthcheck ядра.
 
 ---
@@ -58,7 +82,7 @@
 - Added: збереження сигналів, вибірки, звітність.
 
 ### Step 3.4 — Tests & Tooling — 2025-08-12
-- Added: юніт‑тести (фільтри, збереження, форматери алертів).
+- Added: юніт-тести (фільтри, збереження, форматери алертів).
 - Tooling: форматування `black`; перевірка конфігів; базове покриття.
 
 ---
@@ -71,7 +95,7 @@
 - Added: `basis:scan` — одноразовий аналіз спредів із порогами й сортуванням.
 
 ### Step 2.3 — Alerts (console) — 2025-08-10
-- Added: `basis:alert` з вибором топ‑N і фільтрами.
+- Added: `basis:alert` з вибором топ-N і фільтрами.
 
 ### Step 2.4 — CLI utilities — 2025-08-10
 - Added: `bybit:top`, `price:pair`, утиліти для діагностики.
@@ -88,5 +112,5 @@
 ### Step 1.3 — CLI entrypoint
 - Додано `python -m src.main <command>` та перші заглушки.
 
-### Step 1.4 — CI‑ready tests (локально)
+### Step 1.4 — CI-ready tests (локально)
 - Додано перші тести та базову інфраструктуру під pytest.

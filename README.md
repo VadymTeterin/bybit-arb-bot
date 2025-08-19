@@ -3,7 +3,7 @@
 > Реальний час • Windows • Telegram Alerts • Без індикаторів (Price Action / Liquidity Filters)
 
 ## Огляд
-UA: Телеграм-бот відстежує спред (basis %) між SPOT та ф’ючерсами (USDT‑перпетуали) на Bybit. Підтримано режим реального часу через WebSocket, фільтри ліквідності, попередній перегляд алертів і експорт сигналів у CSV.  
+UA: Телеграм-бот відстежує спред (basis %) між SPOT та ф’ючерсами (USDT‑перпетуали) на Bybit. Підтримано режим реального часу через WebSocket, фільтри ліквідності, попередній перегляд алертів і експорт сигналів у CSV.
 EN: Telegram bot that tracks the spread (basis %) between SPOT and USDT‑perpetual futures on Bybit. Real‑time via WebSocket, liquidity filters, alert preview, and CSV export included.
 
 ---
@@ -36,12 +36,25 @@ pip install -r requirements.txt
 ```env
 BYBIT__API_KEY=
 BYBIT__API_SECRET=
-TELEGRAM__BOT_TOKEN=
-TELEGRAM__ALERT_CHAT_ID=
+TELEGRAM__TOKEN=
+TELEGRAM__CHAT_ID=
 ALERT_THRESHOLD_PCT=1.0
 ALERT_COOLDOWN_SEC=300
 DB_PATH=data/signals.db
 ```
+
+#### Автозавантаження `.env`
+З **Кроку 5.8** `src/infra/config.py` автоматично викликає `autoload_env()` (stdlib), тож `.env` підхоплюється без `python-dotenv` та без PowerShell‑хелперів. Якщо потрібно, можна вказати альтернативний шлях файлу через `ENV_FILE`.
+
+#### Back‑compat містки (на перехідний період)
+Якщо у вашому середовищі залишилися старі назви ключів — вони автоматично мапляться у nested‑конфіг:
+
+| Старий ключ                                 | Новий ключ (nested)                    |
+|---------------------------------------------|----------------------------------------|
+| `TELEGRAM_TOKEN`, `TELEGRAM_BOT_TOKEN`      | `TELEGRAM__TOKEN` → `telegram.token`   |
+| `TELEGRAM_CHAT_ID`, `TG_CHAT_ID`, `TELEGRAM_ALERT_CHAT_ID` | `TELEGRAM__CHAT_ID` → `telegram.chat_id` |
+
+> Під час друку `python -m src.main env` ці значення відображаються у секції `telegram`.
 
 ---
 
@@ -75,33 +88,6 @@ python -m src.main ws:run
 
 ---
 
-## Усі CLI‑команди (довідка)
-```text
-version           — показати версію застосунку
-env               — друк активної конфігурації (безпечні поля)
-logtest           — тест логування
-healthcheck       — внутрішня перевірка ядра
-bybit:ping        — пінг до Bybit REST
-bybit:top         — топ‑пари за обсягом/ліквідністю (конфігурується)
-basis:scan        — одноразовий скан спредів
-basis:alert       — скан з виводом/відбором сигналів за порогами
-alerts:preview    — друк відформатованого алерту для перевірки
-tg:send           — надіслати довільний текст у Telegram
-report:print      — друк звіту з БД (SQLite)
-report:send       — відправка звіту у Telegram
-select:save       — збереження добірки сигналів у БД
-price:pair        — швидкий запит ціни для пари
-ws:run            — запуск WS‑ядра (real‑time)
-```
-
-Параметри, що часто використовуються:
-- `--threshold <pct>` — поріг basis% (наприклад, `0.5`)
-- `--min-vol <usd>` — мінімальний обсяг (24h), наприклад `10000000`
-- `--limit <N>` — обмеження кількості результатів
-- `--symbol <TICKER>` — фільтр за символом
-
----
-
 ## Експорт сигналів у CSV (Крок 5.4)
 ```powershell
 python .\scripts\export_signals.py                 # останні 24 години
@@ -119,70 +105,21 @@ schtasks /Create /TN "BybitArbBot CSV Export Hourly" /TR "C:\Projectsybit-arb-b
 
 ---
 
-## WS Multiplexer (Крок 5.6 — мітка, безломний)
-`src/ws/multiplexer.py` — потокобезпечний маршрутизатор подій із підтримкою `*`‑wildcard для `source/channel/symbol`. Не створює мережевих підключень і не залежить від asyncio.  
-Семантика `stats()` узгоджена з «ледачою відпискою» (поки не викликаємо `clear_inactive()`, кількість підписок відображається стало).
-
-Приклад:
-```python
-from src.ws.multiplexer import WSMultiplexer, WsEvent
-import time
-
-mux = WSMultiplexer(name="core")
-unsubscribe = mux.subscribe(handler=lambda e: None, source="SPOT", channel="book_ticker", symbol="BTCUSDT")
-
-evt = WsEvent(source="SPOT", channel="book_ticker", symbol="BTCUSDT", payload={"bid": "1"}, ts=time.time())
-mux.publish(evt)
-
-unsubscribe()
-mux.clear_inactive()
-```
-
----
-
----
-
-## Профілі `.env` (локальна утиліта, опційно; Windows)
-
-> Скрипт **не входить у репозиторій** і рекомендовано зберігати локально. Поклади файл `use-profile.safe.ps1` у **корінь проєкту** (поруч із `.env`).  
-> Бекапи `.env` зберігаються у `.\.backups\\env\\` і вже ігноруються git-ом (`.backups/`, `.env.backup.*`).
-
-### Запуск без зміни політик PowerShell
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\use-profile.safe.ps1 soft "python -m src.main ws:run"
-```
-
-### Інші приклади
-```powershell
-# Перемкнутися на профіль "medium" і зробити скан
-.\use-profile.safe.ps1 medium "python -m src.main basis:scan --limit 10"
-
-# Відновити останній бекап .env
-.\use-profile.safe.ps1 restore
-```
-
-> Якщо хочеш запускати без `powershell -ExecutionPolicy Bypass`, виконай один раз:
-> ```powershell
-> Unblock-File -Path .\use-profile.safe.ps1
-> ```
-> (далі запускай як звичайно: `.\use-profile.safe.ps1 ...`)
-
-## Тести
+## Тести та форматування
 ```powershell
 pytest -q
+pre-commit run -a
 ```
-- Покриття охоплює фільтри ліквідності, кеш котирувань, збереження в БД, форматування алертів, CSV‑експорт і WS‑мультиплексор.
 
-## Стиль коду
-- Форматування: `black`
-- Лінтинг: (за бажанням) `ruff`
-- Принципи: мінімум зайвих змінних, читаємість, модульність.
+## Усунення несправностей (FAQ)
+- **`token=None` у Telegram:** перевірте, що у `.env` використано `TELEGRAM__TOKEN` та `TELEGRAM__CHAT_ID`, або що присутні старі ключі з таблиці (бек‑міст підхопить їх).
+- **`.env` не підхоплюється:** задайте повний шлях у `ENV_FILE`, перевірте, що файл збережений у UTF‑8 (BOM допускається).
 
 ## Структура проєкту (скорочено)
-```
+```text
 src/
   core/            # обчислення, фільтри, алерти
-  infra/           # логування, конфіги, інтеграції
+  infra/           # логування, конфіги, інтеграції (dotenv_autoload, settings)
   storage/         # SQLite, збереження сигналів
   telegram/        # форматери та відправка
   ws/              # ядро WS + multiplexer (5.6)

@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 import os
 import sqlite3
 from typing import Optional
+
 
 def show_signals(limit: int = 10, last_hours: Optional[int] = None) -> None:
     db = os.getenv("DB_PATH", "data/signals.db")
@@ -35,10 +37,18 @@ def show_signals(limit: int = 10, last_hours: Optional[int] = None) -> None:
         # r: (symbol, spot, fut, basis_pct, vol_usd, ts)
         print(f"{r[5]}  {r[0]:<10}  spot={r[1]}  fut={r[2]}  basis%={r[3]}  vol={r[4]}")
 
+
 if __name__ == "__main__":
     import argparse
-    p = argparse.ArgumentParser(description="Show recent arbitrage signals from SQLite.")
-    p.add_argument("--limit", type=int, default=10, help="How many rows to show (default: 10)")
-    p.add_argument("--last-hours", type=int, default=None, help="Only rows within the last N hours")
+
+    p = argparse.ArgumentParser(
+        description="Show recent arbitrage signals from SQLite."
+    )
+    p.add_argument(
+        "--limit", type=int, default=10, help="How many rows to show (default: 10)"
+    )
+    p.add_argument(
+        "--last-hours", type=int, default=None, help="Only rows within the last N hours"
+    )
     args = p.parse_args()
     show_signals(limit=args.limit, last_hours=args.last_hours)

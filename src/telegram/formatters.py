@@ -1,4 +1,4 @@
-﻿# src/telegram/formatters.py
+# src/telegram/formatters.py
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -13,11 +13,11 @@ def _fmt_usd(x: Optional[float]) -> str:
     except Exception:
         return "n/a"
     if x >= 1_000_000_000:
-        return f"${x/1_000_000_000:.2f}B"
+        return f"${x / 1_000_000_000:.2f}B"
     if x >= 1_000_000:
-        return f"${x/1_000_000:.2f}M"
+        return f"${x / 1_000_000:.2f}M"
     if x >= 1_000:
-        return f"${x/1_000:.2f}K"
+        return f"${x / 1_000:.2f}K"
     return f"${x:.2f}"
 
 
@@ -39,7 +39,7 @@ def _fmt_pct(x: Optional[float]) -> str:
     if x is None:
         return "n/a"
     try:
-        return f"{float(x)*100:.2f}%"
+        return f"{float(x) * 100:.2f}%"
     except Exception:
         return "n/a"
 
@@ -49,7 +49,9 @@ def _fmt_ts(ts_unix: Optional[float]) -> str:
         return "n/a"
     try:
         ts = float(ts_unix)
-        return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        return datetime.fromtimestamp(ts, tz=timezone.utc).strftime(
+            "%Y-%m-%d %H:%M UTC"
+        )
     except Exception:
         return "n/a"
 
@@ -90,6 +92,8 @@ def format_signal(
 # --- Сумісні назви, які можуть використовуватись у інших частинах коду/тестах ---
 # Старе ім'я, яке могли імпортувати тести/модулі:
 format_signal_markdown = format_signal
+
+
 # Те, що зараз просить dev/test_tg_sender.py:
 def format_arbitrage_alert(
     *,

@@ -1,4 +1,4 @@
-﻿import time
+import time
 from typing import Optional
 
 import httpx
@@ -10,7 +10,12 @@ class TelegramSender:
     Очікує, що токен і chat_id будуть передані явно або зчитані в наступних оновленнях (config).
     """
 
-    def __init__(self, token: Optional[str] = None, chat_id: Optional[str] = None, cooldown_s: int = 30):
+    def __init__(
+        self,
+        token: Optional[str] = None,
+        chat_id: Optional[str] = None,
+        cooldown_s: int = 30,
+    ):
         self.token = token
         self.chat_id = chat_id
         self.cooldown_s = cooldown_s

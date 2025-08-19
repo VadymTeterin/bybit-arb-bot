@@ -1,11 +1,16 @@
-import time
-from src.ws.multiplexer import WSMultiplexer, WsEvent
 from src.ws.bridge import publish_bybit_ticker
+from src.ws.multiplexer import WSMultiplexer
+
 
 def test_publish_bybit_ticker_delivers_to_matching_subscription():
     mux = WSMultiplexer()
     captured = []
-    unsub = mux.subscribe(handler=lambda e: captured.append(e), source="SPOT", channel="tickers", symbol="ETHUSDT")
+    unsub = mux.subscribe(
+        handler=lambda e: captured.append(e),
+        source="SPOT",
+        channel="tickers",
+        symbol="ETHUSDT",
+    )
 
     item = {"symbol": "ETHUSDT", "last": 2500.0, "mark": 2501.5}
     fired = publish_bybit_ticker(mux, "SPOT", item, ts=123.0)
@@ -18,6 +23,7 @@ def test_publish_bybit_ticker_delivers_to_matching_subscription():
     assert evt.ts == 123.0
 
     unsub()
+
 
 def test_publish_bybit_ticker_ignores_missing_symbol():
     mux = WSMultiplexer()

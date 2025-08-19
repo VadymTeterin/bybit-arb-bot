@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import math
 from time import time
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, List, Optional, Tuple
 
 
 class QuoteCache:
@@ -61,7 +61,9 @@ class QuoteCache:
 
             # перерахунок basis, якщо можливо
             if row["spot"] and row["linear_mark"] and row["spot"] > 0:
-                row["basis_pct"] = (row["linear_mark"] - row["spot"]) / row["spot"] * 100.0
+                row["basis_pct"] = (
+                    (row["linear_mark"] - row["spot"]) / row["spot"] * 100.0
+                )
                 row["ts_basis"] = float(ts)
             return row["basis_pct"]
 
@@ -99,11 +101,21 @@ class QuoteCache:
         async with self._lock:
             out: Dict[str, Tuple[float, float, float]] = {}
             for k, v in self._data.items():
-                ts = max(float(v.get("ts_spot", 0.0)), float(v.get("ts_linear", 0.0)), float(v.get("ts_basis", 0.0)))
-                out[k] = (float(v.get("spot", math.nan)), float(v.get("linear_mark", math.nan)), ts)
+                ts = max(
+                    float(v.get("ts_spot", 0.0)),
+                    float(v.get("ts_linear", 0.0)),
+                    float(v.get("ts_basis", 0.0)),
+                )
+                out[k] = (
+                    float(v.get("spot", math.nan)),
+                    float(v.get("linear_mark", math.nan)),
+                    ts,
+                )
             return out
 
-    async def snapshot_extended(self) -> Dict[str, Tuple[float, float, float, float, float, float]]:
+    async def snapshot_extended(
+        self,
+    ) -> Dict[str, Tuple[float, float, float, float, float, float]]:
         """
         Розширена версія снапшоту: {symbol: (spot, linear_mark, basis_pct, ts_spot, ts_linear, ts_basis)}
         """

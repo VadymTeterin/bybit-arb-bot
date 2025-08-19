@@ -1,7 +1,8 @@
 import time
+
 import pytest
 
-from src.ws.multiplexer import WSMultiplexer, WsEvent
+from src.ws.multiplexer import WsEvent, WSMultiplexer
 
 
 def make_evt(source="SPOT", channel="book_ticker", symbol="BTCUSDT", payload=None):
@@ -21,9 +22,15 @@ def test_exact_subscription_receives_event():
     def handler(evt: WsEvent):
         received.append(evt)
 
-    mux.subscribe(handler=handler, source="SPOT", channel="book_ticker", symbol="BTCUSDT")
+    mux.subscribe(
+        handler=handler, source="SPOT", channel="book_ticker", symbol="BTCUSDT"
+    )
 
-    fired = mux.publish(make_evt(source="SPOT", channel="book_ticker", symbol="BTCUSDT", payload={"x": 1}))
+    fired = mux.publish(
+        make_evt(
+            source="SPOT", channel="book_ticker", symbol="BTCUSDT", payload={"x": 1}
+        )
+    )
 
     assert fired == 1
     assert len(received) == 1
@@ -43,7 +50,9 @@ def test_wildcards_match_multiple_dimensions():
 
     # Підходить під всі події з ETHUSDT
     fired1 = mux.publish(make_evt(source="SPOT", channel="trade", symbol="ETHUSDT"))
-    fired2 = mux.publish(make_evt(source="LINEAR", channel="book_ticker", symbol="ETHUSDT"))
+    fired2 = mux.publish(
+        make_evt(source="LINEAR", channel="book_ticker", symbol="ETHUSDT")
+    )
 
     assert fired1 == 1 and fired2 == 1
     assert hits == 2
@@ -57,7 +66,9 @@ def test_unsubscribe_stops_delivery():
         nonlocal received
         received += 1
 
-    unsubscribe = mux.subscribe(handler=handler, source="SPOT", channel="trade", symbol="XRPUSDT")
+    unsubscribe = mux.subscribe(
+        handler=handler, source="SPOT", channel="trade", symbol="XRPUSDT"
+    )
 
     assert mux.stats()["active_subscriptions"] == 1
 

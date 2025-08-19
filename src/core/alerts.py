@@ -4,10 +4,9 @@ import asyncio
 import math
 import time
 from dataclasses import dataclass
-from typing import Awaitable, Callable, Optional, Dict
+from typing import Awaitable, Callable, Dict, Optional
 
 from src.telegram.formatters import format_signal
-
 
 SendFunc = Callable[[str], Awaitable[None]]
 
@@ -90,6 +89,8 @@ class RealtimeAlerter:
 
             self._last_sent[symbol] = now
             return True
+
+
 # --- step-4.5: optional Telegram async sender (non-invasive) ---
 try:
     from src.infra import config as _cfg

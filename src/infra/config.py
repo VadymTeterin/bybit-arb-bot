@@ -1,125 +1,184 @@
-﻿from __future__ import annotations
+# src/infra/config.py
+from __future__ import annotations
+
 import os
-from typing import Literal, List
+from functools import lru_cache
+from typing import List, Optional
 
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Autoload .env (stdlib loader lives in src/infra/dotenv_autoload.py)
+from .dotenv_autoload import autoload_env
 
-class TelegramSettings(BaseModel):
-    bot_token: str = ""
-    alert_chat_id: str = ""
-    report_chat_id: str = ""
+# Try to load .env as early as possible (idempotent)
+autoload_env()
 
 
-class BybitSettings(BaseModel):
-    api_key: str = ""
-    api_secret: str = ""
+def _csv_list(x: object) -> List[str]:
+    """Нормалізувати CSV/список у List[str]."""
+    if x is None:
+        return []
+    if isinstance(x, (list, tuple)):
+        return [str(t).strip() for t in x if str(t).strip()]
+    if isinstance(x, str):
+        return [t.strip() for t in x.split(",") if t.strip()]
+    return []
+
+
+# ------------------- Nested models -------------------
+
+
+class TelegramConfig(BaseModel):
+    # ВАЖЛИВО: без alias, щоби працювало TELEGRAM__TOKEN / TELEGRAM__CHAT_ID
+    token: Optional[str] = None
+    # chat_id зручно зберігати як str (Bot API приймає рядок або int)
+    chat_id: Optional[str] = None
+
+    # Back-compat властивості (main.py/_tg_fields можуть очікувати їх)
+    @property
+    def bot_token(self) -> Optional[str]:
+        return self.token
+
+    @property
+    def alert_chat_id(self) -> Optional[str]:
+        return self.chat_id
+
+
+class BybitConfig(BaseModel):
+    api_key: Optional[str] = None
+    api_secret: Optional[str] = None
+
+    # WS параметри з дефолтами (щоб `python -m src.main env` щось показував навіть без .env)
+    ws_public_url_linear: Optional[str] = "wss://stream.bybit.com/v5/public/linear"
+    ws_public_url_spot: Optional[str] = "wss://stream.bybit.com/v5/public/spot"
+
+    # Топіки можна задавати або як CSV-рядок, або як список у .env
+    ws_sub_topics_linear: Optional[str | List[str]] = "tickers.BTCUSDT,tickers.ETHUSDT"
+    ws_sub_topics_spot: Optional[str | List[str]] = "tickers.BTCUSDT,tickers.ETHUSDT"
+
+
+# ------------------- Root settings -------------------
 
 
 class AppSettings(BaseSettings):
-    # базове
-    env: Literal["dev", "prod"] = "dev"
-
-    # параметри відбору/звітів
-    alert_threshold_pct: float = 1.0
-    alert_cooldown_sec: int = 300
-    min_vol_24h_usd: float = 10_000_000.0
-    min_price: float = 0.001
-    db_path: str = "data/signals.db"
-    top_n_report: int = 3
-
-    # ---- depth-фільтр (із фази 3.4) ----
-    min_depth_usd: float = 1_000_000.0   # мінімальна глибина ($) у межах depth_window_pct
-    depth_window_pct: float = 0.5        # ширина вікна у %, 0.5 => 0.5%
-    min_depth_levels: int = 30           # мінімальна сумарна к-сть рівнів (bid+ask) у вікні
-
-    # прапор надсилання алертів
-    enable_alerts: bool = True
-
-    # інтеграції
-    telegram: TelegramSettings = TelegramSettings()
-    bybit: BybitSettings = BybitSettings()
-
-    # allow/deny як СИРОВІ РЯДКИ з .env (CSV або JSON-масив).
-    allow_symbols: str = ""
-    deny_symbols: str = ""
-
-    # ---- WS (фаза 4.2+) ----
-    ws_enabled: bool = False
-
-    # окремі канали для linear та spot
-    ws_public_url_linear: str = "wss://stream.bybit.com/v5/public/linear"
-    ws_public_url_spot: str = "wss://stream.bybit.com/v5/public/spot"
-
-    # CSV рядки топіків (наприклад: "tickers" або "tickers.BTCUSDT,tickers.ETHUSDT")
-    ws_sub_topics_linear: str = "tickers"
-    ws_sub_topics_spot: str = "tickers"
-
-    ws_reconnect_max_sec: int = 30
-
-    # (Залишено для зворотної сумісності  НЕ використовується в 4.2+)
-    ws_public_url: str = "wss://stream.bybit.com/v5/public/linear"
-    ws_sub_topics: str = "tickers"
-
-    # ---- 4.3: realtime wiring ----
-    rt_meta_refresh_sec: int = 300  # як часто оновлювати vol24h із REST (сек)
-    rt_log_passes: bool = True      # логувати коли символ проходить пороги в реальному часі
-
+    # Конфіг Pydantic v2
     model_config = SettingsConfigDict(
         env_file=".env",
+        env_file_encoding="utf-8",
         env_nested_delimiter="__",
         extra="ignore",
     )
 
-    # ---- зручні властивості ----
-    @staticmethod
-    def _parse_symbols(raw: str) -> List[str]:
-        raw = (raw or "").strip()
-        if not raw:
-            return []
-        # підтримуємо CSV і простий JSON-список
-        if raw.lstrip().startswith("["):
-            try:
-                import json
-                arr = json.loads(raw)
-                return [str(x).strip() for x in arr if str(x).strip()]
-            except Exception:
-                pass
-        return [x.strip() for x in raw.split(",") if x.strip()]
+    # Загальні
+    env: str = "dev"
+
+    # Пороги/кулдауни
+    alert_threshold_pct: float = 1.0
+    alert_cooldown_sec: int = 300
+
+    # Фільтри
+    min_vol_24h_usd: float = 10_000_000.0
+    min_price: float = 0.001
+
+    # Шлях до БД
+    db_path: str = "data/signals.db"
+
+    # Репорт
+    top_n_report: int = 10
+
+    # Увімкнення алертів
+    enable_alerts: bool = True
+
+    # Списки дозволених/заборонених символів (можна CSV у .env)
+    allow_symbols: Optional[str | List[str]] = None
+    deny_symbols: Optional[str | List[str]] = None
+
+    # WS опції (тут — «пласкі» поля для back-compat; основні — у BybitConfig)
+    ws_enabled: bool = True
+    ws_public_url_linear: Optional[str] = None
+    ws_public_url_spot: Optional[str] = None
+    ws_sub_topics_linear: Optional[str | List[str]] = None
+    ws_sub_topics_spot: Optional[str | List[str]] = None
+    ws_reconnect_max_sec: Optional[int] = 30
+
+    # Runtime-мета
+    rt_meta_refresh_sec: int = 30
+    rt_log_passes: int = 1
+
+    # Вкладені секції
+    telegram: TelegramConfig = TelegramConfig()
+    bybit: BybitConfig = BybitConfig()
+
+    # --------- Зручні computed-властивості ---------
 
     @property
     def allow_symbols_list(self) -> List[str]:
-        return self._parse_symbols(self.allow_symbols)
+        return _csv_list(self.allow_symbols)
 
     @property
     def deny_symbols_list(self) -> List[str]:
-        return self._parse_symbols(self.deny_symbols)
+        return _csv_list(self.deny_symbols)
 
-    # нові: окремі списки топіків
     @property
     def ws_topics_list_linear(self) -> List[str]:
-        return self._parse_symbols(self.ws_sub_topics_linear)
+        # back-compat: дехто може читати саме це ім'я
+        src = self.ws_sub_topics_linear or self.bybit.ws_sub_topics_linear
+        return _csv_list(src)
 
     @property
     def ws_topics_list_spot(self) -> List[str]:
-        return self._parse_symbols(self.ws_sub_topics_spot)
-
-    # старий метод (не використовується в 4.2, але лишаємо)
-    @property
-    def ws_topics_list(self) -> List[str]:
-        return self._parse_symbols(self.ws_sub_topics)
+        # back-compat
+        src = self.ws_sub_topics_spot or self.bybit.ws_sub_topics_spot
+        return _csv_list(src)
 
 
+# ------------------- Loader with fallbacks -------------------
+
+
+@lru_cache(maxsize=1)
 def load_settings() -> AppSettings:
-    """Єдина точка завантаження налаштувань."""
-    return AppSettings()
+    """
+    Завантажити налаштування з .env / env vars.
 
+    Включає back-compat містки:
+      - Пласкі TELEGRAM_TOKEN / TG_CHAT_ID / TELEGRAM_BOT_TOKEN / TELEGRAM_ALERT_CHAT_ID
+        → у nested telegram.token / telegram.chat_id, якщо ті порожні
+      - Підхоплення «пласких» WS-полів на верхньому рівні, якщо вони відсутні у bybit.*
+    """
+    # Ідемпотентне автозавантаження (на випадок, якщо імпорт модуля пропущено)
+    autoload_env()
 
-# Telegram alerts config (step-4.5)
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
-TELEGRAM_COOLDOWN_SECONDS = int(os.getenv("TELEGRAM_COOLDOWN_SECONDS", "30"))
+    s = AppSettings()
 
-# Feature flag for Telegram notifications
-TELEGRAM_ENABLED = os.getenv("TELEGRAM_ENABLED", "0").strip().lower() in ("1", "true", "yes", "y")
+    # --- Back-compat для пласких Telegram-перемінних ---
+    token_flat = (
+        os.getenv("TELEGRAM__TOKEN")
+        or os.getenv("TELEGRAM_TOKEN")
+        or os.getenv("TELEGRAM_BOT_TOKEN")
+    )
+    chat_flat = (
+        os.getenv("TELEGRAM__CHAT_ID")
+        or os.getenv("TELEGRAM_CHAT_ID")
+        or os.getenv("TG_CHAT_ID")
+        or os.getenv("TELEGRAM_ALERT_CHAT_ID")
+    )
+    if not getattr(getattr(s, "telegram", None), "token", None) and token_flat:
+        s.telegram.token = token_flat
+    if not getattr(getattr(s, "telegram", None), "chat_id", None) and chat_flat:
+        s.telegram.chat_id = chat_flat
+
+    # --- Back-compat для WS-полів (верхній рівень vs. bybit.*) ---
+    # 1) URL-и
+    if not s.ws_public_url_linear and s.bybit.ws_public_url_linear:
+        s.ws_public_url_linear = s.bybit.ws_public_url_linear
+    if not s.ws_public_url_spot and s.bybit.ws_public_url_spot:
+        s.ws_public_url_spot = s.bybit.ws_public_url_spot
+
+    # 2) Топіки
+    if s.ws_sub_topics_linear is None and s.bybit.ws_sub_topics_linear is not None:
+        s.ws_sub_topics_linear = s.bybit.ws_sub_topics_linear
+    if s.ws_sub_topics_spot is None and s.bybit.ws_sub_topics_spot is not None:
+        s.ws_sub_topics_spot = s.bybit.ws_sub_topics_spot
+
+    return s

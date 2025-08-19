@@ -1,10 +1,20 @@
 # src/ws/bridge.py
 from __future__ import annotations
-import time
-from typing import Dict, Any
-from src.ws.multiplexer import WSMultiplexer, WsEvent
 
-def publish_bybit_ticker(mux: WSMultiplexer, source: str, item: Dict[str, Any], *, channel: str = "tickers", ts: float | None = None) -> int:
+import time
+from typing import Any, Dict
+
+from src.ws.multiplexer import WsEvent, WSMultiplexer
+
+
+def publish_bybit_ticker(
+    mux: WSMultiplexer,
+    source: str,
+    item: Dict[str, Any],
+    *,
+    channel: str = "tickers",
+    ts: float | None = None,
+) -> int:
     """
     Легкий міст: публікує item з Bybit tickers у WS-мультиплексор.
     Не змінює поведінку існуючого ws:run; лише дає можливість підписникам реагувати.

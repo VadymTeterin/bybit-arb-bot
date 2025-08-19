@@ -1,7 +1,9 @@
 # tests/test_formatters.py
 
-from src.telegram.formatters import format_signal_markdown
 from datetime import datetime, timezone
+
+from src.telegram.formatters import format_signal_markdown
+
 
 def test_format_with_and_without_funding():
     # Без funding
