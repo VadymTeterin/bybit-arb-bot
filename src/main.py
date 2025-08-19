@@ -18,7 +18,7 @@ from .core.report import format_report, get_top_signals
 from .exchanges.bybit.rest import BybitRest
 from .infra.logging import setup_logging
 from .storage.persistence import init_db
-from .ws.health import MetricsRegistry  # NEW: WS health metrics
+from .ws.health import MetricsRegistry  # WS health metrics (singleton)
 
 # Optional Telegram sender: fall back to direct HTTP if infra.telegram is absent
 try:
@@ -45,6 +45,9 @@ except Exception:  # noqa: BLE001
 
 
 APP_VERSION = "0.4.6"
+
+# --- NEW: global metrics handle for the running process ---
+METRICS = MetricsRegistry.get()
 
 
 # --------------------------------------------------------------------------------------
@@ -753,7 +756,7 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         from .ws.bridge import publish_bybit_ticker
         from .ws.multiplexer import WsEvent, WSMultiplexer
 
-        # NEW: normalized event factory
+        # Normalized event factory
         from .ws.normalizers.bybit_v5 import normalize
         from .ws.subscribers.alerts_subscriber import AlertsSubscriber
     except Exception as e:  # noqa: BLE001
@@ -781,14 +784,11 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
     alerts_sub = AlertsSubscriber(mux)
     alerts_sub.start()
 
-    # --- NEW: toggle + filter + sampling for normalized debug counters ---
+    # --- Debug knobs for normalized flow ---
     debug_norm = _env_bool("WS_DEBUG_NORMALIZED", False)
-    # Comma-separated channels to show (default 'ticker'); leave empty to show all
     _channels_env = os.getenv("WS_DEBUG_FILTER_CHANNELS", "ticker")
     debug_channels = set(_csv_list(_channels_env)) if _channels_env else set()
-    # Optional list of symbols to show (e.g. "BTCUSDT,ETHUSDT")
     debug_symbols = set(_csv_list(os.getenv("WS_DEBUG_FILTER_SYMBOLS", "")))
-    # Minimal interval between repeated logs for the same (source,channel,symbol)
     debug_sample_ms = _env_int("WS_DEBUG_SAMPLE_MS", 1000)
     _last_log: Dict[Tuple[str, str, str], float] = {}
 
@@ -807,9 +807,9 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         channel = str(evt_norm.get("channel") or "")
         symbol = str(evt_norm.get("symbol") or "")
         if not channel or channel == "other":
-            return  # ignore non-ticker / unknown normalized channels
+            return
         if not symbol:
-            return  # drop events without symbol in debug stream
+            return
         if debug_channels and channel not in debug_channels:
             return
         if debug_symbols and symbol not in debug_symbols:
@@ -824,7 +824,7 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         now = time.monotonic()
         last = _last_log.get(key, 0.0)
         if (now - last) * 1000.0 < max(0, debug_sample_ms):
-            return  # sampling: skip too-frequent repeats
+            return
         _last_log[key] = now
         logger.bind(tag="WS").debug(
             f"{source} normalized: channel={channel} symbol={symbol} items={items}"
@@ -869,10 +869,10 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
     # on_message handlers
     # ----------------------------
     async def on_message_spot(msg: dict):
-        # 1) Publish normalized event (channel usually 'ticker'); keep it distinct
+        # 1) Normalized event publish
         try:
             evt_norm = normalize(msg)
-            _debug_log_normalized("SPOT", evt_norm)  # filtered + sampled
+            _debug_log_normalized("SPOT", evt_norm)
             mux.publish(
                 WsEvent(
                     source="SPOT",
@@ -882,10 +882,12 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
                     ts=evt_norm.get("ts_ms") or 0,
                 )
             )
+            # --- NEW: increment SPOT counter after successful normalized publish ---
+            METRICS.inc_spot()
         except Exception as e:
             logger.debug(f"normalize(msg) failed (SPOT): {e!r}")
 
-        # 2) Compatibility path for existing subscribers: publish 'tickers' events per symbol
+        # 2) Compatibility path for existing subscribers
         for item in iter_ticker_entries(msg):
             sym = item.get("symbol")
             last = item.get("last")
@@ -894,10 +896,10 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
                 publish_bybit_ticker(mux, "SPOT", item)
 
     async def on_message_linear(msg: dict):
-        # 1) Publish normalized event
+        # 1) Normalized event publish
         try:
             evt_norm = normalize(msg)
-            _debug_log_normalized("LINEAR", evt_norm)  # filtered + sampled
+            _debug_log_normalized("LINEAR", evt_norm)
             mux.publish(
                 WsEvent(
                     source="LINEAR",
@@ -907,6 +909,8 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
                     ts=evt_norm.get("ts_ms") or 0,
                 )
             )
+            # --- NEW: increment LINEAR counter after successful normalized publish ---
+            METRICS.inc_linear()
         except Exception as e:
             logger.debug(f"normalize(msg) failed (LINEAR): {e!r}")
 
@@ -957,7 +961,7 @@ def cmd_basis_scan(args: argparse.Namespace) -> int:
     return 0
 
 
-# --- NEW: ws:health command ---
+# --- ws:health command ---
 def cmd_ws_health(args: argparse.Namespace) -> int:
     """
     Print current WS health metrics as JSON. Optional --reset to zero counters.
@@ -1059,7 +1063,7 @@ def main() -> None:
 
     sub.add_parser("ws:run").set_defaults(func=cmd_ws_run)
 
-    # NEW: WS health metrics
+    # WS health metrics
     p_wh = sub.add_parser("ws:health")
     p_wh.add_argument(
         "--reset", action="store_true", help="Reset counters before print"
@@ -1069,7 +1073,6 @@ def main() -> None:
     args = parser.parse_args()
 
     log_dir = Path("./logs")
-    # --- UPDATED: LOG_LEVEL from env (default INFO to reduce noise) ---
     log_level = os.getenv("LOG_LEVEL", "INFO")
     setup_logging(log_dir, level=log_level)
 
