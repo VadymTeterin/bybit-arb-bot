@@ -130,3 +130,6 @@ _tmp/
 tmp/
 tmp/**
 t -q
+
+# Allow Windows launcher at repo root
+!launcher_export.cmd
