@@ -1,138 +1,194 @@
-# BYBIT Arbitrage Bot (Windows)
+# Bybit Arbitrage Bot — WS Stability, Health & Telegram `/status` (Step 5.8.4)
 
-> Telegram‑бот для моніторингу базису між **Spot** та **Futures** на Bybit із алертами в Telegram.
-> Платформа розробки: **Windows 11**. Команди наводимо для **PowerShell** та VS Code **«Термінал»**.
+> Windows 11 · Python 3.11+ · aiogram 3.7+ · Bybit Public WS/REST
 
-## Основне
-- Скани різниці **spot vs futures** (basis %) і вибір **топ‑3** пар вище порогу.
-- Фільтри ліквідності: 24h обсяг, мінімальна ціна, глибина.
-- Алерти в Telegram (тротлінг/cooldown).
-- Історія сигналів у SQLite/Parquet.
-- **WebSocket (v5)**: стрім цін + нормалізація + лічильники подій (SPOT/LINEAR).
-- **Windows‑лаунчер:** `launcher_export.cmd` (див. нижче).
+Цей реліз фокусується на **стабільності WebSocket**, **метриках здоровʼя**, сервісній команді **Telegram `/status`** та **зручному запуску під супервізором** на Windows.
 
-## Вимоги
-- Python **3.11+** (Windows)
-- Інтернет з’єднання
-- PowerShell або VS Code «Термінал»
+---
 
-## Швидкий старт (PowerShell)
-> ⚠️ Секрети в `.env` не показуйте на скрінах.
+## Зміст
+- [Швидкий старт](#швидкий-старт)
+- [Запуск під супервізором](#запуск-під-супервізором)
+- [Telegram `/status`](#telegram-status)
+- [Метрики WS](#метрики-ws)
+- [Що запускає супервізор](#що-запускає-супервізор)
+- [Корисні CLI-команди](#корисні-cli-команди)
+- [Логи](#логи)
+- [Тести](#тести)
+- [Структура проєкту (скорочено)](#структура-проєкту-скорочено)
+- [Траблшутінг](#траблшутінг)
+- [Ліцензія](#ліцензія)
+
+---
+
+## Швидкий старт
 
 ```powershell
-# Активувати venv
-& .\.venv\Scripts\Activate.ps1
+git clone <your-repo-url> bybit-arb-bot
+cd bybit-arb-bot
 
-# Встановити залежності
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
 pip install -r requirements.txt
-
-# Скопіювати приклад змінних оточення
-Copy-Item .env.example .env
-
-# Заповнити .env (BYBIT_API_KEY, BYBIT_API_SECRET, TG_BOT_TOKEN, TG_CHAT_ID, ...)
-
-# Перевірити середовище
-python -m src.main env
-
-# Прогнати тести
-pytest -q
 ```
 
-## .env (приклад полів)
-```
+### .env (корінь репозиторію)
+
+> Змінні підхоплюються через **python-dotenv** в усіх раннерах (включно з супервізором). Після змін — зробіть `restart`.
+
+```env
+# базові
+WS_ENABLED=1
+LOG_LEVEL=INFO
+
+# Telegram (обовʼязково для /status і алертів)
+TELEGRAM__BOT_TOKEN=123456:AA...
+TELEGRAM__ALERT_CHAT_ID=123456789
+
+# Bybit (не обовʼязково для публічних WS/REST)
 BYBIT_API_KEY=
 BYBIT_API_SECRET=
-TG_BOT_TOKEN=
-TG_CHAT_ID=
-ALERT_THRESHOLD_PCT=1.0
-ALERT_COOLDOWN_SEC=300
-MIN_VOL_24H_USD=10000000
-MIN_PRICE=0.001
-WS_ENABLED=True
-WS_PUBLIC_URL_LINEAR=wss://stream.bybit.com/v5/public/linear
-WS_PUBLIC_URL_SPOT=wss://stream.bybit.com/v5/public/spot
-WS_SUB_TOPICS_LINEAR=tickers.BTCUSDT,tickers.ETHUSDT
-WS_SUB_TOPICS_SPOT=tickers.BTCUSDT,tickers.ETHUSDT
-WS_RECONNECT_MAX_SEC=30
 ```
 
-## Запуск (CLI)
-Всі команди виконуються так: `python -m src.main <команда> [аргументи]`
+Перевірити, що процес бачить змінні:
 
 ```powershell
-# Довідка
-python -m src.main -h
-
-# Перевірка ENV
-python -m src.main env
-
-# Пошук топ-3 сигналів і вивід у консоль
-python -m src.main basis:alert --limit 3 --threshold 1.0 --min-vol 10000000
-
-# Звіт за годину
-python -m src.main report:print --hours 1 --limit 10
-
-# WebSocket (стрім/нормалізація)
-python -m src.main ws:run
-
-# NEW: прев’ю алерта без відправки у Telegram (Step 5.8.3)
-python -m src.main alerts:preview --symbol BTCUSDT --spot 50000 --mark 50500
-python -m src.main alerts:preview --symbol ETHUSDT --spot 2500 --mark 2525 --vol 12000000 --threshold 0.5
+python -c "import os; print('TOKEN set:', bool(os.getenv('TELEGRAM__BOT_TOKEN'))); print('CHAT_ID:', os.getenv('TELEGRAM__ALERT_CHAT_ID'))"
 ```
 
-## Windows‑лаунчер `launcher_export.cmd`
-Файл у корені репозиторію. Призначення:
-- Гарантує перехід у директорію проекту: `cd /d %~dp0`.
-- Створює `logs\` якщо її нема: `if not exist logs mkdir logs`.
-- Віддає пріоритет `.venv\Scripts\python.exe`.
-- Містить явне посилання на `scripts\export_signals.py`.
-- **Без аргументів** запускає експорт із логуванням у `logs\export.log`:
-  ```
-  %PY_EXE% "%EXPORT_SCRIPT%" >> logs\export.log 2>&1
-  ```
-- **З аргументами** прокидає їх у `python -m src.main`.
+---
 
-Приклади:
+## Запуск під супервізором
+
+Контролер (PowerShell 5.1): `scripts/ws_supervisor_ctl.ps1`
+
 ```powershell
-# Прев’ю алерта (через лаунчер)
-.\launcher_export.cmd alerts:preview --symbol BTCUSDT --spot 50000 --mark 50500
-
-# Без аргументів (створить logs\ та виконає export_signals.py; лог -> logs\export.log)
-.\launcher_export.cmd
+.\scripts\ws_supervisor_ctl.ps1 start         # console-режим (python.exe) з редиректом у logs/
+.\scripts\ws_supervisor_ctl.ps1 status        # PID + останній лог
+.\scripts\ws_supervisor_ctl.ps1 tail -TailLines 200   # “tail -f”
+.\scripts\ws_supervisor_ctl.ps1 restart       # перезапуск (підхопить новий .env)
+.\scripts\ws_supervisor_ctl.ps1 stop          # зупинка
 ```
 
-## Якість коду та тести
+> За замовчуванням — **console-режим** з файлами `logs/supervisor.stdout.log`/`logs/supervisor.stderr.log`.
+> Windowless — `start -NoConsole` / `restart -NoConsole` (менш зручний для дебагу).
+
+Альтернатива:
+
 ```powershell
-ruff check .
-ruff format .
-isort .
-black .
+python -m scripts.ws_bot_supervisor
+```
+
+---
+
+## Telegram `/status`
+
+- Напишіть боту `/status` у чат, ID якого вказано у `TELEGRAM__ALERT_CHAT_ID`.
+- Відповідь: JSON-знімок (лічильники `spot`/`linear`, `started_at_utc`, `uptime_ms`, timestamps останніх подій).
+- **aiogram 3.7+**: використовується `DefaultBotProperties` замість застарілого `parse_mode` у конструкторі.
+
+---
+
+## Метрики WS
+
+Клас: `src/ws/health.py` — потокобезпечний синглтон-реєстр:
+
+- Лічильники подій: `spot`, `linear`.
+- Мітки часу останніх подій (per-type і загальна).
+- Аптайм (`started_ts`, `uptime_ms`).
+
+Знімки:
+
+```powershell
+python -m src.main ws:health
+python -m src.main ws:health --reset
+python -m scripts.ws_health_cli
+```
+
+> Якщо викликаєте з **іншого процесу**, лічильники можуть бути нульові — це очікувано (процесно-локальні метрики).
+
+---
+
+## Що запускає супервізор
+
+`scripts/ws_bot_supervisor.py` піднімає:
+
+- **SPOT WS** — `wss://stream.bybit.com/v5/public/spot`
+- **LINEAR WS** — `wss://stream.bybit.com/v5/public/linear`
+- **Telegram бот** — відповідає на `/status`
+- **Meta refresh** — періодичне оновлення `24h vol` для фільтрів (REST)
+- Повторні спроби через **експоненційний бекоф** (без оверсуту) з `src/ws/backoff.py`
+
+---
+
+## Корисні CLI-команди
+
+```powershell
+# Пінг Bybit (серверний час)
+python -m src.main bybit:ping
+
+# Превʼю форматування алерту
+python -m src.main alerts:preview --symbol BTCUSDT --spot 50000 --mark 50500 --threshold 1.0
+
+# Тести та автоформат
 pytest -q
+pre-commit run -a
 ```
 
-## CI
-- GitHub Actions: тести, лінтинг, форматування.
-- Додатковий workflow **Verify Windows Launcher** перевіряє наявність і структуру `launcher_export.cmd` (див. `.github/workflows/verify-launcher.yml`).
+---
 
-## Структура (скорочено)
+## Логи
+
+- `logs/app.log` — основний лог застосунку (`loguru`).
+- У режимі супервізора (console):
+  - `logs/supervisor.stdout.log`
+  - `logs/supervisor.stderr.log`
+
+Зменшення шуму:
+
+```env
+LOG_LEVEL=INFO
+WS_DEBUG_NORMALIZED=0
+WS_DEBUG_SAMPLE_MS=3000
 ```
-src/
-  main.py
-  ws/
-    backoff.py        # Step 5.8.4 (бекоф)
-    health.py         # Step 5.8.4 (метрики WS)
-  telegram/
-    bot.py
-    formatters.py
+
+---
+
+## Тести (стан на 2025-08-19)
+
+```
+107 passed, 1 skipped
+```
+
+---
+
+## Структура проєкту (скорочено)
+
+```
 scripts/
-  export_signals.py
-  ws_health_cli.py    # тимчасовий health‑CLI
-tests/
-  test_backoff.py     # Step 5.8.4
-  test_ws_health.py   # Step 5.8.4
-  test_launcher_cmd.py
-launcher_export.cmd
-.env.example
-README.md
-CHANGELOG.md
+  ws_bot_supervisor.py     # супервізор: WS + Telegram + meta-refresh (1 процес)
+  ws_health_cli.py         # тимчасовий CLI для метрик
+  ws_supervisor_ctl.ps1    # PowerShell-контролер start/stop/status/restart/tail
+
+src/ws/
+  backoff.py               # експоненційний бекоф (cap, no-overshoot)
+  health.py                # метрики WS (синглтон)
+
+src/telegram/
+  bot.py                   # /status
 ```
+
+---
+
+## Траблшутінг
+
+- **`TelegramNetworkError: Server disconnected`** — супервізор зробить ретраї з бекофом. Якщо часто — перевірте інтернет/фаєрвол та рівень логів.
+- **Бот не відповідає на `/status`** — перевірте `TELEGRAM__BOT_TOKEN` та `TELEGRAM__ALERT_CHAT_ID` у `.env`, далі `restart`, подивіться `supervisor.stderr.log`.
+- **`pythonw.exe` завершується одразу** — використовуйте console-режим (`start` без `-NoConsole`) для видимих логів.
+
+---
+
+## Ліцензія
+
+MIT
