@@ -298,12 +298,18 @@ async def main() -> None:
         try:
             # aiogram v3 imports
             from aiogram import Bot, Dispatcher
+            from aiogram.client.default import DefaultBotProperties
+            from aiogram.enums import ParseMode
             from aiogram.filters import Command
             from aiogram.types import Message
         except Exception as e:  # noqa: BLE001
             logger.error("aiogram is not available: {}", e)
         else:
-            bot = Bot(token=token, parse_mode="Markdown")
+            # aiogram 3.7+: parse_mode via DefaultBotProperties
+            bot = Bot(
+                token=token,
+                default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN),
+            )
             dp = Dispatcher()
 
             @dp.message(Command("start"))
