@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
@@ -101,8 +102,8 @@ def _get_token() -> Optional[str]:
 
 # --- Main async runner --------------------------------------------------------
 async def main() -> None:
-    # logging
-    setup_logging(log_dir="./logs", level=os.getenv("LOG_LEVEL", "INFO"))
+    # logging (Path is required by setup_logging)
+    setup_logging(log_dir=Path("./logs"), level=os.getenv("LOG_LEVEL", "INFO"))
 
     # settings
     s = load_settings()
