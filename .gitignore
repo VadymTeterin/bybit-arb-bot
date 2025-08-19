@@ -133,3 +133,7 @@ t -q
 
 # Allow Windows launcher at repo root
 !launcher_export.cmd
+
+/run/
+/logs/
+*.log
