@@ -69,7 +69,7 @@ def _parse_topic(topic: str) -> Tuple[str, str]:
         "liquidation": "liquidation",
     }
     channel = mapping.get(head, "other")
-    # IMPORTANT: for unknown topics we must NOT attempt to parse symbol; tests expect empty symbol
+    # For unknown topics symbol stays empty to keep downstream logic simple
     symbol = parts[-1] if (channel != "other" and len(parts) >= 2) else ""
     return (channel, symbol)
 
@@ -118,13 +118,17 @@ def normalize(raw: Dict[str, Any]) -> Dict[str, Any]:
         # 'data' may be list with a single dict or a dict
         if isinstance(payload, list) and payload:
             payload = payload[0]
-        out = {
-            "last_price": _safe_float(payload.get("lastPrice")),
-            "index_price": _safe_float(payload.get("indexPrice")),
-            "mark_price": _safe_float(payload.get("markPrice")),
-            "open_interest": _safe_float(payload.get("openInterest")),
-            "turnover_24h": _safe_float(payload.get("turnover24h")),
-            "volume_24h": _safe_float(payload.get("volume24h")),
+        out: Dict[str, Any] = {
+            "last_price": _safe_float(_get_first(payload, "lastPrice", "last_price")),
+            "index_price": _safe_float(
+                _get_first(payload, "indexPrice", "index_price")
+            ),
+            "mark_price": _safe_float(_get_first(payload, "markPrice", "mark_price")),
+            "open_interest": _safe_float(
+                _get_first(payload, "openInterest", "open_interest")
+            ),
+            "turnover_24h": _safe_float(_get_first(payload, "turnover24h")),
+            "volume_24h": _safe_float(_get_first(payload, "volume24h")),
         }
     elif channel == "trade":
         # 'data' is typically a list of trades; take them all
@@ -134,16 +138,15 @@ def normalize(raw: Dict[str, Any]) -> Dict[str, Any]:
                 {
                     "price": _safe_float(t.get("p")) or _safe_float(t.get("price")),
                     "qty": _safe_float(t.get("v")) or _safe_float(t.get("qty")),
-                    "side": (
-                        "sell" if (t.get("m") is True) else "buy"
-                    ),  # Bybit: m=True means taker is sell
+                    # Bybit: m=True means taker is sell
+                    "side": "sell" if (t.get("m") is True) else "buy",
                     "trade_id": str(t.get("i") or t.get("tradeId") or ""),
                     "ts_ms": int(t.get("T") or t.get("ts") or ts),
                 }
             )
         out = {"trades": trades}
     elif channel == "orderbook":
-        # Payload may be {"a": [[px,qty],...], "b": [[px,qty],...]} or a list of deltas
+        # Payload may be {"a": [[px,qty],...], "b": [[px,qty],...]} or structured deltas
         asks = []
         bids = []
         if isinstance(payload, dict):
@@ -153,6 +156,7 @@ def normalize(raw: Dict[str, Any]) -> Dict[str, Any]:
                 bids.append(_ab_row(row))
         out = {"asks": asks, "bids": bids}
     else:
+        # kline/liquidation/other — keep as-is if dict, otherwise wrap as raw
         out = payload if isinstance(payload, dict) else {"raw": payload}
 
     normalized = NormalizedEvent(
@@ -166,6 +170,16 @@ def normalize(raw: Dict[str, Any]) -> Dict[str, Any]:
     return normalized.as_dict()
 
 
+def _get_first(d: Any, *keys: str) -> Any:
+    """Return the first existing key from a dict-like payload."""
+    if not isinstance(d, dict):
+        return None
+    for k in keys:
+        if k in d:
+            return d[k]
+    return None
+
+
 def _safe_float(x: Any) -> Optional[float]:
     try:
         if x is None:
@@ -176,7 +190,12 @@ def _safe_float(x: Any) -> Optional[float]:
 
 
 def _ab_row(row: Any) -> Dict[str, Optional[float]]:
-    # Accept [price, qty] or {"price":..., "qty":...}
+    """Normalize an orderbook row.
+
+    Accepts:
+      - [price, qty]
+      - {"price": ..., "qty": ...}
+    """
     if isinstance(row, (list, tuple)) and len(row) >= 2:
         return {"price": _safe_float(row[0]), "qty": _safe_float(row[1])}
     if isinstance(row, dict):

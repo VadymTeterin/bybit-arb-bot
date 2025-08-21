@@ -37,6 +37,22 @@ def _to_float(x: Any, default: float = 0.0) -> float:
         return float(default)
 
 
+def _mget(obj: Any, key: str, default: Any = None) -> Any:
+    """
+    Безпечне отримання значення за ключем із Mapping або об'єкта з методом get.
+    Уникаємо `dict().get`, який у mypy має Never-тизи.
+    """
+    if isinstance(obj, Mapping):
+        return obj.get(key, default)
+    get_fn = getattr(obj, "get", None)
+    if callable(get_fn):
+        try:
+            return get_fn(key, default)  # type: ignore[misc]
+        except Exception:
+            return default
+    return default
+
+
 def _parse_symbols_value(v: Any) -> List[str]:
     """
     Приймає None / list / рядок з JSON-масивом або CSV.
@@ -65,8 +81,9 @@ def _parse_symbols_value(v: Any) -> List[str]:
 
 
 def _build_pairs(
-    spot_map: Mapping[str, Mapping[str, float]],
-    linear_map: Mapping[str, Mapping[str, float]],
+    # Використовуємо Any, бо клієнт може повертати TypedDict/звичні dict-и з різними наборами ключів
+    spot_map: Mapping[str, Any],
+    linear_map: Mapping[str, Any],
 ) -> List[_Pair]:
     out: List[_Pair] = []
     for sym, srow in spot_map.items():
@@ -76,9 +93,9 @@ def _build_pairs(
         out.append(
             _Pair(
                 symbol=sym,
-                spot=_to_float(srow.get("price", 0.0)),
-                fut=_to_float(frow.get("price", 0.0)),
-                vol_usd=_to_float(srow.get("turnover_usd", 0.0)),
+                spot=_to_float(_mget(srow, "price", 0.0)),
+                fut=_to_float(_mget(frow, "price", 0.0)),
+                vol_usd=_to_float(_mget(srow, "turnover_usd", 0.0)),
             )
         )
     return out

@@ -4,14 +4,16 @@ from __future__ import annotations
 import asyncio
 import json
 import random
-from typing import Awaitable, Callable, Dict, Iterable, Iterator, List, Optional
-
-try:
-    from loguru import logger  # type: ignore
-except Exception:  # pragma: no cover
-    import logging
-
-    logger = logging.getLogger("bybit.ws")
+from typing import (
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Protocol,
+)
 
 import aiohttp
 
@@ -19,6 +21,25 @@ import aiohttp
 from src.ws.reconnect import ReconnectPolicy
 
 
+# ---- Logger (loguru if available; falls back to stdlib logging) ----
+class _LoggerLike(Protocol):
+    def debug(self, msg: str, *args, **kwargs) -> None: ...
+    def info(self, msg: str, *args, **kwargs) -> None: ...
+    def warning(self, msg: str, *args, **kwargs) -> None: ...
+    def error(self, msg: str, *args, **kwargs) -> None: ...
+
+
+try:
+    from loguru import logger as _loguru_logger  # type: ignore
+
+    logger: _LoggerLike = _loguru_logger  # structural type compatible
+except Exception:  # pragma: no cover
+    import logging
+
+    logger = logging.getLogger("bybit.ws")
+
+
+# ---- Backoff helper -------------------------------------------------
 def exp_backoff_with_jitter(
     attempt: int,
     *,
@@ -58,6 +79,7 @@ def exp_backoff_with_jitter(
     return max(0.0, delay)
 
 
+# ---- Parsing helpers -------------------------------------------------
 def _to_float(v, default: Optional[float] = None) -> Optional[float]:
     if v is None:
         return default
@@ -150,6 +172,7 @@ def iter_ticker_entries(message: Dict) -> Iterator[Dict]:
     return iter(rows)
 
 
+# ---- Public WS client -----------------------------------------------
 class BybitPublicWS:
     """
     Minimal Bybit v5 public WS client (spot/linear).

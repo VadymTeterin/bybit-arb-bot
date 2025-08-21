@@ -8,6 +8,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from types import ModuleType
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
@@ -22,7 +23,7 @@ from .ws.health import MetricsRegistry  # WS health metrics (singleton)
 
 # Optional Telegram sender: fall back to direct HTTP if infra.telegram is absent
 try:
-    from .infra import send_telegram_message  # type: ignore
+    from .infra import send_telegram_message  # type: ignore[attr-defined]
 except Exception:  # noqa: BLE001
 
     def send_telegram_message(token: str, chat_id: str, text: str):
@@ -33,13 +34,15 @@ except Exception:  # noqa: BLE001
 
 
 # Optional/back-compat modules (used if present)
+_core_alerts: Optional[ModuleType]
 try:
-    from .core import alerts as _core_alerts  # type: ignore
+    from .core import alerts as _core_alerts  # type: ignore[assignment]
 except Exception:  # noqa: BLE001
     _core_alerts = None
 
+_tg_formatters: Optional[ModuleType]
 try:
-    from .telegram import formatters as _tg_formatters  # type: ignore
+    from .telegram import formatters as _tg_formatters  # type: ignore[assignment]
 except Exception:  # noqa: BLE001
     _tg_formatters = None
 
@@ -381,6 +384,8 @@ def _basis_rows(
                 m[sym] = {"price": price_f, "turnover_usd": vol_f}
             return m
 
+        #     spot_map = _map_from_tickers(spot_rows)
+        #     lin_map = _map_from_tickers(lin_rows)
         spot_map = _map_from_tickers(spot_rows)
         lin_map = _map_from_tickers(lin_rows)
 
@@ -483,8 +488,11 @@ def cmd_alerts_preview(args: argparse.Namespace) -> int:
     try:
         client = BybitRest()
         f = client.get_prev_funding(symbol)
-        rate = f.get("funding_rate", None)
-        next_ts = f.get("next_funding_time", None)
+        if isinstance(f, dict):
+            rate = f.get("funding_rate", None)
+            next_ts = f.get("next_funding_time", None)
+        else:
+            rate, next_ts = None, None
     except Exception:
         rate, next_ts = None, None
 
@@ -509,8 +517,11 @@ def _get_funding_with_cache(
         return r, n
     try:
         f = client.get_prev_funding(symbol)
-        rate = f.get("funding_rate", None)
-        next_ts = f.get("next_funding_time", None)
+        if isinstance(f, dict):
+            rate = f.get("funding_rate", None)
+            next_ts = f.get("next_funding_time", None)
+        else:
+            rate, next_ts = None, None
     except Exception:
         rate, next_ts = None, None
     _FUND_CACHE[symbol] = (now, rate, next_ts)
