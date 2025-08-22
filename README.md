@@ -13,6 +13,7 @@
 - [Telegram `/status`](#telegram-status)
 - [Метрики WS](#метрики-ws)
 - [GitHub Daily Digest](#github-daily-digest)
+- [Manual: Schedule / Unschedule](#manual-schedule--unschedule)
 - [Що запускає супервізор](#що-запускає-супервізор)
 - [Корисні CLI-команди](#корисні-cli-команди)
 - [Логи](#логи)
@@ -93,6 +94,40 @@ TG_CHAT_ID=
 
 ## GitHub Daily Digest
 
+
+---
+
+## Manual: Schedule / Unschedule
+
+> **Мета:** автоматично відправляти GitHub Daily Digest щодня о **07:10 (Europe/Kyiv)** через Windows Task Scheduler.
+> Скрипти: `scripts/gh_digest_run.ps1`, `scripts/schedule_gh_digest.ps1`, `scripts/unschedule_gh_digest.ps1`.
+
+### Запланувати щоденний запуск
+```powershell
+# Регіструємо задачу BybitBot-GH-Digest (щодня 07:10 локального часу Windows; має бути Kyiv TZ)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\schedule_gh_digest.ps1
+
+# Перевірити, що задача є
+Get-ScheduledTask | Where-Object { $_.TaskName -like "BybitBot-GH-Digest" } | Format-Table TaskName,State,LastRunTime,NextRunTime
+
+# Разово запустити вручну (smoke)
+Start-ScheduledTask -TaskName "BybitBot-GH-Digest"
+Get-Content .\logs\gh_digest.*.log -Tail 80
+```
+
+### Вимкнути планування
+```powershell
+# Видаляємо задачу з планувальника
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unschedule_gh_digest.ps1
+
+# Перевірка: має нічого не знайти
+Get-ScheduledTask | Where-Object { $_.TaskName -like "BybitBot-GH-Digest" }
+```
+
+> ⚠️ Потрібні змінні `.env`: `GH_TOKEN` (для real‑режиму), `TG_BOT_TOKEN`, `TG_CHAT_ID`.
+> Один digest на **Kyiv‑добу** (троттлінг через `run/gh_digest.sent.YYYY-MM-DD.stamp`). Для повтору використовуйте `--force` в CLI.
+
+
 Функціонал Step-6.0.x: збір активності репозиторію (коміти, PR, теги) за “Kyiv-добу” з можливістю відправки у Telegram.
 
 ### Приклади запуску
@@ -137,6 +172,8 @@ python -m scripts.gh_daily_digest --mock --date 2025-08-22
 ---
 
 ## Логи
+
+- Для планувальника: `logs/gh_digest.YYYY-MM-DD.log`
 
 - `logs/app.log`
 - `logs/supervisor.*.log`

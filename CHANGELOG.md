@@ -4,6 +4,18 @@
 
 ---
 
+## [0.6.1] - 2025-08-22
+### Додано
+- **Step-6.0.4**: Windows Task Scheduler інтеграція для GitHub Daily Digest (щодня о 07:10 Europe/Kyiv).
+  - Нові скрипти: `scripts/gh_digest_run.ps1`, `scripts/schedule_gh_digest.ps1`, `scripts/unschedule_gh_digest.ps1`.
+  - Форсування UTF‑8 для друку в Windows консолі (у раннері + CLI), стабільний вивід emoji.
+### Змінено
+- README.md: додано розділ **Manual: Schedule / Unschedule** (команди для реєстрації/видалення задачі, smoke‑перевірка).
+- Логи: описано `logs/gh_digest.YYYY-MM-DD.log` для Scheduler.
+
+---
+
+
 ## [0.6.0] - 2025-08-22
 ### Додано
 - **Фаза 6 — GitHub Daily Digest**
