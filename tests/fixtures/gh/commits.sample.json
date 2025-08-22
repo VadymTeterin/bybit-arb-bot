@@ -1,0 +1,16 @@
+[
+  {
+    "sha": "111aaa1",
+    "commit": {
+      "author": {"name": "alice", "date": "2025-08-22T06:00:00Z"},
+      "message": "feat: add digest core"
+    }
+  },
+  {
+    "sha": "222bbb2",
+    "commit": {
+      "author": {"name": "bob", "date": "2025-08-22T10:30:00Z"},
+      "message": "docs: update README"
+    }
+  }
+]

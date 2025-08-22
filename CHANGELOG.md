@@ -2,6 +2,39 @@
 
 > Історія змін структурована за фазами і підкроками. Дати подані у форматі YYYY-MM-DD (Europe/Kyiv).
 
+---
+
+## [0.6.1] - 2025-08-22
+### Додано
+- **Step-6.0.4**: Windows Task Scheduler інтеграція для GitHub Daily Digest (щодня о 07:10 Europe/Kyiv).
+  - Нові скрипти: `scripts/gh_digest_run.ps1`, `scripts/schedule_gh_digest.ps1`, `scripts/unschedule_gh_digest.ps1`.
+  - Форсування UTF‑8 для друку в Windows консолі (у раннері + CLI), стабільний вивід emoji.
+### Змінено
+- README.md: додано розділ **Manual: Schedule / Unschedule** (команди для реєстрації/видалення задачі, smoke‑перевірка).
+- Логи: описано `logs/gh_digest.YYYY-MM-DD.log` для Scheduler.
+
+---
+
+
+## [0.6.0] - 2025-08-22
+### Додано
+- **Фаза 6 — GitHub Daily Digest**
+  - Step-6.0.1: каркас (client, report, CLI scaffold, базові тести).
+  - Step-6.0.2: реальна інтеграція з GitHub API (commits, merges, tags), owner/repo прапорці, .env (`GH_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`).
+  - Step-6.0.3: інтеграція з Telegram `--send`, щоденний троттлінг (1 digest/доба), підтримка `--force`, автозавантаження `.env`.
+
+### Змінено
+- README.md: додано розділ **GitHub Daily Digest** з прикладами запуску.
+- .env.example: нові змінні (`GH_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`, `TG_BOT_TOKEN`, `TG_CHAT_ID`).
+
+---
+
+## [0.5.8.4] - 2025-08-19
+### Додано
+- WS стабільність (Step-5.8.4), health-метрики, команда Telegram `/status`.
+- Супервізор (PowerShell контролер + Python supervisor).
+
+
 ## v0.5.8.4 — 2025-08-19
 ### Added
 - **WS stability & monitoring**

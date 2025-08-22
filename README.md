@@ -3,6 +3,7 @@
 > Windows 11 · Python 3.11+ · aiogram 3.7+ · Bybit Public WS/REST
 
 Цей реліз фокусується на **стабільності WebSocket**, **метриках здоровʼя**, сервісній команді **Telegram `/status`** та **зручному запуску під супервізором** на Windows.
+У **Фазі 6** додано модуль **GitHub Daily Digest** з інтеграцією у Telegram.
 
 ---
 
@@ -11,6 +12,8 @@
 - [Запуск під супервізором](#запуск-під-супервізором)
 - [Telegram `/status`](#telegram-status)
 - [Метрики WS](#метрики-ws)
+- [GitHub Daily Digest](#github-daily-digest)
+- [Manual: Schedule / Unschedule](#manual-schedule--unschedule)
 - [Що запускає супервізор](#що-запускає-супервізор)
 - [Корисні CLI-команди](#корисні-cli-команди)
 - [Логи](#логи)
@@ -35,7 +38,7 @@ pip install -r requirements.txt
 
 ### .env (корінь репозиторію)
 
-> Змінні підхоплюються через **python-dotenv** в усіх раннерах (включно з супервізором). Після змін — зробіть `restart`.
+> Змінні підхоплюються через **python-dotenv** в усіх раннерах (включно з супервізором та digest). Після змін — зробіть `restart`.
 
 ```env
 # базові
@@ -49,12 +52,15 @@ TELEGRAM__ALERT_CHAT_ID=123456789
 # Bybit (не обовʼязково для публічних WS/REST)
 BYBIT_API_KEY=
 BYBIT_API_SECRET=
-```
 
-Перевірити, що процес бачить змінні:
+# --- GitHub Daily Digest ---
+GH_TOKEN=
+GITHUB_OWNER=VadymTeterin
+GITHUB_REPO=bybit-arb-bot
 
-```powershell
-python -c "import os; print('TOKEN set:', bool(os.getenv('TELEGRAM__BOT_TOKEN'))); print('CHAT_ID:', os.getenv('TELEGRAM__ALERT_CHAT_ID'))"
+# --- Telegram для Digest ---
+TG_BOT_TOKEN=
+TG_CHAT_ID=
 ```
 
 ---
@@ -64,20 +70,11 @@ python -c "import os; print('TOKEN set:', bool(os.getenv('TELEGRAM__BOT_TOKEN'))
 Контролер (PowerShell 5.1): `scripts/ws_supervisor_ctl.ps1`
 
 ```powershell
-.\scripts\ws_supervisor_ctl.ps1 start         # console-режим (python.exe) з редиректом у logs/
-.\scripts\ws_supervisor_ctl.ps1 status        # PID + останній лог
-.\scripts\ws_supervisor_ctl.ps1 tail -TailLines 200   # “tail -f”
-.\scripts\ws_supervisor_ctl.ps1 restart       # перезапуск (підхопить новий .env)
-.\scripts\ws_supervisor_ctl.ps1 stop          # зупинка
-```
-
-> За замовчуванням — **console-режим** з файлами `logs/supervisor.stdout.log`/`logs/supervisor.stderr.log`.
-> Windowless — `start -NoConsole` / `restart -NoConsole` (менш зручний для дебагу).
-
-Альтернатива:
-
-```powershell
-python -m scripts.ws_bot_supervisor
+.\scripts\ws_supervisor_ctl.ps1 start
+.\scripts\ws_supervisor_ctl.ps1 status
+.\scripts\ws_supervisor_ctl.ps1 tail -TailLines 200
+.\scripts\ws_supervisor_ctl.ps1 restart
+.\scripts\ws_supervisor_ctl.ps1 stop
 ```
 
 ---
@@ -85,80 +82,109 @@ python -m scripts.ws_bot_supervisor
 ## Telegram `/status`
 
 - Напишіть боту `/status` у чат, ID якого вказано у `TELEGRAM__ALERT_CHAT_ID`.
-- Відповідь: JSON-знімок (лічильники `spot`/`linear`, `started_at_utc`, `uptime_ms`, timestamps останніх подій).
-- **aiogram 3.7+**: використовується `DefaultBotProperties` замість застарілого `parse_mode` у конструкторі.
+- Відповідь: JSON-знімок з метриками.
 
 ---
 
 ## Метрики WS
 
-Клас: `src/ws/health.py` — потокобезпечний синглтон-реєстр:
+Клас: `src/ws/health.py` — потокобезпечний синглтон-реєстр.
 
-- Лічильники подій: `spot`, `linear`.
-- Мітки часу останніх подій (per-type і загальна).
-- Аптайм (`started_ts`, `uptime_ms`).
+---
 
-Знімки:
+## GitHub Daily Digest
 
+
+---
+
+## Manual: Schedule / Unschedule
+
+> **Мета:** автоматично відправляти GitHub Daily Digest щодня о **07:10 (Europe/Kyiv)** через Windows Task Scheduler.
+> Скрипти: `scripts/gh_digest_run.ps1`, `scripts/schedule_gh_digest.ps1`, `scripts/unschedule_gh_digest.ps1`.
+
+### Запланувати щоденний запуск
 ```powershell
-python -m src.main ws:health
-python -m src.main ws:health --reset
-python -m scripts.ws_health_cli
+# Регіструємо задачу BybitBot-GH-Digest (щодня 07:10 локального часу Windows; має бути Kyiv TZ)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\schedule_gh_digest.ps1
+
+# Перевірити, що задача є
+Get-ScheduledTask | Where-Object { $_.TaskName -like "BybitBot-GH-Digest" } | Format-Table TaskName,State,LastRunTime,NextRunTime
+
+# Разово запустити вручну (smoke)
+Start-ScheduledTask -TaskName "BybitBot-GH-Digest"
+Get-Content .\logs\gh_digest.*.log -Tail 80
 ```
 
-> Якщо викликаєте з **іншого процесу**, лічильники можуть бути нульові — це очікувано (процесно-локальні метрики).
+### Вимкнути планування
+```powershell
+# Видаляємо задачу з планувальника
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unschedule_gh_digest.ps1
+
+# Перевірка: має нічого не знайти
+Get-ScheduledTask | Where-Object { $_.TaskName -like "BybitBot-GH-Digest" }
+```
+
+> ⚠️ Потрібні змінні `.env`: `GH_TOKEN` (для real‑режиму), `TG_BOT_TOKEN`, `TG_CHAT_ID`.
+> Один digest на **Kyiv‑добу** (троттлінг через `run/gh_digest.sent.YYYY-MM-DD.stamp`). Для повтору використовуйте `--force` в CLI.
+
+
+Функціонал Step-6.0.x: збір активності репозиторію (коміти, PR, теги) за “Kyiv-добу” з можливістю відправки у Telegram.
+
+### Приклади запуску
+
+```powershell
+# Mock + друк у консоль
+python -m scripts.gh_daily_digest --mock --date 2025-08-22
+
+# Реальний режим (GH_TOKEN обовʼязково в .env)
+python -m scripts.gh_daily_digest --no-mock --owner VadymTeterin --repo bybit-arb-bot --date 2025-08-22
+
+# Надсилання у Telegram (1 раз на добу; можна --force для повтору)
+python -m scripts.gh_daily_digest --mock --date 2025-08-22 --send --force
+```
+
+### Особливості
+- **Kyiv-доба**: 00:00–23:59 за Києвом, конвертовано у UTC.
+- **Троттлінг**: один digest на день (мітки у `run/gh_digest.sent.*.stamp`).
+- **.env**: використовує `GH_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`, а також `TG_BOT_TOKEN`, `TG_CHAT_ID`.
 
 ---
 
 ## Що запускає супервізор
 
 `scripts/ws_bot_supervisor.py` піднімає:
-
-- **SPOT WS** — `wss://stream.bybit.com/v5/public/spot`
-- **LINEAR WS** — `wss://stream.bybit.com/v5/public/linear`
-- **Telegram бот** — відповідає на `/status`
-- **Meta refresh** — періодичне оновлення `24h vol` для фільтрів (REST)
-- Повторні спроби через **експоненційний бекоф** (без оверсуту) з `src/ws/backoff.py`
+- **SPOT WS**, **LINEAR WS**
+- **Telegram бот**
+- **Meta refresh**
+- Повторні спроби через **бекоф**.
 
 ---
 
 ## Корисні CLI-команди
 
 ```powershell
-# Пінг Bybit (серверний час)
-python -m src.main bybit:ping
-
-# Превʼю форматування алерту
-python -m src.main alerts:preview --symbol BTCUSDT --spot 50000 --mark 50500 --threshold 1.0
-
-# Тести та автоформат
 pytest -q
 pre-commit run -a
+python -m src.main bybit:ping
+python -m scripts.gh_daily_digest --mock --date 2025-08-22
 ```
 
 ---
 
 ## Логи
 
-- `logs/app.log` — основний лог застосунку (`loguru`).
-- У режимі супервізора (console):
-  - `logs/supervisor.stdout.log`
-  - `logs/supervisor.stderr.log`
+- Для планувальника: `logs/gh_digest.YYYY-MM-DD.log`
 
-Зменшення шуму:
-
-```env
-LOG_LEVEL=INFO
-WS_DEBUG_NORMALIZED=0
-WS_DEBUG_SAMPLE_MS=3000
-```
+- `logs/app.log`
+- `logs/supervisor.*.log`
+- Для digest: стандартний stdout + мітки в `run/`.
 
 ---
 
-## Тести (стан на 2025-08-19)
+## Тести (стан на 2025-08-22)
 
 ```
-107 passed, 1 skipped
+110 passed
 ```
 
 ---
@@ -167,25 +193,23 @@ WS_DEBUG_SAMPLE_MS=3000
 
 ```
 scripts/
-  ws_bot_supervisor.py     # супервізор: WS + Telegram + meta-refresh (1 процес)
-  ws_health_cli.py         # тимчасовий CLI для метрик
-  ws_supervisor_ctl.ps1    # PowerShell-контролер start/stop/status/restart/tail
+  ws_supervisor_ctl.ps1
+  gh_daily_digest.py     # GitHub Daily Digest CLI
 
-src/ws/
-  backoff.py               # експоненційний бекоф (cap, no-overshoot)
-  health.py                # метрики WS (синглтон)
+src/github/
+  client.py              # GitHub API client
 
-src/telegram/
-  bot.py                   # /status
+src/reports/
+  gh_digest.py           # моделі та агрегація Digest
 ```
 
 ---
 
 ## Траблшутінг
 
-- **`TelegramNetworkError: Server disconnected`** — супервізор зробить ретраї з бекофом. Якщо часто — перевірте інтернет/фаєрвол та рівень логів.
-- **Бот не відповідає на `/status`** — перевірте `TELEGRAM__BOT_TOKEN` та `TELEGRAM__ALERT_CHAT_ID` у `.env`, далі `restart`, подивіться `supervisor.stderr.log`.
-- **`pythonw.exe` завершується одразу** — використовуйте console-режим (`start` без `-NoConsole`) для видимих логів.
+- **Digest не відправляє у Telegram** — перевірте `TG_BOT_TOKEN` і `TG_CHAT_ID`.
+- **Rate limit GitHub** — дочекайтесь reset, зменште частоту.
+- **Повторне відправлення Digest** — використовуйте `--force`.
 
 ---
 
