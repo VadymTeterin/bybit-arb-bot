@@ -103,7 +103,7 @@ def parse_commit(item: Dict[str, Any], default_branch: str = "main") -> CommitEv
     committed_at = (
         datetime.fromisoformat(committed_iso.replace("Z", "+00:00"))
         if committed_iso
-        else datetime.utcnow().replace(tzinfo=timezone.utc)
+        else datetime.now(timezone.utc)
     )
     return CommitEvent(
         sha=sha,
@@ -122,7 +122,7 @@ def parse_merge_pr(item: Dict[str, Any], base_fallback: str = "main") -> MergeEv
     merged_at = (
         datetime.fromisoformat(merged_at_iso.replace("Z", "+00:00"))
         if merged_at_iso
-        else datetime.utcnow().replace(tzinfo=timezone.utc)
+        else datetime.now(timezone.utc)
     )
     base_branch = ((item.get("base") or {}) or {}).get("ref") or base_fallback
     return MergeEvent(
@@ -138,7 +138,7 @@ def parse_tag(item: Dict[str, Any]) -> TagEvent:
     name = item.get("name") or ""
     sha = (item.get("commit") or {}).get("sha") or ""
     # No tag date in tags API; caller should enrich with commit date if needed.
-    tagged_at = datetime.utcnow().replace(tzinfo=timezone.utc)
+    tagged_at = datetime.now(timezone.utc)
     return TagEvent(name=name, sha=sha, tagged_at=tagged_at)
 
 
