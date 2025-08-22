@@ -8,3 +8,5 @@
 *.yml  text
 *.yaml text
 *.toml text
+
+tools/coveragerc.digest text eol=lf
