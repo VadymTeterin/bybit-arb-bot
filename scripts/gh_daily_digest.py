@@ -176,10 +176,29 @@ def _send_telegram(text: str) -> None:
     # We intentionally do NOT set parse_mode to avoid escaping headaches; text is plain.
     payload = {"chat_id": chat_id, "text": text, "disable_web_page_preview": True}
 
+    # --- safe debug before request ---
+    try:
+        tok_tail = token[-4:] if len(token) >= 4 else "****"
+        print(f"[debug] telegram target chat_id={chat_id}, token=***{tok_tail}")
+    except Exception:
+        pass
+
     with httpx.Client(timeout=10.0) as client:
         r = client.post(url, data=payload)
         r.raise_for_status()
         data = r.json()
+
+        # --- safe debug after response ---
+        try:
+            res = data.get("result", {}) or {}
+            msg_id = res.get("message_id")
+            chat_dbg = (res.get("chat") or {}).get("id")
+            print(
+                f"[debug] telegram response: ok={data.get('ok')} msg_id={msg_id} chat_id={chat_dbg}"
+            )
+        except Exception:
+            pass
+
         if not data.get("ok", False):
             raise RuntimeError(f"Telegram sendMessage failed: {data}")
 
