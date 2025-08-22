@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import List, Tuple
@@ -14,6 +15,14 @@ try:
     from zoneinfo import ZoneInfo  # Python 3.11+ on Windows 11 has it
 except Exception:  # pragma: no cover
     ZoneInfo = None  # type: ignore
+
+# --- Force UTF-8 for Windows consoles ---
+if os.name == "nt":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 # Try to load .env if present (non-invasive)
 try:
