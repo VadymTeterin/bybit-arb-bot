@@ -1,5 +1,5 @@
 # src/github/client.py
-# (c) Bybit Arb Bot — GitHub Daily Digest client scaffold
+# (c) Bybit Arb Bot — GitHub Daily Digest client
 from __future__ import annotations
 
 import os
@@ -41,7 +41,7 @@ class GitHubClient:
     def _make_headers(self) -> Dict[str, str]:
         headers = {
             "Accept": "application/vnd.github+json",
-            "User-Agent": "bybit-arb-bot-gh-digest/0.1",
+            "User-Agent": "bybit-arb-bot-gh-digest/0.2",
             "X-GitHub-Api-Version": "2022-11-28",
         }
         if self.token:
@@ -100,7 +100,7 @@ class GitHubClient:
         resp = self._request("GET", path, params=params)
         return resp.json()
 
-    # -------- Convenience endpoints (not used by tests; kept for future steps) ----------
+    # -------- Convenience endpoints ----------
     def list_commits(
         self,
         owner: str,
@@ -126,6 +126,12 @@ class GitHubClient:
             if len(data) < per_page:
                 break
             page += 1
+
+    def get_commit(self, owner: str, repo: str, sha: str) -> Dict[str, Any]:
+        """
+        Returns single commit object (includes author/committer dates).
+        """
+        return self.get_json(f"/repos/{owner}/{repo}/commits/{sha}")
 
     def list_pulls_merged(
         self, owner: str, repo: str, *, state: str = "closed", per_page: int = 100
@@ -155,7 +161,7 @@ class GitHubClient:
         self, owner: str, repo: str, *, per_page: int = 100
     ) -> Iterable[Dict[str, Any]]:
         """
-        Yields tags (lightweight annotated). No server-side date filter; caller filters by commit date.
+        Yields tags (lightweight). No server-side date filter; caller filters by commit date.
         """
         page = 1
         while True:

@@ -1,0 +1,16 @@
+[
+  {
+    "number": 7,
+    "title": "fix: ws stability hotpatch",
+    "merged_at": "2025-08-22T08:10:00Z",
+    "merged_by": {"login": "VadymTeterin"},
+    "base": {"ref": "main"}
+  },
+  {
+    "number": 8,
+    "title": "chore: deps",
+    "merged_at": null,
+    "merged_by": {"login": "renovate[bot]"},
+    "base": {"ref": "main"}
+  }
+]
