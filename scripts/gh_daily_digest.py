@@ -1,16 +1,27 @@
 # scripts/gh_daily_digest.py
-# CLI for GitHub Daily Digest — supports --date, --send, mock/real modes (backward-compatible)
+# CLI for GitHub Daily Digest — supports --date, --send, mock/real modes, daily throttle
 from __future__ import annotations
 
 import argparse
 import os
 from datetime import date, datetime, timezone
+from pathlib import Path
 from typing import List, Tuple
+
+import httpx
 
 try:
     from zoneinfo import ZoneInfo  # Python 3.11+ on Windows 11 has it
 except Exception:  # pragma: no cover
     ZoneInfo = None  # type: ignore
+
+# Try to load .env if present (non-invasive)
+try:
+    from dotenv import load_dotenv  # type: ignore
+
+    load_dotenv()
+except Exception:
+    pass
 
 from src.github.client import GitHubClient
 from src.reports.gh_digest import (
@@ -26,6 +37,8 @@ from src.reports.gh_digest import (
 )
 
 KYIV_TZ = ZoneInfo("Europe/Kyiv") if ZoneInfo else None  # for "today" resolution
+RUN_DIR = Path("run")
+RUN_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _today_kyiv() -> date:
@@ -118,6 +131,50 @@ def _collect_real_events(
     return commits, merges, tags
 
 
+# -------- Telegram sending --------
+
+
+def _throttle_stamp_path(date_kyiv: date) -> Path:
+    # one send per Kyiv-day
+    return RUN_DIR / f"gh_digest.sent.{date_kyiv.isoformat()}.stamp"
+
+
+def _should_send_today(date_kyiv: date) -> bool:
+    return not _throttle_stamp_path(date_kyiv).exists()
+
+
+def _mark_sent_today(date_kyiv: date) -> None:
+    _throttle_stamp_path(date_kyiv).write_text("sent", encoding="utf-8")
+
+
+def _send_telegram(text: str) -> None:
+    """
+    Sends a plain-text message to Telegram via Bot API.
+    Requires env vars: TG_BOT_TOKEN, TG_CHAT_ID
+    """
+    token = (
+        os.getenv("TG_BOT_TOKEN")
+        or os.getenv("TG_TOKEN")
+        or os.getenv("TELEGRAM_BOT_TOKEN")
+    )
+    chat_id = os.getenv("TG_CHAT_ID")
+    if not token or not chat_id:
+        raise RuntimeError(
+            "Telegram credentials are missing: set TG_BOT_TOKEN and TG_CHAT_ID in environment/.env"
+        )
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    # We intentionally do NOT set parse_mode to avoid escaping headaches; text is plain.
+    payload = {"chat_id": chat_id, "text": text, "disable_web_page_preview": True}
+
+    with httpx.Client(timeout=10.0) as client:
+        r = client.post(url, data=payload)
+        r.raise_for_status()
+        data = r.json()
+        if not data.get("ok", False):
+            raise RuntimeError(f"Telegram sendMessage failed: {data}")
+
+
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="GitHub Daily Digest")
     parser.add_argument(
@@ -138,7 +195,7 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument(
         "--send",
         action="store_true",
-        help="Send the digest message (reserved; prints hint)",
+        help="Send the digest message to Telegram (one per Kyiv-day; see --force)",
     )
     # Backward-compatible flags:
     parser.add_argument(
@@ -149,6 +206,10 @@ def main(argv: List[str] | None = None) -> int:
         action="store_true",
         help="Use real GitHub API instead of offline mock data",
     )
+    # Throttle control:
+    parser.add_argument(
+        "--force", action="store_true", help="Bypass daily throttle and send anyway"
+    )
     args = parser.parse_args(argv)
 
     d = date.fromisoformat(args.date) if args.date else _today_kyiv()
@@ -158,7 +219,7 @@ def main(argv: List[str] | None = None) -> int:
     if args.no_mock:
         use_mock = False
     elif args.mock:
-        use_mock = True  # explicit mock wins only if --no-mock not set
+        use_mock = True
 
     if use_mock:
         commits, merges, tags = _mock_events(d)
@@ -172,9 +233,20 @@ def main(argv: List[str] | None = None) -> int:
     print(text)
 
     if args.send:
-        print(
-            "\n[send] NOTE: Sending is not wired in Step-6.0.2. We will integrate Telegram in Step-6.0.3."
-        )
+        if not args.force and not _should_send_today(d):
+            print(
+                "\n[send] Skipped: daily throttle (already sent for this Kyiv-day). Use --force to override."
+            )
+            return 0
+        try:
+            _send_telegram(text)
+            _mark_sent_today(d)
+            print("\n[send] OK: digest sent to Telegram.")
+        except Exception as e:
+            # Do not leak secrets; show concise error
+            print(f"\n[send] ERROR: {e.__class__.__name__}: {e}")
+            return 2
+
     return 0
 
 
