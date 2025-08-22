@@ -1,0 +1,10 @@
+[run]
+branch = True
+include =
+    src/reports/gh_digest.py
+
+[report]
+skip_covered = True
+show_missing = True
+fail_under = 90
+precision = 0
