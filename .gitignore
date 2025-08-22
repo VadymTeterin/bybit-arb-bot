@@ -137,3 +137,6 @@ t -q
 /run/
 /logs/
 *.log
+
+# GH digest throttle stamps
+run/gh_digest.sent.*.stamp
