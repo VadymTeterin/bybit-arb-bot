@@ -1,14 +1,14 @@
-# Bybit Arbitrage Bot — WS Stability, Health & Telegram `/status` (Step 5.8.4)
+# Bybit Arbitrage Bot — GitHub Daily Digest + WS Stability (v0.6.2)
 
-> Windows 11 · Python 3.11+ · aiogram 3.7+ · Bybit Public WS/REST
+> Windows 11 · Python 3.11+ · aiogram 3.7+ · Bybit Public WS/REST · GitHub API
 
-Цей реліз фокусується на **стабільності WebSocket**, **метриках здоровʼя**, сервісній команді **Telegram `/status`** та **зручному запуску під супервізором** на Windows.
-У **Фазі 6** додано модуль **GitHub Daily Digest** з інтеграцією у Telegram.
+Цей реліз додає **GitHub Daily Digest** та робить клієнт GitHub значно надійнішим завдяки **автоматичним ретраям з бекофом** і коректній обробці **rate-limit**. Також збережено фокус на **стабільності WebSocket**, **метриках здоровʼя** та сервісній команді **Telegram `/status`**.
 
 ---
 
 ## Зміст
 - [Швидкий старт](#швидкий-старт)
+- [.env](#env)
 - [Запуск під супервізором](#запуск-під-супервізором)
 - [Telegram `/status`](#telegram-status)
 - [Метрики WS](#метрики-ws)
@@ -36,7 +36,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### .env (корінь репозиторію)
+## .env
 
 > Змінні підхоплюються через **python-dotenv** в усіх раннерах (включно з супервізором та digest). Після змін — зробіть `restart`.
 
@@ -94,41 +94,12 @@ TG_CHAT_ID=
 
 ## GitHub Daily Digest
 
+**Що це:** зведення активності репозиторію (коміти, PR/мерджі, теги) за **«Kyiv-добу»** з можливістю відправки у Telegram.
 
----
-
-## Manual: Schedule / Unschedule
-
-> **Мета:** автоматично відправляти GitHub Daily Digest щодня о **07:10 (Europe/Kyiv)** через Windows Task Scheduler.
-> Скрипти: `scripts/gh_digest_run.ps1`, `scripts/schedule_gh_digest.ps1`, `scripts/unschedule_gh_digest.ps1`.
-
-### Запланувати щоденний запуск
-```powershell
-# Регіструємо задачу BybitBot-GH-Digest (щодня 07:10 локального часу Windows; має бути Kyiv TZ)
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\schedule_gh_digest.ps1
-
-# Перевірити, що задача є
-Get-ScheduledTask | Where-Object { $_.TaskName -like "BybitBot-GH-Digest" } | Format-Table TaskName,State,LastRunTime,NextRunTime
-
-# Разово запустити вручну (smoke)
-Start-ScheduledTask -TaskName "BybitBot-GH-Digest"
-Get-Content .\logs\gh_digest.*.log -Tail 80
-```
-
-### Вимкнути планування
-```powershell
-# Видаляємо задачу з планувальника
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unschedule_gh_digest.ps1
-
-# Перевірка: має нічого не знайти
-Get-ScheduledTask | Where-Object { $_.TaskName -like "BybitBot-GH-Digest" }
-```
-
-> ⚠️ Потрібні змінні `.env`: `GH_TOKEN` (для real‑режиму), `TG_BOT_TOKEN`, `TG_CHAT_ID`.
-> Один digest на **Kyiv‑добу** (троттлінг через `run/gh_digest.sent.YYYY-MM-DD.stamp`). Для повтору використовуйте `--force` в CLI.
-
-
-Функціонал Step-6.0.x: збір активності репозиторію (коміти, PR, теги) за “Kyiv-добу” з можливістю відправки у Telegram.
+**Надійність GitHub клієнта (v0.6.2):**
+- Ретраї з експоненційним бекофом для `429/5xx` та тимчасових помилок мережі.
+- Повага до заголовків **`Retry-After`** та **`X-RateLimit-Reset`** (із верхньою межею очікування).
+- Юніт-тести покривають сценарії: `500→200`, `429 (Retry-After)`, `rate-limit reset`, «неретраємі» `4xx`.
 
 ### Приклади запуску
 
@@ -150,11 +121,43 @@ python -m scripts.gh_daily_digest --mock --date 2025-08-22 --send --force
 
 ---
 
+## Manual: Schedule / Unschedule
+
+> **Мета:** автоматично відправляти GitHub Daily Digest щодня о **07:10 (Europe/Kyiv)** через Windows Task Scheduler.
+> Скрипти: `scripts/gh_digest_run.ps1`, `scripts/schedule_gh_digest.ps1`, `scripts/unschedule_gh_digest.ps1`.
+
+### Запланувати щоденний запуск
+```powershell
+# Регіструємо задачу BybitBot-GH-Digest (щодня 07:10 локального часу Windows; має бути Kyiv TZ)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\schedule_gh_digest.ps1
+
+# Перевіряємо, що задача зʼявилася
+Get-ScheduledTask | Where-Object { $_.TaskName -like "BybitBot-GH-Digest" } | Format-Table TaskName,State,LastRunTime,NextRunTime
+
+# Разово запустити вручну (smoke)
+Start-ScheduledTask -TaskName "BybitBot-GH-Digest"
+Get-Content .\logs\gh_digest.*.log -Tail 80
+```
+
+### Вимкнути планування
+```powershell
+# Видаляємо задачу з планувальника
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unschedule_gh_digest.ps1
+
+# Перевірка: має нічого не знайти
+Get-ScheduledTask | Where-Object { $_.TaskName -like "BybitBot-GH-Digest" }
+```
+
+> ⚠️ Потрібні змінні `.env`: `GH_TOKEN` (для real-режиму), `TG_BOT_TOKEN`, `TG_CHAT_ID`.
+> Один digest на **Kyiv-добу** (троттлінг через `run/gh_digest.sent.YYYY-MM-DD.stamp`). Для повтору використовуйте `--force`.
+
+---
+
 ## Що запускає супервізор
 
 `scripts/ws_bot_supervisor.py` піднімає:
 - **SPOT WS**, **LINEAR WS**
-- **Telegram бот**
+- **Telegram-бот**
 - **Meta refresh**
 - Повторні спроби через **бекоф**.
 
@@ -174,18 +177,14 @@ python -m scripts.gh_daily_digest --mock --date 2025-08-22
 ## Логи
 
 - Для планувальника: `logs/gh_digest.YYYY-MM-DD.log`
-
-- `logs/app.log`
-- `logs/supervisor.*.log`
-- Для digest: стандартний stdout + мітки в `run/`.
+- Загальні: `logs/app.log`, `logs/supervisor.*.log`
+- Для digest: stdout + мітки в `run/`.
 
 ---
 
-## Тести (стан на 2025-08-22)
+## Тести
 
-```
-110 passed
-```
+- Локально та в CI: ✅ **pre-commit** (ruff/format/isort) і ✅ **unit tests** (Digest, GitHubClient, core).
 
 ---
 
@@ -197,10 +196,13 @@ scripts/
   gh_daily_digest.py     # GitHub Daily Digest CLI
 
 src/github/
-  client.py              # GitHub API client
+  client.py              # GitHub API client (ретраї/бекоф, rate-limit guard)
 
 src/reports/
   gh_digest.py           # моделі та агрегація Digest
+
+tests/
+  test_github_client_retry.py   # юніт-тести ретраїв GitHub клієнта
 ```
 
 ---
@@ -208,7 +210,7 @@ src/reports/
 ## Траблшутінг
 
 - **Digest не відправляє у Telegram** — перевірте `TG_BOT_TOKEN` і `TG_CHAT_ID`.
-- **Rate limit GitHub** — дочекайтесь reset, зменште частоту.
+- **Rate limit GitHub** — дочекайтесь reset; при необхідності зменште частоту.
 - **Повторне відправлення Digest** — використовуйте `--force`.
 
 ---
