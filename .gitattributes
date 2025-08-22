@@ -10,3 +10,17 @@
 *.toml text
 
 tools/coveragerc.digest text eol=lf
+# Canonical LF для кросплатформених файлів
+*.py   text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+*.sh   text eol=lf
+tools/coveragerc.digest text eol=lf
+
+# Windows-native скрипти
+*.ps1  text eol=crlf
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
