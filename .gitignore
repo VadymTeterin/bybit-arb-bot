@@ -142,3 +142,4 @@ t -q
 run/gh_digest.sent.*.stamp
 
 tools/coveragerc.digest
+artifacts/
