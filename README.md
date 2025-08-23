@@ -1,74 +1,174 @@
-# Bybit Arbitrage Bot — GitHub Daily Digest + WS Stability (v0.6.2)
+# Bybit Arbitrage Bot
 
-> Windows 11 · Python 3.11+ · aiogram 3.7+ · Bybit Public WS/REST · GitHub API
+> Windows 11 · Python 3.11+ · aiogram 3 · Bybit REST & WebSocket v5 · pydantic-settings v2
 
-Цей реліз додає **GitHub Daily Digest** та робить клієнт GitHub значно надійнішим завдяки **автоматичним ретраям з бекофом** і коректній обробці **rate-limit**. Також збережено фокус на **стабільності WebSocket**, **метриках здоровʼя** та сервісній команді **Telegram `/status`**.
+**Мета:** Telegram-бот, що в реальному часі аналізує базис між **Spot** та **USDT-перпетуалами** на Bybit, відбирає **топ-3** монети за порогом (за замовчуванням **1%**), застосовує фільтри ліквідності, зберігає історію та надсилає алерти у Telegram з троттлінгом.
 
 ---
 
 ## Зміст
-- [Швидкий старт](#швидкий-старт)
-- [.env](#env)
-- [Запуск під супервізором](#запуск-під-супервізором)
-- [Telegram `/status`](#telegram-status)
-- [Метрики WS](#метрики-ws)
-- [GitHub Daily Digest](#github-daily-digest)
-- [Manual: Schedule / Unschedule](#manual-schedule--unschedule)
-- [CI: Digest E2E Smoke (Step-6.0.6)](#ci-digest-e2e-smoke-step-606)
-- [Що запускає супервізор](#що-запускає-супервізор)
-- [Корисні CLI-команди](#корисні-cli-команди)
-- [Логи](#логи)
-- [Тести](#тести)
-- [Структура проєкту (скорочено)](#структура-проєкту-скорочено)
+- [Особливості](#особливості)
+- [Вимоги](#вимоги)
+- [Швидкий старт (PowerShell)](#швидкий-старт-powershell)
+- [Конфігурація](#конфігурація)
+  - [Nested ключі (рекомендовано)](#nested-ключі-рекомендовано)
+  - [Сумісність зі старими flat-ключами](#сумісність-зі-старими-flatключами)
+  - [Програмний доступ](#програмний-доступ)
+- [Запуск](#запуск)
+  - [CLI (локальний smoke)](#cli-локальний-smoke)
+  - [Під супервізором](#під-супервізором)
+  - [Telegram-команди](#telegramкоманди)
+- [Тести та якість коду](#тести-та-якість-коду)
+- [Структура проєкту](#структура-проєкту)
+- [CI/CD](#cicd)
 - [Траблшутінг](#траблшутінг)
 - [Ліцензія](#ліцензія)
 
 ---
 
-## Швидкий старт
+## Особливості
+
+- ⚡ **WS-стріми** Bybit v5 (spot + linear) із автоперепідключенням і троттлінгом алертів
+- 🧮 **Basis%** між spot і ф’ючерсами, **Top-3** монети понад поріг
+- 💧 **Фільтри ліквідності**: 24h обсяг (USD), мінімальна ціна
+- 📨 **Telegram-алерти** з форматуванням, антиспам (**cooldown** на монету)
+- 🧱 **pydantic-settings v2**: валідовані секції конфігурації + **back-compat** зі старими ключами
+- 🗄️ **SQLite / Parquet** для історії (сигнали, котирування)
+- 🧪 **pytest** + **ruff/black/isort/mypy** через **pre-commit**
+- 🔧 Windows-орієнтований DX: інструкції лише для **PowerShell / VS Code “Термінал”**
+
+---
+
+## Вимоги
+
+- Windows 11
+- Python **3.11+**
+- Доступ до Інтернету (Wi-Fi до 1 Гбіт, роутер Archer A64 — ок)
+- Токени: **Telegram Bot Token**, **Telegram Chat ID** (для надсилання алертів)
+- (Опційно) **Bybit API Key/Secret** для приватних методів; публічні WS/REST працюють і без них
+
+---
+
+## Швидкий старт (PowerShell)
 
 ```powershell
-git clone <your-repo-url> bybit-arb-bot
+# 1) Клон репозиторію
+git clone https://github.com/VadymTeterin/bybit-arb-bot.git
 cd bybit-arb-bot
 
+# 2) Віртуальне середовище
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
-pip install -r requirements.txt
+# 3) Залежності
+pip install -r .
+equirements.txt
+
+# 4) Конфіг
+Copy-Item .\.env.example .\.env
+# заповніть TELEGRAM__TOKEN, TELEGRAM__CHAT_ID, (опційно) BYBIT__API_KEY/SECRET
+
+# 5) Перевірка
+pytest -q
+pre-commit run -a
 ```
 
-## .env
+> **Безпека:** ніколи не комітьте `.env`. Файл уже у `.gitignore`.
 
-> Змінні підхоплюються через **python-dotenv** в усіх раннерах (включно з супервізором та digest). Після змін — зробіть `restart`.
+---
+
+## Конфігурація
+
+Файл-лоадер: `src/infra/config.py` (pydantic-settings v2, **nested delimiter** `__`).
+Пріоритет: **Environment** → **.env** → **дефолти в коді**.
+Булеві: `true/false`, `1/0`, `yes/no`, `on/off` (без урахування регістру).
+Списки (CSV): `BTCUSDT,ETHUSDT` → `["BTCUSDT", "ETHUSDT"]`.
+
+### Nested ключі (рекомендовано)
 
 ```env
-# базові
-WS_ENABLED=1
-LOG_LEVEL=INFO
+RUNTIME__ENV=dev
+RUNTIME__ENABLE_ALERTS=true
+RUNTIME__DB_PATH=./data/signals.db
+RUNTIME__TOP_N_REPORT=10
 
-# Telegram (обовʼязково для /status і алертів)
-TELEGRAM__BOT_TOKEN=123456:AA...
-TELEGRAM__ALERT_CHAT_ID=123456789
+TELEGRAM__TOKEN=
+TELEGRAM__CHAT_ID=
 
-# Bybit (не обовʼязково для публічних WS/REST)
-BYBIT_API_KEY=
-BYBIT_API_SECRET=
+BYBIT__API_KEY=
+BYBIT__API_SECRET=
+# BYBIT__WS_PUBLIC_URL_LINEAR=wss://stream.bybit.com/v5/public/linear
+# BYBIT__WS_PUBLIC_URL_SPOT=wss://stream.bybit.com/v5/public/spot
+# BYBIT__WS_SUB_TOPICS_LINEAR=tickers.BTCUSDT,tickers.ETHUSDT
+# BYBIT__WS_SUB_TOPICS_SPOT=tickers.BTCUSDT,tickers.ETHUSDT
 
-# --- GitHub Daily Digest ---
-GH_TOKEN=
-GITHUB_OWNER=VadymTeterin
-GITHUB_REPO=bybit-arb-bot
+ALERTS__THRESHOLD_PCT=1.0      # 0..100
+ALERTS__COOLDOWN_SEC=300       # 0..86400
 
-# --- Telegram для Digest (CI notify) ---
-TG_BOT_TOKEN=
-TG_CHAT_ID=
+LIQUIDITY__MIN_VOL_24H_USD=10000000
+LIQUIDITY__MIN_PRICE=0.001
+```
+
+**Валідація:**
+- `ALERTS__THRESHOLD_PCT` ∈ `[0..100]`
+- `ALERTS__COOLDOWN_SEC` ∈ `[0..86400]`
+- `LIQUIDITY__MIN_VOL_24H_USD` ≥ `0`, `LIQUIDITY__MIN_PRICE` ≥ `0`
+- `RUNTIME__TOP_N_REPORT` ∈ `[1..100]`
+
+### Сумісність зі старими flat-ключами
+
+Усі legacy-ключі **підтримуються**. Якщо задано і nested, і flat — **flat переважає**.
+
+| Nested (recommended)                        | Legacy (supported)                                          |
+|---------------------------------------------|-------------------------------------------------------------|
+| `RUNTIME__ENV`                              | `ENV`                                                       |
+| `RUNTIME__DB_PATH`                          | `DB_PATH`                                                   |
+| `RUNTIME__TOP_N_REPORT`                     | `TOP_N_REPORT`                                              |
+| `RUNTIME__ENABLE_ALERTS`                    | `ENABLE_ALERTS`                                             |
+| `TELEGRAM__TOKEN`                           | `TELEGRAM_TOKEN`, `TELEGRAM_BOT_TOKEN`                      |
+| `TELEGRAM__CHAT_ID`                         | `TELEGRAM_CHAT_ID`, `TG_CHAT_ID`, `TELEGRAM_ALERT_CHAT_ID`  |
+| `BYBIT__API_KEY`                            | `BYBIT_API_KEY`                                             |
+| `BYBIT__API_SECRET`                         | `BYBIT_API_SECRET`                                          |
+| `ALERTS__THRESHOLD_PCT`                     | `ALERT_THRESHOLD_PCT`                                       |
+| `ALERTS__COOLDOWN_SEC`                      | `ALERT_COOLDOWN_SEC`                                        |
+| `LIQUIDITY__MIN_VOL_24H_USD`                | `MIN_VOL_24H_USD`                                           |
+| `LIQUIDITY__MIN_PRICE`                      | `MIN_PRICE`                                                 |
+| `BYBIT__WS_PUBLIC_URL_LINEAR`               | `WS_PUBLIC_URL_LINEAR` *(override)*                         |
+| `BYBIT__WS_PUBLIC_URL_SPOT`                 | `WS_PUBLIC_URL_SPOT` *(override)*                           |
+| `BYBIT__WS_SUB_TOPICS_LINEAR`               | `WS_SUB_TOPICS_LINEAR` *(override)*                         |
+| `BYBIT__WS_SUB_TOPICS_SPOT`                 | `WS_SUB_TOPICS_SPOT` *(override)*                           |
+
+### Програмний доступ
+
+```python
+# comments: English only
+from src.infra.config import load_settings
+
+s = load_settings()
+print("env:", s.env)                                  # mirrors s.runtime.env
+print("enable_alerts:", s.enable_alerts)              # mirrors s.runtime.enable_alerts
+print("alerts:", s.alerts.threshold_pct, s.alerts.cooldown_sec)
+print("liquidity:", s.liquidity.min_vol_24h_usd, s.liquidity.min_price)
+print("telegram token present:", bool(s.telegram.token))  # never print secrets
 ```
 
 ---
 
-## Запуск під супервізором
+## Запуск
 
-Контролер (PowerShell 5.1): `scripts/ws_supervisor_ctl.ps1`
+### CLI (локальний smoke)
+
+```powershell
+# топ-3 за дефолтним порогом
+python -m src.main basis:alert --limit 3
+
+# із кастомним порогом і мінімальним обсягом
+python -m src.main basis:alert --limit 3 --threshold 0.8 --min-vol 12000000
+```
+
+### Під супервізором
+
+Скрипт керування (PowerShell): `scripts/ws_supervisor_ctl.ps1`
 
 ```powershell
 .\scripts\ws_supervisor_ctl.ps1 start
@@ -78,172 +178,67 @@ TG_CHAT_ID=
 .\scripts\ws_supervisor_ctl.ps1 stop
 ```
 
----
+Логи: `logs/app.log`, `logs/supervisor.*.log`. PID: `run/supervisor.pid`.
 
-## Telegram `/status`
+### Telegram-команди
 
-- Напишіть боту `/status` у чат, ID якого вказано у `TELEGRAM__ALERT_CHAT_ID`.
-- Відповідь: JSON-знімок з метриками.
-
----
-
-## Метрики WS
-
-Клас: `src/ws/health.py` — потокобезпечний синглтон-реєстр.
+- `/start` — коротка довідка і параметри
+- `/top3` — поточні топ-3 монети
+- `/set_threshold 1.5` — змінити поріг у %
+- `/status` — перевірка стану (WS/REST/алерти)
+- `/report` — зведення за період
 
 ---
 
-## GitHub Daily Digest
-
-**Що це:** зведення активності репозиторію (коміти, PR/мерджі, теги) за **«Kyiv-добу»** з можливістю відправки у Telegram.
-
-**Надійність GitHub клієнта (v0.6.2):**
-- Ретраї з експоненційним бекофом для `429/5xx` та тимчасових помилок мережі.
-- Повага до заголовків **`Retry-After`** та **`X-RateLimit-Reset`** (із верхньою межею очікування).
-- Юніт-тести покривають сценарії: `500→200`, `429 (Retry-After)`, `rate-limit reset`, «неретраємі» `4xx`.
-
-### Приклади запуску
-
-```powershell
-# Mock + друк у консоль
-python -m scripts.gh_daily_digest --mock --date 2025-08-22
-
-# Реальний режим (GH_TOKEN обовʼязково в .env)
-python -m scripts.gh_daily_digest --no-mock --owner VadymTeterin --repo bybit-arb-bot --date 2025-08-22
-
-# Надсилання у Telegram (1 раз на добу; можна --force для повтору)
-python -m scripts.gh_daily_digest --mock --date 2025-08-22 --send --force
-```
-
-### Особливості
-- **Kyiv-доба**: 00:00–23:59 за Києвом, конвертовано у UTC.
-- **Троттлінг**: один digest на день (мітки у `run/gh_digest.sent.*.stamp`).
-- **.env**: використовує `GH_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`, а також `TG_BOT_TOKEN`, `TG_CHAT_ID`.
-
----
-
-## Manual: Schedule / Unschedule
-
-> **Мета:** автоматично відправляти GitHub Daily Digest щодня о **07:10 (Europe/Kyiv)** через Windows Task Scheduler.
-> Скрипти: `scripts/gh_digest_run.ps1`, `scripts/schedule_gh_digest.ps1`, `scripts/unschedule_gh_digest.ps1`.
-
-### Запланувати щоденний запуск
-```powershell
-# Регіструємо задачу BybitBot-GH-Digest (щодня 07:10 локального часу Windows; має бути Kyiv TZ)
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\schedule_gh_digest.ps1
-
-# Перевіряємо, що задача зʼявилася
-Get-ScheduledTask | Where-Object { $_.TaskName -like "BybitBot-GH-Digest" } | Format-Table TaskName,State,LastRunTime,NextRunTime
-
-# Разово запустити вручну (smoke)
-Start-ScheduledTask -TaskName "BybitBot-GH-Digest"
-Get-Content .\logs\gh_digest.*.log -Tail 80
-```
-
-### Вимкнути планування
-```powershell
-# Видаляємо задачу з планувальника
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\unschedule_gh_digest.ps1
-
-# Перевірка: має нічого не знайти
-Get-ScheduledTask | Where-Object { $_.TaskName -like "BybitBot-GH-Digest" }
-```
-
-> ⚠️ Потрібні змінні `.env`: `GH_TOKEN` (для real-режиму), `TG_BOT_TOKEN`, `TG_CHAT_ID`.
-> Один digest на **Kyiv-добу** (троттлінг через `run/gh_digest.sent.YYYY-MM-DD.stamp`). Для повтору використовуйте `--force`.
-
----
-
-## CI: Digest E2E Smoke (Step-6.0.6)
-
-**Що робить:** збирає псевдо-дайджест (`tools/digest_smoke.py`) і публікує як артефакт `digest-smoke-<run_id>`; опційно шле повідомлення в Telegram.
-
-**Secrets (Repo → Settings → Secrets → Actions):**
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_CHAT_ID`
-
-**Запуск у GitHub UI:**
-- Actions → **Digest E2E Smoke** → **Run workflow** (обрати гілку).
-
-**Запуск через gh CLI (PowerShell):**
-```powershell
-# Список воркфлоу
-gh workflow list
-# Ручний запуск на гілці
-gh workflow run .github/workflows/digest-e2e-smoke.yml --ref step-6.0.6-digest-e2e
-# Знайти RUN_ID workflow_dispatch
-gh run list --workflow digest-e2e-smoke.yml --branch step-6.0.6-digest-e2e --event workflow_dispatch --limit 5
-# Подивитись логи / скачати ZIP логів
-gh run view <RUN_ID> --log
-gh api "repos/$(gh repo view --json nameWithOwner -q .nameWithOwner)/actions/runs/<RUN_ID>/logs" --output run_<RUN_ID>.zip
-# Завантажити артефакт
-gh run download <RUN_ID> -n "digest-smoke-<RUN_ID>" -D artifacts
-```
-
----
-
-## Що запускає супервізор
-
-`scripts/ws_bot_supervisor.py` піднімає:
-- **SPOT WS**, **LINEAR WS**
-- **Telegram-бот**
-- **Meta refresh**
-- Повторні спроби через **бекоф**.
-
----
-
-## Корисні CLI-команди
+## Тести та якість коду
 
 ```powershell
 pytest -q
 pre-commit run -a
-python -m src.main bybit:ping
-python -m scripts.gh_daily_digest --mock --date 2025-08-22
 ```
 
----
-
-## Логи
-
-- Для планувальника: `logs/gh_digest.YYYY-MM-DD.log`
-- Загальні: `logs/app.log`, `logs/supervisor.*.log`
-- Для digest: stdout + мітки в `run/`.
+**pre-commit** (repo-level): `ruff`, `ruff-format`, `isort`, `black`, `mypy`, trim-whitespace, EOF check.
+Гайд-коммітів: **Conventional Commits** (наприклад, `feat(config): ...`).
 
 ---
 
-## Тести
-
-- Локально та в CI: ✅ **pre-commit** (ruff/format/isort) і ✅ **unit tests** (Digest, GitHubClient, core).
-
----
-
-## Структура проєкту (скорочено)
+## Структура проєкту
 
 ```
+src/
+  core/                 # business-логіка (basis, selector, alerts)
+  infra/                # конфіг, логування, сховище, планувальник
+    config.py           # pydantic-settings v2 (nested + back-compat)
+  telegram/             # bot handlers, форматування повідомлень
+  bybit/                # REST/WS клієнти, утиліти
+  storage/              # SQLite/Parquet
 scripts/
-  ws_supervisor_ctl.ps1
-  gh_daily_digest.py     # GitHub Daily Digest CLI
-
-src/github/
-  client.py              # GitHub API client (ретраї/бекоф, rate-limit guard)
-
-src/reports/
-  gh_digest.py           # моделі та агрегація Digest
-
-tests/
-  test_github_client_retry.py   # юніт-тести ретраїв GitHub клієнта
+  ws_supervisor_ctl.ps1 # керування рантаймом
+  gh_daily_digest.py    # (опц.) GitHub Daily Digest CLI
+tests/                  # pytest (юніт + інтеграційні)
 ```
+
+---
+
+## CI/CD
+
+- **GitHub Actions**: лінтинг (ruff/black/isort), тести (pytest), типізація (mypy)
+- **Reusable notify** workflow з передачею `secrets: inherit`
+- **Digest E2E Smoke**: збірка дайджесту, артефакт, опційне повідомлення у Telegram
+
+> Secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, (опц.) `GH_TOKEN`.
 
 ---
 
 ## Траблшутінг
 
-- **Digest не відправляє у Telegram** — перевірте `TG_BOT_TOKEN` і `TG_CHAT_ID`.
-- **Rate limit GitHub** — дочекайтесь reset; при необхідності зменште частоту.
-- **Повторне відправлення Digest** — використовуйте `--force`.
+- **`pip install -r requirements.txt` падає через \x00** — не використовуйте `-Encoding Unicode` для `requirements.txt`; зберігайте в **UTF-8**.
+- **`git diff` «нескінченний»** — ви у пейджері; натисніть `q` для виходу або `git --no-pager diff`.
+- **CRLF/LF попередження** — додайте `.gitattributes` із правилами EOL; Python-файли краще з **LF**.
+- **Digest не шле у Telegram** — перевірте `TELEGRAM_TOKEN/CHAT_ID` (секрети не логуються).
 
 ---
 
 ## Ліцензія
 
-MIT
+MIT © 2025
