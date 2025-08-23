@@ -1,5 +1,7 @@
 # Bybit Arbitrage Bot
 
+[![Digest E2E Smoke](https://github.com/VadymTeterin/bybit-arb-bot/actions/workflows/digest-e2e-smoke.yml/badge.svg?branch=main)](https://github.com/VadymTeterin/bybit-arb-bot/actions/workflows/digest-e2e-smoke.yml)
+
 > Windows 11 · Python 3.11+ · aiogram 3 · Bybit REST & WebSocket v5 · pydantic-settings v2
 
 **Мета:** Telegram-бот, що в реальному часі аналізує базис між **Spot** та **USDT-перпетуалами** на Bybit, відбирає **топ-3** монети за порогом (за замовчуванням **1%**), застосовує фільтри ліквідності, зберігає історію та надсилає алерти у Telegram з троттлінгом.
@@ -12,12 +14,12 @@
 - [Швидкий старт (PowerShell)](#швидкий-старт-powershell)
 - [Конфігурація](#конфігурація)
   - [Nested ключі (рекомендовано)](#nested-ключі-рекомендовано)
-  - [Сумісність зі старими flat-ключами](#сумісність-зі-старими-flatключами)
+  - [Сумісність зі старими flat-ключами](#сумісність-зі-старими-flat-ключами)
   - [Програмний доступ](#програмний-доступ)
 - [Запуск](#запуск)
   - [CLI (локальний smoke)](#cli-локальний-smoke)
   - [Під супервізором](#під-супервізором)
-  - [Telegram-команди](#telegramкоманди)
+  - [Telegram-команди](#telegram-команди)
 - [Тести та якість коду](#тести-та-якість-коду)
 - [Структура проєкту](#структура-проєкту)
 - [CI/CD](#cicd)
@@ -43,8 +45,8 @@
 
 - Windows 11
 - Python **3.11+**
-- Доступ до Інтернету (Wi-Fi до 1 Гбіт, роутер Archer A64 — ок)
-- Токени: **Telegram Bot Token**, **Telegram Chat ID** (для надсилання алертів)
+- Інтернет (Wi-Fi до 1 Гбіт, роутер Archer A64 — ок)
+- Токени: **Telegram Bot Token**, **Telegram Chat ID**
 - (Опційно) **Bybit API Key/Secret** для приватних методів; публічні WS/REST працюють і без них
 
 ---
@@ -66,7 +68,7 @@ equirements.txt
 
 # 4) Конфіг
 Copy-Item .\.env.example .\.env
-# заповніть TELEGRAM__TOKEN, TELEGRAM__CHAT_ID, (опційно) BYBIT__API_KEY/SECRET
+# заповніть TELEGRAM__TOKEN, TELEGRAM__CHAT_ID, (опц.) BYBIT__API_KEY/SECRET
 
 # 5) Перевірка
 pytest -q
@@ -79,7 +81,7 @@ pre-commit run -a
 
 ## Конфігурація
 
-Файл-лоадер: `src/infra/config.py` (pydantic-settings v2, **nested delimiter** `__`).
+Файл-лоадер: `src/infra/config.py` (**pydantic-settings v2**, роздільник **`__`**).
 Пріоритет: **Environment** → **.env** → **дефолти в коді**.
 Булеві: `true/false`, `1/0`, `yes/no`, `on/off` (без урахування регістру).
 Списки (CSV): `BTCUSDT,ETHUSDT` → `["BTCUSDT", "ETHUSDT"]`.
@@ -141,7 +143,6 @@ LIQUIDITY__MIN_PRICE=0.001
 ### Програмний доступ
 
 ```python
-# comments: English only
 from src.infra.config import load_settings
 
 s = load_settings()
@@ -197,8 +198,8 @@ pytest -q
 pre-commit run -a
 ```
 
-**pre-commit** (repo-level): `ruff`, `ruff-format`, `isort`, `black`, `mypy`, trim-whitespace, EOF check.
-Гайд-коммітів: **Conventional Commits** (наприклад, `feat(config): ...`).
+**pre-commit**: `ruff`, `ruff-format`, `isort`, `black`, `mypy`, trim-whitespace, EOF check.
+Комміти — у стилі **Conventional Commits**.
 
 ---
 
@@ -206,16 +207,14 @@ pre-commit run -a
 
 ```
 src/
-  core/                 # business-логіка (basis, selector, alerts)
-  infra/                # конфіг, логування, сховище, планувальник
-    config.py           # pydantic-settings v2 (nested + back-compat)
-  telegram/             # bot handlers, форматування повідомлень
-  bybit/                # REST/WS клієнти, утиліти
-  storage/              # SQLite/Parquet
+  core/
+  infra/
+    config.py
+  telegram/
+  bybit/
+  storage/
 scripts/
-  ws_supervisor_ctl.ps1 # керування рантаймом
-  gh_daily_digest.py    # (опц.) GitHub Daily Digest CLI
-tests/                  # pytest (юніт + інтеграційні)
+tests/
 ```
 
 ---
@@ -223,17 +222,15 @@ tests/                  # pytest (юніт + інтеграційні)
 ## CI/CD
 
 - **GitHub Actions**: лінтинг (ruff/black/isort), тести (pytest), типізація (mypy)
-- **Reusable notify** workflow з передачею `secrets: inherit`
+- **Reusable notify** workflow з `secrets: inherit`
 - **Digest E2E Smoke**: збірка дайджесту, артефакт, опційне повідомлення у Telegram
-
-> Secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, (опц.) `GH_TOKEN`.
 
 ---
 
 ## Траблшутінг
 
-- **`pip install -r requirements.txt` падає через \x00** — не використовуйте `-Encoding Unicode` для `requirements.txt`; зберігайте в **UTF-8**.
-- **`git diff` «нескінченний»** — ви у пейджері; натисніть `q` для виходу або `git --no-pager diff`.
+- **`pip install -r requirements.txt` падає через \x00** — не використовуйте `-Encoding Unicode` для `requirements.txt`; зберігайте файл у **UTF-8**.
+- **`git diff` «нескінченний»** — ви у пейджері; натисніть `q` або використайте `git --no-pager diff`.
 - **CRLF/LF попередження** — додайте `.gitattributes` із правилами EOL; Python-файли краще з **LF**.
 - **Digest не шле у Telegram** — перевірте `TELEGRAM_TOKEN/CHAT_ID` (секрети не логуються).
 
