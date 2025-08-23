@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Notify Telegram (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      ref_name:   { required: true, type: string }
+      run_number: { required: true, type: string }
+      run_id:     { required: true, type: string }
+      repository: { required: true, type: string }
+      server_url: { required: true, type: string }
+    secrets:
+      TELEGRAM_BOT_TOKEN:
+        required: false
+      TELEGRAM_CHAT_ID:
+        required: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    # Витягуємо секрети в job-level env
+    env:
+      TG_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TG_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+
+    steps:
+      - name: Send Telegram message (only if secrets exist)
+        # ТЕПЕР перевіряємо env, а не secrets — це дозволено
+        if: ${{ env.TG_BOT_TOKEN != '' && env.TG_CHAT_ID != '' }}
+        shell: bash
+        run: |
+          RUN_URL="${{ inputs.server_url }}/${{ inputs.repository }}/actions/runs/${{ inputs.run_id }}"
+          TEXT="✅ Digest E2E smoke passed on ${{ inputs.ref_name }} (#${{ inputs.run_number }}). Artifact: see ${RUN_URL}"
+          curl -sS -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+               -d chat_id="${TG_CHAT_ID}" \
+               --data-urlencode "text=${TEXT}" > /dev/null

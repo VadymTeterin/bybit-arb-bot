@@ -1,0 +1,63 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Digest E2E Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main", "develop", "step-6.0*", "feature/**" ]
+    paths:
+      - "tools/digest_smoke.py"
+      - ".github/workflows/digest-e2e-smoke.yml"
+      - ".github/workflows/_notify-telegram.yml"
+      - "tests/e2e/**"
+      - "src/**"
+      - "requirements.txt"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 20
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Generate pseudo digest
+        run: |
+          python tools/digest_smoke.py --out artifacts/digest-${{ github.run_id }}.md --json artifacts/digest-${{ github.run_id }}.json --limit 10
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-smoke-${{ github.run_id }}
+          path: artifacts/
+
+      - name: Run smoke test
+        run: |
+          pytest -q tests/e2e/test_digest_smoke.py
+
+  notify:
+    needs: smoke
+    if: ${{ needs.smoke.result == 'success' }}
+    uses: ./.github/workflows/_notify-telegram.yml
+    with:
+      ref_name:   ${{ github.ref_name }}
+      run_number: ${{ github.run_number }}
+      run_id:     ${{ github.run_id }}
+      repository: ${{ github.repository }}
+      server_url: ${{ github.server_url }}
+    secrets:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}

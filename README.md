@@ -14,6 +14,7 @@
 - [Метрики WS](#метрики-ws)
 - [GitHub Daily Digest](#github-daily-digest)
 - [Manual: Schedule / Unschedule](#manual-schedule--unschedule)
+- [CI: Digest E2E Smoke (Step-6.0.6)](#ci-digest-e2e-smoke-step-606)
 - [Що запускає супервізор](#що-запускає-супервізор)
 - [Корисні CLI-команди](#корисні-cli-команди)
 - [Логи](#логи)
@@ -58,7 +59,7 @@ GH_TOKEN=
 GITHUB_OWNER=VadymTeterin
 GITHUB_REPO=bybit-arb-bot
 
-# --- Telegram для Digest ---
+# --- Telegram для Digest (CI notify) ---
 TG_BOT_TOKEN=
 TG_CHAT_ID=
 ```
@@ -150,6 +151,34 @@ Get-ScheduledTask | Where-Object { $_.TaskName -like "BybitBot-GH-Digest" }
 
 > ⚠️ Потрібні змінні `.env`: `GH_TOKEN` (для real-режиму), `TG_BOT_TOKEN`, `TG_CHAT_ID`.
 > Один digest на **Kyiv-добу** (троттлінг через `run/gh_digest.sent.YYYY-MM-DD.stamp`). Для повтору використовуйте `--force`.
+
+---
+
+## CI: Digest E2E Smoke (Step-6.0.6)
+
+**Що робить:** збирає псевдо-дайджест (`tools/digest_smoke.py`) і публікує як артефакт `digest-smoke-<run_id>`; опційно шле повідомлення в Telegram.
+
+**Secrets (Repo → Settings → Secrets → Actions):**
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+
+**Запуск у GitHub UI:**
+- Actions → **Digest E2E Smoke** → **Run workflow** (обрати гілку).
+
+**Запуск через gh CLI (PowerShell):**
+```powershell
+# Список воркфлоу
+gh workflow list
+# Ручний запуск на гілці
+gh workflow run .github/workflows/digest-e2e-smoke.yml --ref step-6.0.6-digest-e2e
+# Знайти RUN_ID workflow_dispatch
+gh run list --workflow digest-e2e-smoke.yml --branch step-6.0.6-digest-e2e --event workflow_dispatch --limit 5
+# Подивитись логи / скачати ZIP логів
+gh run view <RUN_ID> --log
+gh api "repos/$(gh repo view --json nameWithOwner -q .nameWithOwner)/actions/runs/<RUN_ID>/logs" --output run_<RUN_ID>.zip
+# Завантажити артефакт
+gh run download <RUN_ID> -n "digest-smoke-<RUN_ID>" -D artifacts
+```
 
 ---
 
