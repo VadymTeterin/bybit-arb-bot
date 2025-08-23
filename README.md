@@ -15,6 +15,7 @@
 - [Конфігурація](#конфігурація)
   - [Nested ключі (рекомендовано)](#nested-ключі-рекомендовано)
   - [Сумісність зі старими flat-ключами](#сумісність-зі-старими-flat-ключами)
+  - [Мікроблок: Пріоритет ключів для alerts](#мікроблок-пріоритет-ключів-для-alerts)
   - [Програмний доступ](#програмний-доступ)
 - [Запуск](#запуск)
   - [CLI (локальний smoke)](#cli-локальний-smoke)
@@ -63,8 +64,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
 # 3) Залежності
-pip install -r .
-equirements.txt
+pip install -r requirements.txt
 
 # 4) Конфіг
 Copy-Item .\.env.example .\.env
@@ -139,6 +139,18 @@ LIQUIDITY__MIN_PRICE=0.001
 | `BYBIT__WS_PUBLIC_URL_SPOT`                 | `WS_PUBLIC_URL_SPOT` *(override)*                           |
 | `BYBIT__WS_SUB_TOPICS_LINEAR`               | `WS_SUB_TOPICS_LINEAR` *(override)*                         |
 | `BYBIT__WS_SUB_TOPICS_SPOT`                 | `WS_SUB_TOPICS_SPOT` *(override)*                           |
+
+### Мікроблок: Пріоритет ключів для alerts
+
+> Якщо одночасно задано `ALERTS__THRESHOLD_PCT` (nested) і `ALERT_THRESHOLD_PCT` (flat),
+> перемагає **flat**. Так само для `COOLDOWN_SEC`.
+>
+> **Рекомендація:** у файлах `.env` використовуйте **nested**-ключі. **Flat** залишайте для CI/Secrets.
+> **Windows cleanup (якщо “липнуть” глобальні змінні):**
+> ```powershell
+> Remove-Item Env:ALERT_THRESHOLD_PCT -ErrorAction SilentlyContinue
+> [Environment]::SetEnvironmentVariable('ALERT_THRESHOLD_PCT',$null,'User')
+> ```
 
 ### Програмний доступ
 
