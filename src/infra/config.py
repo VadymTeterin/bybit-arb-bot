@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
-from typing import List, Optional
+from typing import List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Autoload .env (stdlib loader lives in src/infra/dotenv_autoload.py)
@@ -16,7 +16,7 @@ autoload_env()
 
 
 def _csv_list(x: object) -> List[str]:
-    """Нормалізувати CSV/список у List[str]."""
+    """Normalize CSV/list into List[str]."""
     if x is None:
         return []
     if isinstance(x, (list, tuple)):
@@ -26,16 +26,54 @@ def _csv_list(x: object) -> List[str]:
     return []
 
 
+def _from_env_many(*names: str, default: str = "") -> str:
+    """Return the first non-empty value among the given env var names."""
+    for n in names:
+        v = os.getenv(n)
+        if v not in (None, ""):
+            return v
+    return default
+
+
+def _from_env_many_float(*names: str, default: float | None = None) -> float | None:
+    raw = _from_env_many(*names, default="" if default is None else str(default))
+    try:
+        return float(raw) if raw != "" else default
+    except ValueError:
+        return default
+
+
+def _from_env_many_int(*names: str, default: int | None = None) -> int | None:
+    raw = _from_env_many(*names, default="" if default is None else str(default))
+    try:
+        return int(float(raw)) if raw != "" else default
+    except ValueError:
+        return default
+
+
+def _from_env_many_bool(*names: str, default: bool | None = None) -> bool | None:
+    raw = _from_env_many(*names, default="" if default is None else str(default))
+    if raw == "":
+        return default
+    val = str(raw).strip().lower()
+    if val in {"1", "true", "yes", "y", "on"}:
+        return True
+    if val in {"0", "false", "no", "n", "off"}:
+        return False
+    return default
+
+
 # ------------------- Nested models -------------------
 
 
 class TelegramConfig(BaseModel):
-    # ВАЖЛИВО: без alias, щоби працювало TELEGRAM__TOKEN / TELEGRAM__CHAT_ID
+    """Telegram settings."""
+
     token: Optional[str] = None
-    # chat_id зручно зберігати як str (Bot API приймає рядок або int)
+    # Bot API accepts str or int; we keep str for convenience
     chat_id: Optional[str] = None
 
-    # Back-compat властивості (main.py/_tg_fields можуть очікувати їх)
+    # Back-compat properties (some code may expect these)
     @property
     def bot_token(self) -> Optional[str]:
         return self.token
@@ -46,23 +84,66 @@ class TelegramConfig(BaseModel):
 
 
 class BybitConfig(BaseModel):
+    """Bybit settings (API & WS)."""
+
     api_key: Optional[str] = None
     api_secret: Optional[str] = None
 
-    # WS параметри з дефолтами (щоб `python -m src.main env` щось показував навіть без .env)
+    # Default WS endpoints (so env demo works even without .env)
     ws_public_url_linear: Optional[str] = "wss://stream.bybit.com/v5/public/linear"
     ws_public_url_spot: Optional[str] = "wss://stream.bybit.com/v5/public/spot"
 
-    # Топіки можна задавати або як CSV-рядок, або як список у .env
+    # Topics can be CSV or list via .env
     ws_sub_topics_linear: Optional[str | List[str]] = "tickers.BTCUSDT,tickers.ETHUSDT"
     ws_sub_topics_spot: Optional[str | List[str]] = "tickers.BTCUSDT,tickers.ETHUSDT"
+
+
+class AlertsConfig(BaseModel):
+    """Alert thresholds & throttling (validated)."""
+
+    threshold_pct: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=100.0,
+        description="Basis % threshold to trigger an alert (0..100).",
+    )
+    cooldown_sec: int = Field(
+        default=300,
+        ge=0,
+        le=86_400,
+        description="Per-symbol cooldown to avoid spam, seconds (0..86400).",
+    )
+
+
+class LiquidityConfig(BaseModel):
+    """Liquidity filters (validated)."""
+
+    min_vol_24h_usd: float = Field(
+        default=10_000_000.0,
+        ge=0.0,
+        description="Minimum 24h USD volume to consider asset liquid.",
+    )
+    min_price: float = Field(
+        default=0.001,
+        ge=0.0,
+        description="Minimum last price to exclude very low-priced assets.",
+    )
+
+
+class RuntimeConfig(BaseModel):
+    """Runtime behavior & misc toggles (validated)."""
+
+    env: Literal["dev", "prod"] = "dev"
+    db_path: str = "data/signals.db"
+    top_n_report: int = Field(default=10, ge=1, le=100)
+    enable_alerts: bool = True
 
 
 # ------------------- Root settings -------------------
 
 
 class AppSettings(BaseSettings):
-    # Конфіг Pydantic v2
+    # Pydantic v2 settings config
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -70,31 +151,30 @@ class AppSettings(BaseSettings):
         extra="ignore",
     )
 
-    # Загальні
+    # ---------- EXISTING TOP-LEVEL FIELDS (back-compat kept) ----------
+    # General
     env: str = "dev"
 
-    # Пороги/кулдауни
+    # Thresholds / cooldowns
     alert_threshold_pct: float = 1.0
     alert_cooldown_sec: int = 300
 
-    # Фільтри
+    # Filters
     min_vol_24h_usd: float = 10_000_000.0
     min_price: float = 0.001
 
-    # Шлях до БД
+    # DB path
     db_path: str = "data/signals.db"
 
-    # Репорт
+    # Report / runtime
     top_n_report: int = 10
-
-    # Увімкнення алертів
     enable_alerts: bool = True
 
-    # Списки дозволених/заборонених символів (можна CSV у .env)
+    # Allowed/denied symbol lists (CSV or list in .env)
     allow_symbols: Optional[str | List[str]] = None
     deny_symbols: Optional[str | List[str]] = None
 
-    # WS опції (тут — «пласкі» поля для back-compat; основні — у BybitConfig)
+    # WS options (flat fields for back-compat; primary values live in BybitConfig)
     ws_enabled: bool = True
     ws_public_url_linear: Optional[str] = None
     ws_public_url_spot: Optional[str] = None
@@ -102,16 +182,18 @@ class AppSettings(BaseSettings):
     ws_sub_topics_spot: Optional[str | List[str]] = None
     ws_reconnect_max_sec: Optional[int] = 30
 
-    # Runtime-мета
+    # Runtime meta
     rt_meta_refresh_sec: int = 30
     rt_log_passes: int = 1
 
-    # Вкладені секції
+    # ---------- NEW NESTED SECTIONS ----------
     telegram: TelegramConfig = TelegramConfig()
     bybit: BybitConfig = BybitConfig()
+    alerts: AlertsConfig = AlertsConfig()
+    liquidity: LiquidityConfig = LiquidityConfig()
+    runtime: RuntimeConfig = RuntimeConfig()
 
-    # --------- Зручні computed-властивості ---------
-
+    # --------- Handy computed properties (kept) ---------
     @property
     def allow_symbols_list(self) -> List[str]:
         return _csv_list(self.allow_symbols)
@@ -122,7 +204,7 @@ class AppSettings(BaseSettings):
 
     @property
     def ws_topics_list_linear(self) -> List[str]:
-        # back-compat: дехто може читати саме це ім'я
+        # back-compat: some code may read this name
         src = self.ws_sub_topics_linear or self.bybit.ws_sub_topics_linear
         return _csv_list(src)
 
@@ -133,49 +215,137 @@ class AppSettings(BaseSettings):
         return _csv_list(src)
 
 
-# ------------------- Loader with fallbacks -------------------
+# ------------------- Loader with merging/validation -------------------
 
 
 @lru_cache(maxsize=1)
 def load_settings() -> AppSettings:
     """
-    Завантажити налаштування з .env / env vars.
+    Load settings from .env / env vars with hardening.
 
-    Включає back-compat містки:
-      - Пласкі TELEGRAM_TOKEN / TG_CHAT_ID / TELEGRAM_BOT_TOKEN / TELEGRAM_ALERT_CHAT_ID
-        → у nested telegram.token / telegram.chat_id, якщо ті порожні
-      - Підхоплення «пласких» WS-полів на верхньому рівні, якщо вони відсутні у bybit.*
+    Back-compat bridges included:
+      - Flat TELEGRAM_* / TG_* → nested telegram.token / telegram.chat_id if nested empty
+      - Flat WS fields on top-level used if bybit.* absent
+      - Flat legacy keys for alerts/liquidity/runtime override nested sections
+      - Final instance is reconstructed so that top-level mirrors nested (single source of truth)
     """
-    # Ідемпотентне автозавантаження (на випадок, якщо імпорт модуля пропущено)
-    autoload_env()
+    autoload_env()  # idempotent
 
-    s = AppSettings()
+    # 1) First pass: parse everything the usual way (nested & flat)
+    base = AppSettings()
 
-    # --- Back-compat для пласких Telegram-перемінних ---
-    token_flat = (
-        os.getenv("TELEGRAM__TOKEN")
-        or os.getenv("TELEGRAM_TOKEN")
-        or os.getenv("TELEGRAM_BOT_TOKEN")
+    # 2) Build nested sections with overrides from flat legacy keys (if present)
+    telegram = TelegramConfig(
+        token=_from_env_many(
+            "TELEGRAM__TOKEN",
+            "TELEGRAM_TOKEN",
+            "TELEGRAM_BOT_TOKEN",
+            default=base.telegram.token or "",
+        ),
+        chat_id=_from_env_many(
+            "TELEGRAM__CHAT_ID",
+            "TELEGRAM_CHAT_ID",
+            "TG_CHAT_ID",
+            "TELEGRAM_ALERT_CHAT_ID",
+            default=base.telegram.chat_id or "",
+        ),
     )
-    chat_flat = (
-        os.getenv("TELEGRAM__CHAT_ID")
-        or os.getenv("TELEGRAM_CHAT_ID")
-        or os.getenv("TG_CHAT_ID")
-        or os.getenv("TELEGRAM_ALERT_CHAT_ID")
-    )
-    if not getattr(getattr(s, "telegram", None), "token", None) and token_flat:
-        s.telegram.token = token_flat
-    if not getattr(getattr(s, "telegram", None), "chat_id", None) and chat_flat:
-        s.telegram.chat_id = chat_flat
 
-    # --- Back-compat для WS-полів (верхній рівень vs. bybit.*) ---
-    # 1) URL-и
+    bybit = BybitConfig(
+        api_key=_from_env_many(
+            "BYBIT__API_KEY", "BYBIT_API_KEY", default=base.bybit.api_key or ""
+        ),
+        api_secret=_from_env_many(
+            "BYBIT__API_SECRET", "BYBIT_API_SECRET", default=base.bybit.api_secret or ""
+        ),
+        ws_public_url_linear=base.bybit.ws_public_url_linear,
+        ws_public_url_spot=base.bybit.ws_public_url_spot,
+        ws_sub_topics_linear=base.bybit.ws_sub_topics_linear,
+        ws_sub_topics_spot=base.bybit.ws_sub_topics_spot,
+    )
+
+    alerts = AlertsConfig(
+        threshold_pct=_from_env_many_float(
+            "ALERTS__THRESHOLD_PCT",
+            "ALERT_THRESHOLD_PCT",
+            default=base.alerts.threshold_pct,
+        )
+        or base.alerts.threshold_pct,
+        cooldown_sec=_from_env_many_int(
+            "ALERTS__COOLDOWN_SEC",
+            "ALERT_COOLDOWN_SEC",
+            default=base.alerts.cooldown_sec,
+        )
+        or base.alerts.cooldown_sec,
+    )
+
+    liquidity = LiquidityConfig(
+        min_vol_24h_usd=_from_env_many_float(
+            "LIQUIDITY__MIN_VOL_24H_USD",
+            "MIN_VOL_24H_USD",
+            default=base.liquidity.min_vol_24h_usd,
+        )
+        or base.liquidity.min_vol_24h_usd,
+        min_price=_from_env_many_float(
+            "LIQUIDITY__MIN_PRICE", "MIN_PRICE", default=base.liquidity.min_price
+        )
+        or base.liquidity.min_price,
+    )
+
+    runtime = RuntimeConfig(
+        env=_from_env_many("RUNTIME__ENV", "ENV", default=base.runtime.env)
+        or base.runtime.env,
+        db_path=_from_env_many(
+            "RUNTIME__DB_PATH", "DB_PATH", default=base.runtime.db_path
+        )
+        or base.runtime.db_path,
+        top_n_report=_from_env_many_int(
+            "RUNTIME__TOP_N_REPORT", "TOP_N_REPORT", default=base.runtime.top_n_report
+        )
+        or base.runtime.top_n_report,
+        enable_alerts=_from_env_many_bool(
+            "RUNTIME__ENABLE_ALERTS",
+            "ENABLE_ALERTS",
+            default=base.runtime.enable_alerts,
+        )
+        if _from_env_many("RUNTIME__ENABLE_ALERTS", "ENABLE_ALERTS", default="") != ""
+        else base.runtime.enable_alerts,
+    )
+
+    # 3) Reconstruct final AppSettings so validation is applied and
+    #    top-level values mirror nested sections (single source of truth)
+    s = AppSettings(
+        # keep existing top-levels but source them from nested validated values where applicable
+        env=runtime.env,
+        alert_threshold_pct=alerts.threshold_pct,
+        alert_cooldown_sec=alerts.cooldown_sec,
+        min_vol_24h_usd=liquidity.min_vol_24h_usd,
+        min_price=liquidity.min_price,
+        db_path=runtime.db_path,
+        top_n_report=runtime.top_n_report,
+        enable_alerts=runtime.enable_alerts,
+        allow_symbols=base.allow_symbols,
+        deny_symbols=base.deny_symbols,
+        ws_enabled=base.ws_enabled,
+        ws_public_url_linear=base.ws_public_url_linear,
+        ws_public_url_spot=base.ws_public_url_spot,
+        ws_sub_topics_linear=base.ws_sub_topics_linear,
+        ws_sub_topics_spot=base.ws_sub_topics_spot,
+        ws_reconnect_max_sec=base.ws_reconnect_max_sec,
+        rt_meta_refresh_sec=base.rt_meta_refresh_sec,
+        rt_log_passes=base.rt_log_passes,
+        telegram=telegram,
+        bybit=bybit,
+        alerts=alerts,
+        liquidity=liquidity,
+        runtime=runtime,
+    )
+
+    # 4) Additional back-compat for WS fields (top-level vs bybit.*)
     if not s.ws_public_url_linear and s.bybit.ws_public_url_linear:
         s.ws_public_url_linear = s.bybit.ws_public_url_linear
     if not s.ws_public_url_spot and s.bybit.ws_public_url_spot:
         s.ws_public_url_spot = s.bybit.ws_public_url_spot
-
-    # 2) Топіки
     if s.ws_sub_topics_linear is None and s.bybit.ws_sub_topics_linear is not None:
         s.ws_sub_topics_linear = s.bybit.ws_sub_topics_linear
     if s.ws_sub_topics_spot is None and s.bybit.ws_sub_topics_spot is not None:
