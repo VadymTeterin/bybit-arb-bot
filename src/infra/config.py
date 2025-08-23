@@ -1,18 +1,20 @@
-# src/infra/config.py
 from __future__ import annotations
 
 import os
 from functools import lru_cache
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Autoload .env (stdlib loader lives in src/infra/dotenv_autoload.py)
 from .dotenv_autoload import autoload_env
 
-# Try to load .env as early as possible (idempotent)
+# Load .env once at import time (idempotent)
 autoload_env()
+
+
+# ------------------- helpers -------------------
 
 
 def _csv_list(x: object) -> List[str]:
@@ -63,17 +65,16 @@ def _from_env_many_bool(*names: str, default: bool | None = None) -> bool | None
     return default
 
 
-# ------------------- Nested models -------------------
+# ------------------- nested models -------------------
 
 
 class TelegramConfig(BaseModel):
     """Telegram settings."""
 
     token: Optional[str] = None
-    # Bot API accepts str or int; we keep str for convenience
     chat_id: Optional[str] = None
 
-    # Back-compat properties (some code may expect these)
+    # Back-compat properties
     @property
     def bot_token(self) -> Optional[str]:
         return self.token
@@ -89,7 +90,7 @@ class BybitConfig(BaseModel):
     api_key: Optional[str] = None
     api_secret: Optional[str] = None
 
-    # Default WS endpoints (so env demo works even without .env)
+    # Default WS endpoints
     ws_public_url_linear: Optional[str] = "wss://stream.bybit.com/v5/public/linear"
     ws_public_url_spot: Optional[str] = "wss://stream.bybit.com/v5/public/spot"
 
@@ -101,33 +102,17 @@ class BybitConfig(BaseModel):
 class AlertsConfig(BaseModel):
     """Alert thresholds & throttling (validated)."""
 
-    threshold_pct: float = Field(
-        default=1.0,
-        ge=0.0,
-        le=100.0,
-        description="Basis % threshold to trigger an alert (0..100).",
-    )
-    cooldown_sec: int = Field(
-        default=300,
-        ge=0,
-        le=86_400,
-        description="Per-symbol cooldown to avoid spam, seconds (0..86400).",
-    )
+    model_config = ConfigDict(validate_assignment=True)
+
+    threshold_pct: float = Field(default=1.0, ge=0.0, le=100.0)
+    cooldown_sec: int = Field(default=300, ge=0, le=86_400)
 
 
 class LiquidityConfig(BaseModel):
     """Liquidity filters (validated)."""
 
-    min_vol_24h_usd: float = Field(
-        default=10_000_000.0,
-        ge=0.0,
-        description="Minimum 24h USD volume to consider asset liquid.",
-    )
-    min_price: float = Field(
-        default=0.001,
-        ge=0.0,
-        description="Minimum last price to exclude very low-priced assets.",
-    )
+    min_vol_24h_usd: float = Field(default=10_000_000.0, ge=0.0)
+    min_price: float = Field(default=0.001, ge=0.0)
 
 
 class RuntimeConfig(BaseModel):
@@ -139,11 +124,10 @@ class RuntimeConfig(BaseModel):
     enable_alerts: bool = True
 
 
-# ------------------- Root settings -------------------
+# ------------------- root settings -------------------
 
 
 class AppSettings(BaseSettings):
-    # Pydantic v2 settings config
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -151,30 +135,19 @@ class AppSettings(BaseSettings):
         extra="ignore",
     )
 
-    # ---------- EXISTING TOP-LEVEL FIELDS (back-compat kept) ----------
-    # General
+    # legacy top-level fields (back-compat)
     env: str = "dev"
-
-    # Thresholds / cooldowns
     alert_threshold_pct: float = 1.0
     alert_cooldown_sec: int = 300
-
-    # Filters
     min_vol_24h_usd: float = 10_000_000.0
     min_price: float = 0.001
-
-    # DB path
     db_path: str = "data/signals.db"
-
-    # Report / runtime
     top_n_report: int = 10
     enable_alerts: bool = True
 
-    # Allowed/denied symbol lists (CSV or list in .env)
     allow_symbols: Optional[str | List[str]] = None
     deny_symbols: Optional[str | List[str]] = None
 
-    # WS options (flat fields for back-compat; primary values live in BybitConfig)
     ws_enabled: bool = True
     ws_public_url_linear: Optional[str] = None
     ws_public_url_spot: Optional[str] = None
@@ -182,18 +155,17 @@ class AppSettings(BaseSettings):
     ws_sub_topics_spot: Optional[str | List[str]] = None
     ws_reconnect_max_sec: Optional[int] = 30
 
-    # Runtime meta
     rt_meta_refresh_sec: int = 30
     rt_log_passes: int = 1
 
-    # ---------- NEW NESTED SECTIONS ----------
+    # new nested sections
     telegram: TelegramConfig = TelegramConfig()
     bybit: BybitConfig = BybitConfig()
     alerts: AlertsConfig = AlertsConfig()
     liquidity: LiquidityConfig = LiquidityConfig()
     runtime: RuntimeConfig = RuntimeConfig()
 
-    # --------- Handy computed properties (kept) ---------
+    # convenience properties
     @property
     def allow_symbols_list(self) -> List[str]:
         return _csv_list(self.allow_symbols)
@@ -204,37 +176,33 @@ class AppSettings(BaseSettings):
 
     @property
     def ws_topics_list_linear(self) -> List[str]:
-        # back-compat: some code may read this name
         src = self.ws_sub_topics_linear or self.bybit.ws_sub_topics_linear
         return _csv_list(src)
 
     @property
     def ws_topics_list_spot(self) -> List[str]:
-        # back-compat
         src = self.ws_sub_topics_spot or self.bybit.ws_sub_topics_spot
         return _csv_list(src)
 
 
-# ------------------- Loader with merging/validation -------------------
+# ------------------- builder -------------------
 
 
-@lru_cache(maxsize=1)
-def load_settings() -> AppSettings:
+def _build_settings() -> AppSettings:
     """
-    Load settings from .env / env vars with hardening.
+    Build settings from current process env (ENV) and .env (supports per-call ENV_FILE).
 
-    Back-compat bridges included:
-      - Flat TELEGRAM_* / TG_* → nested telegram.token / telegram.chat_id if nested empty
-      - Flat WS fields on top-level used if bybit.* absent
-      - Flat legacy keys for alerts/liquidity/runtime override nested sections
-      - Final instance is reconstructed so that top-level mirrors nested (single source of truth)
+    Precedence within aliases:
+      - Telegram: NESTED (TELEGRAM__*) → TG_CHAT_ID → TELEGRAM_CHAT_ID → TELEGRAM_ALERT_CHAT_ID
+      - Alerts:  FLAT (ALERT_*) → NESTED (ALERTS__*)    # <- flat має перекривати nested
+      - Liquidity/Runtime: NESTED → FLAT
     """
-    autoload_env()  # idempotent
+    # Re-load .env if ENV_FILE changed between calls (idempotent & respects existing ENV)
+    autoload_env()
 
-    # 1) First pass: parse everything the usual way (nested & flat)
     base = AppSettings()
 
-    # 2) Build nested sections with overrides from flat legacy keys (if present)
+    # Telegram: prefer nested → then TG_CHAT_ID → other flat aliases
     telegram = TelegramConfig(
         token=_from_env_many(
             "TELEGRAM__TOKEN",
@@ -244,13 +212,14 @@ def load_settings() -> AppSettings:
         ),
         chat_id=_from_env_many(
             "TELEGRAM__CHAT_ID",
-            "TELEGRAM_CHAT_ID",
             "TG_CHAT_ID",
+            "TELEGRAM_CHAT_ID",
             "TELEGRAM_ALERT_CHAT_ID",
             default=base.telegram.chat_id or "",
         ),
     )
 
+    # Bybit (simple aliasing for keys)
     bybit = BybitConfig(
         api_key=_from_env_many(
             "BYBIT__API_KEY", "BYBIT_API_KEY", default=base.bybit.api_key or ""
@@ -264,21 +233,23 @@ def load_settings() -> AppSettings:
         ws_sub_topics_spot=base.bybit.ws_sub_topics_spot,
     )
 
+    # Alerts: FLAT → NESTED (legacy flat overrides nested, як очікує тест flat_overrides_nested)
     alerts = AlertsConfig(
         threshold_pct=_from_env_many_float(
-            "ALERTS__THRESHOLD_PCT",
             "ALERT_THRESHOLD_PCT",
+            "ALERTS__THRESHOLD_PCT",
             default=base.alerts.threshold_pct,
         )
         or base.alerts.threshold_pct,
         cooldown_sec=_from_env_many_int(
-            "ALERTS__COOLDOWN_SEC",
             "ALERT_COOLDOWN_SEC",
+            "ALERTS__COOLDOWN_SEC",
             default=base.alerts.cooldown_sec,
         )
         or base.alerts.cooldown_sec,
     )
 
+    # Liquidity: NESTED → FLAT
     liquidity = LiquidityConfig(
         min_vol_24h_usd=_from_env_many_float(
             "LIQUIDITY__MIN_VOL_24H_USD",
@@ -292,6 +263,7 @@ def load_settings() -> AppSettings:
         or base.liquidity.min_price,
     )
 
+    # Runtime: NESTED → FLAT
     runtime = RuntimeConfig(
         env=_from_env_many("RUNTIME__ENV", "ENV", default=base.runtime.env)
         or base.runtime.env,
@@ -312,10 +284,8 @@ def load_settings() -> AppSettings:
         else base.runtime.enable_alerts,
     )
 
-    # 3) Reconstruct final AppSettings so validation is applied and
-    #    top-level values mirror nested sections (single source of truth)
+    # Reconstruct to mirror nested into top-level (single source of truth)
     s = AppSettings(
-        # keep existing top-levels but source them from nested validated values where applicable
         env=runtime.env,
         alert_threshold_pct=alerts.threshold_pct,
         alert_cooldown_sec=alerts.cooldown_sec,
@@ -341,7 +311,7 @@ def load_settings() -> AppSettings:
         runtime=runtime,
     )
 
-    # 4) Additional back-compat for WS fields (top-level vs bybit.*)
+    # WS fallbacks (top-level ← bybit.*) for back-compat
     if not s.ws_public_url_linear and s.bybit.ws_public_url_linear:
         s.ws_public_url_linear = s.bybit.ws_public_url_linear
     if not s.ws_public_url_spot and s.bybit.ws_public_url_spot:
@@ -352,3 +322,16 @@ def load_settings() -> AppSettings:
         s.ws_sub_topics_spot = s.bybit.ws_sub_topics_spot
 
     return s
+
+
+# ------------------- public API (single cached function) -------------------
+
+
+@lru_cache(maxsize=1)
+def _settings_cached() -> AppSettings:
+    return _build_settings()
+
+
+# expose the same cached callable under both names
+load_settings = _settings_cached
+get_settings = _settings_cached
