@@ -1,0 +1,61 @@
+name: Digest E2E Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main", "develop", "step-6.0*", "feature/**" ]
+    paths:
+      - "tools/digest_smoke.py"
+      - ".github/workflows/digest-e2e-smoke.yml"
+      - "tests/e2e/**"
+      - "src/**"
+      - "requirements.txt"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 20
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Generate pseudo digest
+        run: |
+          python tools/digest_smoke.py --out artifacts/digest-${{ github.run_id }}.md --json artifacts/digest-${{ github.run_id }}.json --limit 10
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-smoke-${{ github.run_id }}
+          path: artifacts/
+
+      - name: Run smoke test
+        run: |
+          pytest -q tests/e2e/test_digest_smoke.py
+
+  notify:
+    needs: smoke
+    if: ${{ success() && secrets.TELEGRAM_BOT_TOKEN != '' && secrets.TELEGRAM_CHAT_ID != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Telegram (optional)
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          TEXT="✅ Digest E2E smoke passed on ${{ github.ref_name }} (#${{ github.run_number }}). Artifact: see $RUN_URL"
+          curl -sS -X POST "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" -d chat_id="${TG_CHAT_ID}" --data-urlencode "text=${TEXT}" > /dev/null
