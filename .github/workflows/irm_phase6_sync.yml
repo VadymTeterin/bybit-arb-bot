@@ -1,0 +1,29 @@
+name: IRM Phase 6.2 SSOT sync
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'docs/irm.phase6.yaml'
+      - 'tools/irm_phase6_gen.py'
+      - '.github/workflows/irm_phase6_sync.yml'
+      - 'docs/IRM.md'
+  workflow_dispatch: {}
+
+jobs:
+  check-ssot:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install pyyaml
+
+      - name: Verify IRM Phase 6.2 is in sync
+        run: python tools/irm_phase6_gen.py --check
