@@ -1,7 +1,7 @@
 # IMPLEMENTATION ROADMAP (IRM)
 Проєкт: **БОТ АРБІТРАЖНИЙ BYBIT**
-Версія документа: **1.5 (IRM.md)** • Дата: **2025-08-24 (Europe/Kyiv)**
-Власник: VadymTeterin • Мітки: Implementation Roadmap (IRM), **Фаза 5 — WS (5.8.x)**, **Фаза 6 — Daily Digest (6.0/6.1)**
+Версія документа: ** 1.6 (IRM.md)** • Дата: **2025-08-24 (Europe/Kyiv)**
+Власник: VadymTeterin • Мітки: Implementation Roadmap (IRM), **Фаза 5 — WS (5.8.x)**, **Фаза 6 — Daily Digest (6.0/6.1)**, **Фаза 6.2 — WS Health/Resilience (6.2.x)**
 
 ---
 
@@ -112,7 +112,7 @@
 ---
 
 ## 5) Наступні дії (as of 2025-08-24)
-- **WS Stability (5.8.4):** soak‑прогони, метрики/документація, health/backoff.
+- **WS Runtime (6.2.2):** підключення `WSManager` у `ws:run`, heartbeat timeout, Telegram `/status`, інтеграційні тести resubscribe/timeouts.
 - **REST покриття (2, 5.2, 5.4):** довідники/агрегації, ретраї/ліміти.
 - **Операційна звітність (Фаза 6):** завершити 6.0.6, додати 6.1.2 DOCX, 6.1.3 аналітику.
 
