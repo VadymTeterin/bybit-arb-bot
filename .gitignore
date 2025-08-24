@@ -145,3 +145,6 @@ tools/coveragerc.digest
 artifacts/
 
 new step.md
+
+# helper scripts
+dev/scripts/*.ps1
