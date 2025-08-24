@@ -1,0 +1,2 @@
+{"ts":"2025-08-24T22:37:35+03:00","phase":"6","step":"6.3.1","label":"done-branch","note":"SQLite schema (signals/quotes/meta)"}
+{"ts":"2025-08-24T22:37:35+03:00","phase":"6","step":"6.3.2","label":"done-branch","note":"DAO + retention + tests"}
