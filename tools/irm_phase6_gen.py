@@ -29,10 +29,8 @@ def _ensure_utf8_stdio() -> None:
         if not stream:
             continue
         try:
-            # Python 3.7+: reconfigure available on text streams
             stream.reconfigure(encoding="utf-8")
         except Exception:
-            # Fallback: wrap the underlying buffer
             try:
                 buffer = stream.buffer  # type: ignore[attr-defined]
             except Exception:
@@ -103,24 +101,29 @@ def render_markdown(data: dict) -> str:
 
 def splice_content(full_md: str, new_block: str) -> str:
     """
-    Return full_md with the 6.2 block replaced/inserted inside sentinels.
-    If sentinels exist, replace content between them.
-    Else, try to locate the '### Фаза 6.2' header and replace that section.
-    Else, append at the end.
+    Replace/insert the 6.2 block:
+    - If sentinels exist, replace content between them.
+      IMPORTANT: search END only *after* BEGIN, so inline mentions do not break.
+    - Else, try to locate the '### Фаза 6.2' header and replace that section.
+    - Else, append at the end.
     """
     begin_idx = full_md.find(BEGIN)
-    end_idx = full_md.find(END)
-    wrapped = f"{BEGIN}\n{new_block}\n{END}\n"
-    if begin_idx != -1 and end_idx != -1 and end_idx > begin_idx:
-        # Replace existing sentinel block
+    if begin_idx != -1:
+        search_from = begin_idx + len(BEGIN)
+        end_idx = full_md.find(END, search_from)  # <-- FIX: search after BEGIN
+        wrapped = f"{BEGIN}\n{new_block}\n{END}\n"
+        if end_idx != -1:
+            before = full_md[:begin_idx]
+            after = full_md[end_idx + len(END) :]
+            return before + wrapped + after
+        # If no closing END sentinel exists, replace from BEGIN to EOF
         before = full_md[:begin_idx]
-        after = full_md[end_idx + len(END) :]
-        return before + wrapped + after
+        return before + wrapped
+
     # No sentinels — try header-based replace
     m = HEADER_RE.search(full_md)
     if m:
         start = m.start()
-        # find next H3 header or end
         next_h3 = re.search(r"^###\s+", full_md[m.end() :], re.MULTILINE)
         if next_h3:
             stop = m.end() + next_h3.start()
@@ -128,8 +131,11 @@ def splice_content(full_md: str, new_block: str) -> str:
             stop = len(full_md)
         before = full_md[:start]
         after = full_md[stop:]
+        wrapped = f"{BEGIN}\n{new_block}\n{END}\n"
         return before + wrapped + after
+
     # Append to the end
+    wrapped = f"{BEGIN}\n{new_block}\n{END}\n"
     if not full_md.endswith("\n"):
         full_md += "\n"
     return full_md + "\n" + wrapped
@@ -142,12 +148,10 @@ def check_mode() -> int:
         print("docs/IRM.md not found.", file=sys.stderr)
         return 2
     full_md = IRM_MD.read_text(encoding="utf-8")
-    # Extract current effective block
     effective = splice_content(full_md, new_block)
     if effective == full_md:
         print("IRM up-to-date.")
         return 0
-    # Show a unified diff for convenience
     diff = difflib.unified_diff(
         full_md.splitlines(keepends=True),
         effective.splitlines(keepends=True),
