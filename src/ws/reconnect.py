@@ -1,8 +1,5 @@
 # src/ws/reconnect.py
-"""Generic reconnection policy and heartbeat helpers for WS clients.
-
-This module is exchange-agnostic and can be used by any WS connector.
-"""
+"""Generic reconnection policy and heartbeat helpers for WS clients."""
 
 from __future__ import annotations
 
@@ -14,24 +11,33 @@ from typing import Optional
 
 @dataclass
 class ReconnectPolicy:
-    base_delay: float = 0.5  # seconds
+    """
+    Stateful reconnection policy.
+    - base_delay: initial seconds (first retry).
+    - max_delay: cap for delay.
+    - factor: multiplier per attempt.
+    - jitter: 0.0..1.0 => +/- percentage of the computed delay.
+    """
+
+    base_delay: float = 0.5
     max_delay: float = 30.0
     factor: float = 2.0
-    jitter: float = 0.1  # fraction of delay to randomize
-
+    jitter: float = 0.1
     _attempt: int = 0
 
     def next_delay(self) -> float:
-        """Return the next backoff delay and increment the attempt counter."""
-        delay = min(self.max_delay, self.base_delay * (self.factor**self._attempt))
-        # Apply jitter
-        jitter_span = delay * self.jitter
-        delay = delay + random.uniform(-jitter_span, jitter_span)
+        # compute pure exponential (attempt 0 => base)
+        delay = self.base_delay * (self.factor**self._attempt)
+        if delay > self.max_delay:
+            delay = self.max_delay
+        # apply symmetric jitter as percentage of delay
+        if self.jitter > 0.0:
+            j = (random.random() * 2.0 - 1.0) * self.jitter
+            delay = max(0.0, delay * (1.0 + j))
         self._attempt += 1
-        return max(0.0, delay)
+        return float(delay)
 
     def reset(self) -> None:
-        """Reset the backoff attempts (call on successful connect or stable heartbeat)."""
         self._attempt = 0
 
 

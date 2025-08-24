@@ -10,6 +10,7 @@
 
 ## Зміст
 - [Особливості](#особливості)
+- [WS Resilience (6.2.0)](#ws-resilience-620)
 - [Вимоги](#вимоги)
 - [Швидкий старт (PowerShell)](#швидкий-старт-powershell)
 - [Конфігурація](#конфігурація)
@@ -24,6 +25,7 @@
 - [Тести та якість коду](#тести-та-якість-коду)
 - [Структура проєкту](#структура-проєкту)
 - [CI/CD](#cicd)
+- [Документація](#документація)
 - [Траблшутінг](#траблшутінг)
 - [Ліцензія](#ліцензія)
 
@@ -42,13 +44,25 @@
 
 ---
 
+## WS Resilience (6.2.0)
+
+Покращення стабільності WS-шару та метрик (Step **6.2.0**):
+
+- **Парсер Bybit `tickers`**: підтримка plain-полів та `E4/E8` (напр. `lastPriceE8`), fallback символу з `topic`, стабільні ключі `symbol/last/mark/index`. Файл: `src/exchanges/bybit/ws.py`.
+- **WS Multiplexer**: *ледача відписка* (`unsubscribe()` вимикає доставку, але запис зберігається до `clear_inactive()`), сумісний `stats()`; файл: `src/ws/multiplexer.py`.
+- **Каркас health-метрик** (SPOT/LINEAR counters, uptime, last_event_ts) — готово для `/status` у 6.2.1.
+
+Деталі: див. **[docs/WS_RESILIENCE.md](docs/WS_RESILIENCE.md)**.
+
+---
+
 ## Вимоги
 
 - Windows 11
 - Python **3.11+**
-- Інтернет (Wi-Fi до 1 Гбіт, роутер Archer A64 — ок)
+- Інтернет (Wi‑Fi до 1 Гбіт, роутер Archer A64 — ок)
 - Токени: **Telegram Bot Token**, **Telegram Chat ID**
-- (Опційно) **Bybit API Key/Secret** для приватних методів; публічні WS/REST працюють і без них
+- (Опц.) **Bybit API Key/Secret** для приватних методів; публічні WS/REST працюють і без них
 
 ---
 
@@ -81,10 +95,8 @@ pre-commit run -a
 
 ## Конфігурація
 
-Файл-лоадер: `src/infra/config.py` (**pydantic-settings v2**, роздільник **`__`**).
+Лоадер: `src/infra/config.py` (**pydantic-settings v2**, роздільник **`__`**).
 Пріоритет: **Environment** → **.env** → **дефолти в коді**.
-Булеві: `true/false`, `1/0`, `yes/no`, `on/off` (без урахування регістру).
-Списки (CSV): `BTCUSDT,ETHUSDT` → `["BTCUSDT", "ETHUSDT"]`.
 
 ### Nested ключі (рекомендовано)
 
@@ -144,13 +156,6 @@ LIQUIDITY__MIN_PRICE=0.001
 
 > Якщо одночасно задано `ALERTS__THRESHOLD_PCT` (nested) і `ALERT_THRESHOLD_PCT` (flat),
 > перемагає **flat**. Так само для `COOLDOWN_SEC`.
->
-> **Рекомендація:** у файлах `.env` використовуйте **nested**-ключі. **Flat** залишайте для CI/Secrets.
-> **Windows cleanup (якщо “липнуть” глобальні змінні):**
-> ```powershell
-> Remove-Item Env:ALERT_THRESHOLD_PCT -ErrorAction SilentlyContinue
-> [Environment]::SetEnvironmentVariable('ALERT_THRESHOLD_PCT',$null,'User')
-> ```
 
 ### Програмний доступ
 
@@ -219,14 +224,22 @@ pre-commit run -a
 
 ```
 src/
+  exchanges/
+    bybit/
+      ws.py
+  ws/
+    multiplexer.py
+    backoff.py
+    health.py
+    bridge.py
   core/
   infra/
     config.py
   telegram/
-  bybit/
   storage/
 scripts/
 tests/
+docs/
 ```
 
 ---
@@ -236,6 +249,12 @@ tests/
 - **GitHub Actions**: лінтинг (ruff/black/isort), тести (pytest), типізація (mypy)
 - **Reusable notify** workflow з `secrets: inherit`
 - **Digest E2E Smoke**: збірка дайджесту, артефакт, опційне повідомлення у Telegram
+
+---
+
+## Документація
+
+- **WS Resilience (6.2.0)** — `docs/WS_RESILIENCE.md`
 
 ---
 

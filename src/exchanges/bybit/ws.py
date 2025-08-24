@@ -1,4 +1,5 @@
 # src/exchanges/bybit/ws.py
+# English-only comments per project rules.
 from __future__ import annotations
 
 import asyncio
@@ -17,8 +18,14 @@ from typing import (
 
 import aiohttp
 
-# Reconnect/heartbeat helpers (project-wide, exchange-agnostic)
+# Reconnect/backoff helpers (project-wide, exchange-agnostic)
 from src.ws.reconnect import ReconnectPolicy
+
+# Health metrics (optional singleton). If unavailable, we no-op.
+try:
+    from src.ws.health import MetricsRegistry  # type: ignore
+except Exception:  # pragma: no cover
+    MetricsRegistry = None  # type: ignore
 
 
 # ---- Logger (loguru if available; falls back to stdlib logging) ----
@@ -39,7 +46,7 @@ except Exception:  # pragma: no cover
     logger = logging.getLogger("bybit.ws")
 
 
-# ---- Backoff helper -------------------------------------------------
+# ---- Legacy-compatible exponential backoff with jitter --------------
 def exp_backoff_with_jitter(
     attempt: int,
     *,
@@ -54,10 +61,9 @@ def exp_backoff_with_jitter(
 
     - Tests may call with 'cap=' -> accept as alias for max delay.
     - attempt is 1-based: attempt=1 -> base, attempt=2 -> base*factor, ...
-
-    We also clamp jittered value to NEVER exceed the target (legacy tests expect v <= target).
+    - Never overshoot the unclamped target after jitter (upper clamp).
     """
-    # Resolve cap/max_delay
+    # Resolve cap/max_delay to a single upper bound
     if cap is not None and max_delay is not None:
         max_d = min(cap, max_delay)
     else:
@@ -68,23 +74,24 @@ def exp_backoff_with_jitter(
         )
 
     k = max(0, int(attempt) - 1)  # 1-based -> 0-based exponent
-    nominal = base * (factor**k)  # 1, 2, 4, 8, ...
+    nominal = base * (factor**k)
     clipped = min(max_d, nominal)
 
     span = max(0.0, jitter) * clipped
     jittered = clipped + random.uniform(-span, span)
 
-    # IMPORTANT: do not overshoot the target (upper clamp)
+    # do not exceed unclamped target after jitter
     delay = min(clipped, jittered)
     return max(0.0, delay)
 
 
 # ---- Parsing helpers -------------------------------------------------
-def _to_float(v, default: Optional[float] = None) -> Optional[float]:
+def _to_float(v: object, default: Optional[float] = None) -> Optional[float]:
+    """Try to convert arbitrary value to float; return default if impossible."""
     if v is None:
         return default
     try:
-        return float(v)
+        return float(v)  # fast path (floats/ints/str-numeric)
     except Exception:
         try:
             return float(str(v).strip())
@@ -92,15 +99,13 @@ def _to_float(v, default: Optional[float] = None) -> Optional[float]:
             return default
 
 
-def _from_e_scaled(val) -> Optional[float]:
-    # Supports fields like "...E8" or "...E4"
-    if val is None:
-        return None
-    s = str(val).strip()
-    try:
-        return float(s)
-    except Exception:
-        return None
+def _from_scaled(v: object, scale: int) -> Optional[float]:
+    """
+    Convert scaled integers (E4/E8 etc.) to float.
+    Example: 345678901 with scale=4 => 34567.8901
+    """
+    f = _to_float(v)
+    return None if f is None else f / (10**scale)
 
 
 def _infer_symbol_from_topic(topic: str) -> Optional[str]:
@@ -112,64 +117,62 @@ def _infer_symbol_from_topic(topic: str) -> Optional[str]:
     return None
 
 
+# ---- Public parser API ----------------------------------------------
 def iter_ticker_entries(message: Dict) -> Iterator[Dict]:
     """
-    Normalize Bybit v5 'tickers' message into rows of:
-    { 'symbol': str, 'last': float|None, 'mark': float|None }
-    Accepts both object and array payloads, and E8/E4 integer variants.
+    Normalize Bybit v5 'tickers' WS message into rows:
+      { 'symbol': str, 'last': float|None, 'mark': float|None, 'index': float|None }
+
+    Supports:
+      - 'data' as dict (single row) or list of dicts
+      - scaled numeric fields E4/E8 (e.g., lastPriceE8, markPriceE4, indexPriceE8)
+      - symbol fallback from 'topic' when missing in 'data'
+      - legacy fields like 'last' or 'lastPriceLatest'
     """
     topic = str(message.get("topic") or "").strip()
     data = message.get("data")
     if data is None:
-        return iter(())
-    rows: List[Dict] = []
+        return iter(())  # empty iterator
+
     if isinstance(data, dict):
-        arr = [data]
+        arr: List[Dict] = [data]
     elif isinstance(data, list):
-        arr = list(data)
+        arr = [x for x in data if isinstance(x, dict)]
     else:
         return iter(())
 
+    out_rows: List[Dict] = []
     for item in arr:
-        if not isinstance(item, dict):
-            continue
         symbol = item.get("symbol") or _infer_symbol_from_topic(topic) or ""
         symbol = str(symbol).upper()
 
-        # last price
-        last = _to_float(item.get("lastPrice"))
-        if last is None:
-            lp_e8 = item.get("lastPriceE8")
-            if lp_e8 is not None:
-                last = _from_e_scaled(lp_e8)
-                if last is not None:
-                    last /= 1e8
-            else:
-                lp_e4 = item.get("lastPriceE4")
-                if lp_e4 is not None:
-                    last = _from_e_scaled(lp_e4)
-                    if last is not None:
-                        last /= 1e4
-        if last is None:
-            last = _to_float(item.get("lastPriceLatest"))
+        # last price: plain or scaled or legacy
+        last = (
+            _to_float(item.get("lastPrice"))
+            or _from_scaled(item.get("lastPriceE8"), 8)
+            or _from_scaled(item.get("lastPriceE4"), 4)
+            or _to_float(item.get("last"))
+            or _to_float(item.get("lastPriceLatest"))
+        )
 
-        # mark price (derivatives)
-        mark = _to_float(item.get("markPrice"))
-        if mark is None:
-            mp_e8 = item.get("markPriceE8")
-            if mp_e8 is not None:
-                mark = _from_e_scaled(mp_e8)
-                if mark is not None:
-                    mark /= 1e8
-            else:
-                mp_e4 = item.get("markPriceE4")
-                if mp_e4 is not None:
-                    mark = _from_e_scaled(mp_e4)
-                    if mark is not None:
-                        mark /= 1e4
+        # mark price (derivatives): plain or scaled
+        mark = (
+            _to_float(item.get("markPrice"))
+            or _from_scaled(item.get("markPriceE8"), 8)
+            or _from_scaled(item.get("markPriceE4"), 4)
+        )
 
-        rows.append({"symbol": symbol, "last": last, "mark": mark})
-    return iter(rows)
+        # index price: plain or scaled
+        index = (
+            _to_float(item.get("indexPrice"))
+            or _from_scaled(item.get("indexPriceE8"), 8)
+            or _from_scaled(item.get("indexPriceE4"), 4)
+        )
+
+        # Always include expected keys; values may be None
+        out_rows.append({"symbol": symbol, "last": last, "mark": mark, "index": index})
+
+    return iter(out_rows)
 
 
 # ---- Public WS client -----------------------------------------------
@@ -180,13 +183,21 @@ class BybitPublicWS:
     - Subscribes to topics list (e.g. ["tickers.BTCUSDT","tickers.ETHUSDT"] or ["tickers"])
     - Calls on_message for every incoming JSON
     - Uses ReconnectPolicy (exponential backoff with jitter) between reconnects
+    - Optionally increments WS health metrics (SPOT/LINEAR) on each non-ping payload
     """
 
-    def __init__(self, url: str, topics: Iterable[str]) -> None:
+    def __init__(
+        self,
+        url: str,
+        topics: Iterable[str],
+        *,
+        metrics_source: Optional[str] = None,  # "SPOT" | "LINEAR" | None
+    ) -> None:
         self.url = url
         self.topics = list(topics)
         self._stop = asyncio.Event()
         self._session: Optional[aiohttp.ClientSession] = None
+        self._metrics_source = (metrics_source or "").upper() or None
 
     async def _subscribe(self, ws: aiohttp.ClientWebSocketResponse) -> None:
         if not self.topics:
@@ -223,6 +234,7 @@ class BybitPublicWS:
                         async for msg in ws:
                             if self._stop.is_set():
                                 break
+
                             if msg.type == aiohttp.WSMsgType.TEXT:
                                 try:
                                     payload = json.loads(msg.data)
@@ -233,16 +245,29 @@ class BybitPublicWS:
                                 # reset backoff on any valid message
                                 policy.reset()
 
-                                # Some Bybit servers send pong frames as JSON
+                                # Skip pongs/keepalives that some Bybit edges send as JSON
                                 if isinstance(payload, dict) and (
                                     str(payload.get("op", "")).lower() == "pong"
                                     or str(payload.get("event", "")).lower() == "pong"
                                 ):
                                     continue
 
+                                # Health metrics (optional)
+                                try:
+                                    if MetricsRegistry and self._metrics_source:
+                                        reg = MetricsRegistry.get()
+                                        if self._metrics_source == "SPOT":
+                                            reg.inc_spot(1)
+                                        elif self._metrics_source == "LINEAR":
+                                            reg.inc_linear(1)
+                                except Exception:
+                                    # metrics must never break the WS loop
+                                    pass
+
                                 await on_message(payload)
 
                             elif msg.type == aiohttp.WSMsgType.BINARY:
+                                # Bybit public streams are text JSON; ignore binary frames
                                 continue
                             elif msg.type == aiohttp.WSMsgType.ERROR:
                                 logger.error(f"WS error: {ws.exception()}")
@@ -262,5 +287,5 @@ class BybitPublicWS:
         logger.info("WS stopped")
 
 
-# Compatibility alias
+# Backward-compatible alias
 BybitWS = BybitPublicWS
