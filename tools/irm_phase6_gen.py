@@ -54,6 +54,15 @@ IRM_MD = ROOT / "docs" / "IRM.md"
 
 BEGIN = "<!-- IRM:BEGIN 6.2 -->"
 END = "<!-- IRM:END 6.2 -->"
+
+# Sentinel *lines* only
+BEGIN_LINE_RE = re.compile(r"(?m)^\s*<!-- IRM:BEGIN 6\.2 -->\s*$")
+END_LINE_RE = re.compile(r"(?m)^\s*<!-- IRM:END 6\.2 -->\s*$")
+# Full block pattern: BEGIN line ... END line (non-greedy inside)
+BLOCK_RE = re.compile(
+    r"(?ms)^\s*<!-- IRM:BEGIN 6\.2 -->\s*$.*?^\s*<!-- IRM:END 6\.2 -->\s*$"
+)
+
 HEADER_RE = re.compile(r"^###\s+Фаза\s+6\.2\b.*$", re.MULTILINE)
 
 
@@ -99,43 +108,35 @@ def render_markdown(data: dict) -> str:
     return "\n".join(out).rstrip() + "\n"
 
 
+def _wrap_block(new_block: str) -> str:
+    return f"{BEGIN}\n{new_block}\n{END}\n"
+
+
 def splice_content(full_md: str, new_block: str) -> str:
     """
-    Replace/insert the 6.2 block:
-    - If sentinels exist, replace content between them.
-      IMPORTANT: search END only *after* BEGIN, so inline mentions do not break.
-    - Else, try to locate the '### Фаза 6.2' header and replace that section.
-    - Else, append at the end.
+    Replace/insert the 6.2 block robustly:
+    1) If a sentinel block exists, replace it via regex (BEGIN-line ... END-line),
+       ignoring any inline mentions inside the content.
+    2) Else, if a '### Фаза 6.2' header exists, replace that section with sentinel-wrapped block.
+    3) Else, append the sentinel-wrapped block to the end of file.
     """
-    begin_idx = full_md.find(BEGIN)
-    if begin_idx != -1:
-        search_from = begin_idx + len(BEGIN)
-        end_idx = full_md.find(END, search_from)  # <-- FIX: search after BEGIN
-        wrapped = f"{BEGIN}\n{new_block}\n{END}\n"
-        if end_idx != -1:
-            before = full_md[:begin_idx]
-            after = full_md[end_idx + len(END) :]
-            return before + wrapped + after
-        # If no closing END sentinel exists, replace from BEGIN to EOF
-        before = full_md[:begin_idx]
-        return before + wrapped
+    wrapped = _wrap_block(new_block)
 
-    # No sentinels — try header-based replace
+    # 1) Replace existing sentinel block (strict whole-line anchors)
+    if BLOCK_RE.search(full_md):
+        return BLOCK_RE.sub(wrapped, full_md, count=1)
+
+    # 2) Header-based replace (no sentinels yet)
     m = HEADER_RE.search(full_md)
     if m:
         start = m.start()
         next_h3 = re.search(r"^###\s+", full_md[m.end() :], re.MULTILINE)
-        if next_h3:
-            stop = m.end() + next_h3.start()
-        else:
-            stop = len(full_md)
+        stop = m.end() + next_h3.start() if next_h3 else len(full_md)
         before = full_md[:start]
         after = full_md[stop:]
-        wrapped = f"{BEGIN}\n{new_block}\n{END}\n"
         return before + wrapped + after
 
-    # Append to the end
-    wrapped = f"{BEGIN}\n{new_block}\n{END}\n"
+    # 3) Append to the end (ensure trailing newline)
     if not full_md.endswith("\n"):
         full_md += "\n"
     return full_md + "\n" + wrapped
