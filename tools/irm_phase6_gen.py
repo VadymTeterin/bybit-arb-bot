@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-IRM Phase 6.2 generator (SSOT-lite)
+IRM Phase 6.2 generator (SSOT-lite) with guard healing
 - Reads docs/irm.phase6.yaml
 - Produces a Markdown block for "Фаза 6.2" and injects it into docs/IRM.md
-- Two modes:
-    --check : exits with code 1 if IRM.md doesn't match generated block
-    --write : updates IRM.md in-place
-This script is Windows-friendly and does not rely on GNU tools.
+- Modes:
+    --check : exit 1 if IRM.md needs update
+    --write : update IRM.md in-place
+- Windows-friendly (forces UTF-8 on stdio)
 """
 
 from __future__ import annotations
@@ -58,11 +58,13 @@ END = "<!-- IRM:END 6.2 -->"
 # Sentinel *lines* only
 BEGIN_LINE_RE = re.compile(r"(?m)^\s*<!-- IRM:BEGIN 6\.2 -->\s*$")
 END_LINE_RE = re.compile(r"(?m)^\s*<!-- IRM:END 6\.2 -->\s*$")
-# Full block pattern: BEGIN line ... END line (non-greedy inside)
+
+# Full block pattern: BEGIN line ... END line (non-greedy), strict to full lines
 BLOCK_RE = re.compile(
     r"(?ms)^\s*<!-- IRM:BEGIN 6\.2 -->\s*$.*?^\s*<!-- IRM:END 6\.2 -->\s*$"
 )
 
+# Header if sentinels absent
 HEADER_RE = re.compile(r"^###\s+Фаза\s+6\.2\b.*$", re.MULTILINE)
 
 
@@ -112,15 +114,38 @@ def _wrap_block(new_block: str) -> str:
     return f"{BEGIN}\n{new_block}\n{END}\n"
 
 
+def _heal_duplicates(full_md: str, new_block: str) -> str:
+    """
+    Guard: if the file contains multiple 6.2 sentinel lines/blocks,
+    collapse the range from the FIRST BEGIN to the LAST END into one fresh block.
+    """
+    begins = list(BEGIN_LINE_RE.finditer(full_md))
+    ends = list(END_LINE_RE.finditer(full_md))
+    if (
+        len(begins) >= 1
+        and len(ends) >= 1
+        and (len(begins) > 1 or len(ends) > 1 or begins[0].start() > ends[-1].start())
+    ):
+        start = begins[0].start()
+        stop = ends[-1].end()
+        return full_md[:start] + _wrap_block(new_block) + full_md[stop:]
+    return full_md
+
+
 def splice_content(full_md: str, new_block: str) -> str:
     """
     Replace/insert the 6.2 block robustly:
-    1) If a sentinel block exists, replace it via regex (BEGIN-line ... END-line),
-       ignoring any inline mentions inside the content.
+    0) Guard-heal duplicates: collapse [first BEGIN .. last END] into a single wrapped block.
+    1) If a sentinel block exists, replace exactly that block (BEGIN-line ... END-line) via regex.
     2) Else, if a '### Фаза 6.2' header exists, replace that section with sentinel-wrapped block.
     3) Else, append the sentinel-wrapped block to the end of file.
     """
     wrapped = _wrap_block(new_block)
+
+    # 0) Guard-heal duplicates, if any
+    healed = _heal_duplicates(full_md, new_block)
+    if healed is not full_md:
+        full_md = healed  # file healed; now proceed with normal flow
 
     # 1) Replace existing sentinel block (strict whole-line anchors)
     if BLOCK_RE.search(full_md):
@@ -177,7 +202,9 @@ def write_mode() -> int:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Sync Phase 6.2 IRM from YAML")
+    ap = argparse.ArgumentParser(
+        description="Sync Phase 6.2 IRM from YAML (with guard healing)"
+    )
     ap.add_argument(
         "--check", action="store_true", help="Check IRM diff; exit 1 if updates needed"
     )
