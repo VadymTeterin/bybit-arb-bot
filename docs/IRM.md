@@ -74,7 +74,7 @@
 - [x] 6.1.1 Env precedence (flat > nested для alerts), тести, Ruff E402.
 - [ ] 6.1.2 DOCX-експорт для дайджесту — planned.
 - [ ] 6.1.3 Аналітика дайджестів (тижд./місячні агрегати) — planned.
-<!-- IRM:BEGIN 6.2 -->
+
 ### Фаза 6.2 — SSOT-lite (автоматизація IRM)
 > Оновлено: 2025-08-24T00:00:00Z
 
@@ -86,8 +86,7 @@ _Статуси_: **todo** — ще не почато, **doing** — в робо
   - [ ] Налаштовано .github/workflows/irm_phase6_sync.yml
 
 - [x] **6.2.1 — Інтеграція з docs/IRM.md (сентинели)**  `status: done`
-  - [ ] Додати/перевірити блок <!-- IRM:BEGIN 6.2 --> … <!-- IRM:END 6.2 -->
-  - [ ] Генерувати секцію з YAML
+  - [ ] Додати/перевірити блок
 
 - [x] **6.2.2 — Перевірки у PR (--check)**  `status: done`
   - [ ] GitHub Actions запускає генератор у режимі --check
@@ -97,7 +96,17 @@ _Статуси_: **todo** — ще не почато, **doing** — в робо
   - [ ] Можливість локально запускати оновлення IRM
   - [ ] Додати ops-ноту в README
 
-<!-- IRM:END 6.2 -->
+### Фаза 6.3 — Історія (SQLite) та фільтри ліквідності
+- [x] 6.3.0 Kickoff — мітка часу зафіксована (2025-08-24).
+- [ ] 6.3.1 Схема SQLite (signals/quotes/meta) — ⧗ DoD pending (реалізовано у гілці `feat/phase6.3-kickoff`).
+- [ ] 6.3.2 DAO + retention + тести — ⧗ DoD pending (реалізовано у гілці `feat/phase6.3-kickoff`).
+- [ ] 6.3.3 Фільтри у `selector` (24h vol USD, мін. ціна, depth — опц.).
+- [ ] 6.3.4 Selector → alerts: cooldown + history-suppression.
+- [ ] 6.3.5 `/report`: звіт з SQLite + CSV/Parquet.
+- [ ] 6.3.6 Тести: unit + інтеграція (mock Bybit, E2E).
+- [ ] 6.3.7 Документи: `docs/HISTORY_AND_FILTERS.md`, README, CHANGELOG.
+- [ ] 6.3.8 CI: покриття, бейдж.
+- [ ] Генерувати секцію з YAML
 
 ### Подальші фази (укрупнено)
 - [ ] 7 — Risk & Money Management (quality-gates, ліміти, dry-run).
