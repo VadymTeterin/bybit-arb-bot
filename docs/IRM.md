@@ -101,8 +101,8 @@ _Статуси_: **todo** — ще не почато, **doing** — в робо
 
 ### Фаза 6.3 — Історія (SQLite) та фільтри ліквідності
 - [x] 6.3.0 Kickoff — мітка часу зафіксована (2025-08-24).
-- [ ] 6.3.1 Схема SQLite (signals/quotes/meta) — ⧗ DoD pending (реалізовано у гілці `feat/phase6.3-kickoff`).
-- [ ] 6.3.2 DAO + retention + тести — ⧗ DoD pending (реалізовано у гілці `feat/phase6.3-kickoff`).
+- [x] 6.3.1 Схема SQLite (signals/quotes/meta) — done.
+- [x] 6.3.2 DAO + retention + тести — done.
 - [ ] 6.3.3 Фільтри у `selector` (24h vol USD, мін. ціна, depth — опц.).
 - [ ] 6.3.4 Selector → alerts: cooldown + history-suppression.
 - [ ] 6.3.5 `/report`: звіт з SQLite + CSV/Parquet.
