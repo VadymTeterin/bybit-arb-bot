@@ -1,2 +1,4 @@
 - [2025-08-24 22:37:35 EEST] ‘аза 6 Ч Step 6.3.1 (in branch): схема SQLite (signals/quotes/meta).
 - [2025-08-24 22:37:35 EEST] ‘аза 6 Ч Step 6.3.2 (in branch): DAO + retention + тести.
+- [2025-08-24 23:51:36 EEST] ‘аза 6  Step 6.3.1: merged to main (done).
+- [2025-08-24 23:51:36 EEST] ‘аза 6 Ч Step 6.3.2: merged to main (done).
