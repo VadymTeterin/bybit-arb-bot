@@ -12,13 +12,6 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 
-def _utc_iso(ts: Optional[float]) -> Optional[str]:
-    if ts is None:
-        return None
-    # Render as "YYYY-MM-DD HH:MM:SS UTC"
-    return time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(ts))
-
-
 @dataclass
 class WSHealth:
     started_ts: float
@@ -28,77 +21,56 @@ class WSHealth:
     last_spot_ts: Optional[float] = None
     last_linear_ts: Optional[float] = None
 
-    @property
-    def uptime_ms(self) -> int:
-        return int((time.time() - self.started_ts) * 1000)
-
     def to_dict(self) -> Dict[str, Any]:
-        d: Dict[str, Any] = {
+        return {
             "started_ts": self.started_ts,
-            "started_at_utc": _utc_iso(self.started_ts),
-            "uptime_ms": self.uptime_ms,
+            "uptime_ms": int((time.time() - self.started_ts) * 1000),
             "counters": {"spot": self.spot_events, "linear": self.linear_events},
             "last_event_ts": self.last_event_ts,
-            "last_event_at_utc": _utc_iso(self.last_event_ts),
             "last_spot_ts": self.last_spot_ts,
-            "last_spot_at_utc": _utc_iso(self.last_spot_ts),
             "last_linear_ts": self.last_linear_ts,
-            "last_linear_at_utc": _utc_iso(self.last_linear_ts),
         }
-        return d
 
 
 class MetricsRegistry:
-    """
-    Thread-safe singleton holding WebSocket health metrics.
-    Use `MetricsRegistry.get()` to access the single instance.
-    """
+    """Thread-safe singleton registry of WS health metrics."""
 
-    _instance: Optional["MetricsRegistry"] = None
-    _guard = threading.Lock()
+    _instance: "MetricsRegistry|None" = None
+    _lock = threading.Lock()
 
     def __init__(self) -> None:
-        self._lock = threading.Lock()
+        self._lock_local = threading.Lock()
         self._state = WSHealth(started_ts=time.time())
 
-    # --- Singleton access ---
     @classmethod
     def get(cls) -> "MetricsRegistry":
-        if cls._instance is None:
-            with cls._guard:
-                if cls._instance is None:
-                    cls._instance = cls()
-        return cls._instance
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = MetricsRegistry()
+            return cls._instance
 
-    # --- Mutations ---
-    def reset(self) -> None:
-        with self._lock:
-            self._state = WSHealth(started_ts=time.time())
-
+    # --- mutations
     def inc_spot(self, n: int = 1) -> None:
-        if n < 0:
-            raise ValueError("n must be >= 0")
-        now = time.time()
-        with self._lock:
-            self._state.spot_events += n
+        with self._lock_local:
+            self._state.spot_events += int(n)
+            now = time.time()
             self._state.last_spot_ts = now
             self._state.last_event_ts = now
 
     def inc_linear(self, n: int = 1) -> None:
-        if n < 0:
-            raise ValueError("n must be >= 0")
-        now = time.time()
-        with self._lock:
-            self._state.linear_events += n
+        with self._lock_local:
+            self._state.linear_events += int(n)
+            now = time.time()
             self._state.last_linear_ts = now
             self._state.last_event_ts = now
 
-    # --- Read-only view ---
+    def reset(self) -> None:
+        with self._lock_local:
+            self._state = WSHealth(started_ts=time.time())
+
+    # --- views
     def snapshot(self) -> Dict[str, Any]:
-        """
-        Return a copy of the current metrics as a serializable dict.
-        """
-        with self._lock:
+        with self._lock_local:
             s = WSHealth(
                 started_ts=self._state.started_ts,
                 spot_events=self._state.spot_events,

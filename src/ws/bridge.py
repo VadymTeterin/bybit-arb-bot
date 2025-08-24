@@ -16,10 +16,8 @@ def publish_bybit_ticker(
     ts: float | None = None,
 ) -> int:
     """
-    Легкий міст: публікує item з Bybit tickers у WS-мультиплексор.
-    Не змінює поведінку існуючого ws:run; лише дає можливість підписникам реагувати.
-
-    Returns: кількість викликаних хендлерів.
+    Minimal bridge: adapt Bybit ticker dict -> WsEvent and publish to mux.
+    Returns number of handlers fired.
     """
     if mux is None or item is None:
         return 0
