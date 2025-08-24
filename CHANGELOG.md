@@ -17,6 +17,25 @@
 
 ---
 
+## [6.2.0] — 2025-08-24
+**Phase 6 — Step-6.2.0 · WS Resilience & Health**
+
+### Added
+- **Парсер Bybit v5 `tickers`** (`src/exchanges/bybit/ws.py`): підтримка plain та `E4/E8` полів (`lastPriceE8/markPriceE4/...`), fallback символу з `topic`, стабільні ключі `symbol/last/mark/index`.
+- **WS Multiplexer** (`src/ws/multiplexer.py`): *ледача відписка* (`unsubscribe()` вимикає доставку, але запис лишається до `clear_inactive()`), сумісний `stats()` для тестів.
+- Каркас **health-метрик** (SPOT/LINEAR counters, uptime, last_event_ts) — база для `/status` у 6.2.1.
+- Документація: `docs/WS_RESILIENCE.md` (короткий опис змін та семантики відписки).
+
+### Tests
+- Увесь набір `ws`-тестів зелений локально: **31 passed, 91 deselected**.
+
+### Migration Notes
+- API зовнішніх модулів не порушено. Для отримання метрик планується `/status` у 6.2.1.
+
+[6.2.0]: https://github.com/VadymTeterin/bybit-arb-bot/compare/v6.1.1...v6.2.0
+
+---
+
 ## [6.1.1] — 2025-08-24
 
 ### Fixed
