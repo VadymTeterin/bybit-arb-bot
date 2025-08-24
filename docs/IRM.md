@@ -80,20 +80,20 @@
 
 _Статуси_: **todo** — ще не почато, **doing** — в роботі, **done** — завершено, **blocked** — заблоковано
 
-- [ ] **6.2.0 — Каркас SSOT-lite (YAML + генератор + CI)**  `status: todo`
+- [x] **6.2.0 — Каркас SSOT-lite (YAML + генератор + CI)**  `status: done`
   - [ ] Створено docs/irm.phase6.yaml
   - [ ] Додано tools/irm_phase6_gen.py
   - [ ] Налаштовано .github/workflows/irm_phase6_sync.yml
 
-- [ ] **6.2.1 — Інтеграція з docs/IRM.md (сентинели)**  `status: todo`
+- [x] **6.2.1 — Інтеграція з docs/IRM.md (сентинели)**  `status: done`
   - [ ] Додати/перевірити блок <!-- IRM:BEGIN 6.2 --> … <!-- IRM:END 6.2 -->
   - [ ] Генерувати секцію з YAML
 
-- [ ] **6.2.2 — Перевірки у PR (--check)**  `status: todo`
+- [x] **6.2.2 — Перевірки у PR (--check)**  `status: done`
   - [ ] GitHub Actions запускає генератор у режимі --check
   - [ ] PR фейлиться, якщо IRM не синхронізований
 
-- [ ] **6.2.3 — Ручне оновлення (--write)**  `status: todo`
+- [x] **6.2.3 — Ручне оновлення (--write)**  `status: done`
   - [ ] Можливість локально запускати оновлення IRM
   - [ ] Додати ops-ноту в README
 

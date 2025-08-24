@@ -9,26 +9,26 @@ status_legend:
 sections:
   - id: "6.2.0"
     name: "Каркас SSOT-lite (YAML + генератор + CI)"
-    status: "todo"
+    status: "done"
     tasks:
       - "Створено docs/irm.phase6.yaml"
       - "Додано tools/irm_phase6_gen.py"
       - "Налаштовано .github/workflows/irm_phase6_sync.yml"
   - id: "6.2.1"
     name: "Інтеграція з docs/IRM.md (сентинели)"
-    status: "todo"
+    status: "done"
     tasks:
       - "Додати/перевірити блок <!-- IRM:BEGIN 6.2 --> … <!-- IRM:END 6.2 -->"
       - "Генерувати секцію з YAML"
   - id: "6.2.2"
     name: "Перевірки у PR (--check)"
-    status: "todo"
+    status: "done"
     tasks:
       - "GitHub Actions запускає генератор у режимі --check"
       - "PR фейлиться, якщо IRM не синхронізований"
   - id: "6.2.3"
     name: "Ручне оновлення (--write)"
-    status: "todo"
+    status: "done"
     tasks:
       - "Можливість локально запускати оновлення IRM"
       - "Додати ops-ноту в README"
