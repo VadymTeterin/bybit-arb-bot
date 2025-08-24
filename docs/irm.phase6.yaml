@@ -1,0 +1,34 @@
+phase: "6.2"
+title: "SSOT-lite (автоматизація IRM)"
+updated_utc: "2025-08-24T00:00:00Z"
+status_legend:
+  todo: "ще не почато"
+  doing: "в роботі"
+  done: "завершено"
+  blocked: "заблоковано"
+sections:
+  - id: "6.2.0"
+    name: "Каркас SSOT-lite (YAML + генератор + CI)"
+    status: "todo"
+    tasks:
+      - "Створено docs/irm.phase6.yaml"
+      - "Додано tools/irm_phase6_gen.py"
+      - "Налаштовано .github/workflows/irm_phase6_sync.yml"
+  - id: "6.2.1"
+    name: "Інтеграція з docs/IRM.md (сентинели)"
+    status: "todo"
+    tasks:
+      - "Додати/перевірити блок <!-- IRM:BEGIN 6.2 --> … <!-- IRM:END 6.2 -->"
+      - "Генерувати секцію з YAML"
+  - id: "6.2.2"
+    name: "Перевірки у PR (--check)"
+    status: "todo"
+    tasks:
+      - "GitHub Actions запускає генератор у режимі --check"
+      - "PR фейлиться, якщо IRM не синхронізований"
+  - id: "6.2.3"
+    name: "Ручне оновлення (--write)"
+    status: "todo"
+    tasks:
+      - "Можливість локально запускати оновлення IRM"
+      - "Додати ops-ноту в README"
