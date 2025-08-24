@@ -384,8 +384,6 @@ def _basis_rows(
                 m[sym] = {"price": price_f, "turnover_usd": vol_f}
             return m
 
-        #     spot_map = _map_from_tickers(spot_rows)
-        #     lin_map = _map_from_tickers(lin_rows)
         spot_map = _map_from_tickers(spot_rows)
         lin_map = _map_from_tickers(lin_rows)
 
@@ -1080,6 +1078,9 @@ def main() -> None:
         "--reset", action="store_true", help="Reset counters before print"
     )
     p_wh.set_defaults(func=cmd_ws_health)
+
+    # NEW: friendly alias for ws:health
+    sub.add_parser("status").set_defaults(func=cmd_ws_health)
 
     args = parser.parse_args()
 
