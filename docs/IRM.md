@@ -1,6 +1,6 @@
 # IMPLEMENTATION ROADMAP (IRM)
 Проєкт: **БОТ АРБІТРАЖНИЙ BYBIT**
-Версія документа: ** 1.6 (IRM.md)** • Дата: **2025-08-24 (Europe/Kyiv)**
+Версія документа: ** 1.7 1.6(IRM.md)** • Дата: ** 2025-08-24 (Europe/Kyiv)**
 Власник: VadymTeterin • Мітки: Implementation Roadmap (IRM), **Фаза 5 — WS (5.8.x)**, **Фаза 6 — Daily Digest (6.0/6.1)**, **Фаза 6.2 — WS Health/Resilience (6.2.x)**
 
 ---
@@ -74,6 +74,36 @@
 - [x] 6.1.1 Env precedence (flat > nested для alerts), тести, Ruff E402.
 - [ ] 6.1.2 DOCX-експорт для дайджесту — planned.
 - [ ] 6.1.3 Аналітика дайджестів (тижд./місячні агрегати) — planned.
+
+### Фаза 6.2 — WS Health & Observability
+- [x] 6.2.0 — WS Resilience
+  - Нормалізатор Bybit `tickers` (plain + `E4/E8`), стабільні ключі `symbol/last/mark/index`, fallback символу з `topic`.
+    _Файл:_ `src/exchanges/bybit/ws.py`
+  - **WS Multiplexer**: *ледача відписка* (lazy unsubscribe), `stats()` для тестів.
+    _Файл:_ `src/ws/multiplexer.py`
+  - Базові health-поля: `uptime`, `counters.spot/linear`, `last_event_ts`.
+  - **Docs/Tests:** `docs/WS_RESILIENCE.md`; ws-тести зелені.
+
+- [x] 6.2.1 — WS Health / Manager / Status (CLI)
+  - **CLI-аліас `status`** (дзеркалить `ws:health`): `uptime_ms`, `counters.spot/linear`, `reconnects_total`, `last_*`, `*_at_utc`, `last_msg_age_ms`.
+    _Файли:_ `src/main.py`, `src/ws/health.py`
+  - **`WSManager`**: збереження тем, heartbeat-мітки, підрахунок реконектів, **replay тем** (вмикатиметься у 6.2.2).
+    _Файл:_ `src/ws/manager.py`
+  - **Tests:** `tests/test_ws_resubscribe.py`, `tests/test_ws_heartbeat.py`, `tests/test_status_snapshot.py`; pre-commit green; PR у `main` — merged.
+
+- [ ] 6.2.2 — Runtime wiring & Telegram `/status`
+  - Під’єднати `WSManager` у `ws:run`: `on_connect()` → replay `subscribe`, `on_message(payload)`, `on_disconnect(reason)` + `MetricsRegistry.inc_reconnects()`.
+  - **Heartbeat timeout** (15–20s) у WS-клієнті; контрольований `reconnect()`; **reset backoff** на валідних повідомленнях.
+  - **Telegram `/status`**: форматований звіт метрик (CLI-поля): `uptime_ms`, counters, `reconnects_total`, `last_*`, `*_at_utc`, `last_msg_age_ms`.
+    _Файли:_ `src/telegram/bot.py` (+ `formatters.py`)
+  - **Integration tests:** resubscribe integration (обрив → реконект ≤ 5s → topics replayed), heartbeat-timeout, telegram-status.
+  - **Docs:** README/CHANGELOG (секція 6.2.2).
+
+- [ ] 6.2.3 — Soak & Failure Drills (planned)
+  - Довгі прогони (≥ 2 год), симуляції мережевих збоїв, валідація `last_msg_age_ms`, SLO для реконектів та часу відновлення.
+
+- [ ] 6.2.4 — Release polish (planned)
+  - Оновити README/CHANGELOG (фінал 6.2.2), підготовка реліз-заміток; за потреби — тег релізу.
 
 ### Подальші фази (укрупнено)
 - [ ] 7 — Risk & Money Management (quality-gates, ліміти, dry-run).
