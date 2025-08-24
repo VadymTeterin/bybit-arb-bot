@@ -14,11 +14,35 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import io
 import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
+
+
+# --- Ensure UTF-8 stdio on Windows runners (cp1252 would fail on Cyrillic) ---
+def _ensure_utf8_stdio() -> None:
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name, None)
+        if not stream:
+            continue
+        try:
+            # Python 3.7+: reconfigure available on text streams
+            stream.reconfigure(encoding="utf-8")
+        except Exception:
+            # Fallback: wrap the underlying buffer
+            try:
+                buffer = stream.buffer  # type: ignore[attr-defined]
+            except Exception:
+                continue
+            wrapper = io.TextIOWrapper(buffer, encoding="utf-8", errors="replace")
+            setattr(sys, name, wrapper)
+
+
+_ensure_utf8_stdio()
+# ---------------------------------------------------------------------------
 
 try:
     import yaml  # type: ignore
