@@ -1,166 +1,151 @@
-"""
-WS Multiplexer (step 5.6 marker)
---------------------------------
-Невтручальний модуль для маршрутизації подій з різних WS-джерел (SPOT/LINEAR/...)
-без зміни чинного функціоналу (крок 5.5).
-
-Використання (приклад):
-    mux = WSMultiplexer(name="core")
-    unsubscribe = mux.subscribe(handler=my_cb, source="SPOT", channel="book_ticker", symbol="BTCUSDT")
-    mux.publish(WsEvent(source="SPOT", channel="book_ticker", symbol="BTCUSDT", payload={"bid": "1"}, ts=...))
-    unsubscribe()  # відписка при потребі
-
-Модуль не створює мережевих підключень і не залежить від asyncio.
-Його можна інтегрувати з існуючими WS-клієнтами через адаптери.
-"""
-
+# src/ws/multiplexer.py
+# English-only comments per project rules.
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
-from threading import RLock
-from typing import Callable, Dict, List
-
-__all__ = ["WsEvent", "WSMultiplexer"]
+from typing import Any, Callable, Dict, Optional
 
 
 @dataclass(frozen=True)
 class WsEvent:
-    """Уніфікована подія WS.
-
-    Attributes:
-        source: Джерело/маркет тип (наприклад: "SPOT", "LINEAR"). Необмежено — це довільний рядок.
-        channel: Логічний канал (наприклад: "book_ticker", "trade").
-        symbol: Торговий інструмент (наприклад: "BTCUSDT").
-        payload: Початкові дані події (dict). Може бути будь-якою структурою.
-        ts: UNIX time у секундах або мілісекундах (float|int) — без жорсткого формату.
-    """
-
-    source: str
-    channel: str
-    symbol: str
-    payload: dict
-    ts: float | int
+    source: str  # e.g. "SPOT" | "LINEAR"
+    channel: str  # e.g. "tickers" | "trade"
+    symbol: str  # e.g. "BTCUSDT" ("" allowed)
+    payload: Dict[str, Any]
+    ts: float  # seconds since epoch (float)
 
 
 class _Subscription:
-    __slots__ = ("source", "channel", "symbol", "handler", "sid", "active")
+    __slots__ = ("sid", "handler", "source", "channel", "symbol", "active")
 
     def __init__(
         self,
-        source: str,
-        channel: str,
-        symbol: str,
-        handler: Callable[[WsEvent], None],
         sid: int,
+        handler: Callable[[WsEvent], None],
+        source: Optional[str],
+        channel: Optional[str],
+        symbol: Optional[str],
     ) -> None:
-        # Нормалізація патернів (UPPER для стабільного порівняння)
-        self.source = source.upper()
-        self.channel = channel.upper()
-        self.symbol = symbol.upper()
-        self.handler = handler
         self.sid = sid
+        self.handler = handler
+        self.source = None if not source or source == "*" else str(source)
+        self.channel = None if not channel or channel == "*" else str(channel)
+        self.symbol = None if not symbol or symbol == "*" else str(symbol).upper()
         self.active = True
 
-    def matches(self, evt: WsEvent) -> bool:
+    def matches(self, e: WsEvent) -> bool:
         if not self.active:
             return False
-        return (
-            (self.source == "*" or self.source == evt.source.upper())
-            and (self.channel == "*" or self.channel == evt.channel.upper())
-            and (self.symbol == "*" or self.symbol == evt.symbol.upper())
-        )
+        if self.source is not None and self.source != e.source:
+            return False
+        if self.channel is not None and self.channel != e.channel:
+            return False
+        if self.symbol is not None and self.symbol != e.symbol:
+            return False
+        return True
 
 
 class WSMultiplexer:
-    """Простий, потокобезпечний маршрутизатор WS-подій із підтримкою wildcards.
+    """
+    Thread-safe in-process event bus for WS events with filtering by:
+      - source   (e.g. "SPOT" | "LINEAR")
+      - channel  (e.g. "tickers" | "trade")
+      - symbol   (e.g. "BTCUSDT")
 
-    - Без мережевої логіки.
-    - Без залежності від asyncio.
-    - Підходить для юніт-тестів (можна публікувати події вручну).
+    Semantics of unsubscribe (lazy):
+      - unsubscribe() marks the subscription inactive (active=False);
+      - record remains in registry until clear_inactive();
+      - deliveries stop immediately;
+      - stats() reports:
+          * active_subscriptions -> number of records in registry (lazy semantics);
+          * active_handlers      -> number of currently active handlers.
     """
 
-    def __init__(self, *, name: str = "ws-mux") -> None:
-        self._name = name
-        self._lock = RLock()
+    def __init__(self, name: str = "core") -> None:
+        self.name = name
+        self._lock = threading.Lock()
         self._subs: Dict[int, _Subscription] = {}
-        self._next_sid = 1
-
-    # ---------------------- Публічний API ----------------------
+        self._next_id = 1
 
     def subscribe(
         self,
-        *,
         handler: Callable[[WsEvent], None],
-        source: str = "*",
-        channel: str = "*",
-        symbol: str = "*",
+        *,
+        source: Optional[str] = None,
+        channel: Optional[str] = None,
+        symbol: Optional[str] = None,
     ) -> Callable[[], None]:
-        """Підписка на події.
-
-        Підтримує wildcards: "*" для source / channel / symbol.
-
-        Повертає функцію відписки.
-        """
+        """Register a handler with optional filters; returns unsubscribe() callable."""
         if not callable(handler):
             raise TypeError("handler must be callable")
-
         with self._lock:
-            sid = self._next_sid
-            self._next_sid += 1
-            sub = _Subscription(source, channel, symbol, handler, sid)
+            sid = self._next_id
+            self._next_id += 1
+            sub = _Subscription(sid, handler, source, channel, symbol)
             self._subs[sid] = sub
 
         def _unsubscribe() -> None:
+            # Lazy unsubscribe: keep record, mark inactive -> no deliveries
             with self._lock:
                 s = self._subs.get(sid)
-                if s:
+                if s is not None:
                     s.active = False
-                    # Ледача відписка: не видаляємо з dict, щоб уникати зсувів під час ітерації
 
         return _unsubscribe
 
-    def publish(self, evt: WsEvent) -> int:
-        """Надсилає подію всім відповідним хендлерам.
-
-        Повертає кількість викликаних хендлерів.
-        """
-        if not isinstance(evt, WsEvent):
-            raise TypeError("evt must be WsEvent")
-
+    def publish(self, event: WsEvent) -> int:
+        """Deliver event to all matching active subscribers. Returns #handlers fired."""
+        if not isinstance(event, WsEvent):
+            raise TypeError("event must be WsEvent")
         fired = 0
+        to_call: list[Callable[[WsEvent], None]] = []
         with self._lock:
-            # Копіюємо посилання на активні підписки, щоб не тримати lock під час колбеків
-            subs: List[_Subscription] = [s for s in self._subs.values() if s.active]
-
-        for s in subs:
-            if s.matches(evt):
-                s.handler(evt)
+            for s in list(self._subs.values()):
+                if s.active and s.matches(event):
+                    to_call.append(s.handler)
+        # call outside the lock
+        for h in to_call:
+            try:
+                h(event)
+            except Exception:
+                # Swallow handler exceptions to not break the bus
+                pass
+            else:
                 fired += 1
         return fired
 
-    def stats(self) -> dict:
-        """Коротка статистика по підписках.
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        Return internal counters and state snapshot.
 
-        Семантика "ледачої відписки":
-        - active_subscriptions == total_subscriptions (поки не викличемо clear_inactive()).
-        - Для діагностики додаємо поле active_handlers із реально активними підписками.
+        IMPORTANT: For test compatibility (lazy unsubscribe):
+          - 'active_subscriptions' reports number of records in registry (len(self._subs)),
+            i.e. includes inactive entries until clear_inactive() is called.
+          - 'active_handlers' reports number of currently active subscriptions.
         """
         with self._lock:
-            total = len(self._subs)
-            active_flagged = sum(1 for s in self._subs.values() if s.active)
+            total_records = len(self._subs)
+            currently_active = sum(1 for s in self._subs.values() if s.active)
         return {
-            "name": self._name,
-            "total_subscriptions": total,
-            "active_subscriptions": total,  # важливо для сумісності з тестом
-            "active_handlers": active_flagged,
+            "name": self.name,
+            "total_subscriptions": total_records,
+            "active_subscriptions": total_records,  # lazy semantics required by tests
+            "active_handlers": currently_active,  # real active handlers
+            "inactive_subscriptions": total_records - currently_active,
         }
 
+    # Compatibility alias expected by tests
+    def stats(self) -> Dict[str, Any]:
+        """Compatibility alias for tests expecting mux.stats()."""
+        return self.get_stats()
+
     def clear_inactive(self) -> int:
-        """Жадібне очищення неактивних підписок. Повертає кількість видалених."""
+        """Drop inactive subscriptions aggressively. Returns removed count."""
         removed = 0
         with self._lock:
-            dead_ids = [sid for sid, s in self._subs.items() if not s.active]
-            for sid in dead_ids:
+            dead = [sid for sid, s in self._subs.items() if not s.active]
+            for sid in dead:
                 del self._subs[sid]
                 removed += 1
         return removed
