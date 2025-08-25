@@ -148,3 +148,6 @@ new step.md
 
 # helper scripts
 dev/scripts/*.ps1
+
+# generated clean IRM view (no sentinels)
+docs/IRM.view.md
