@@ -1,0 +1,18 @@
+﻿{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Render: IRM clean view",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy","Bypass",
+        "-File","${workspaceFolder}/tools/render_irm_view.ps1",
+        "-Open"
+      ],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    }
+  ]
+}
