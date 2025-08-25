@@ -35,3 +35,25 @@ def load_liquidity_params() -> LiquidityParams:
         LiquidityParams.min_price_usd,
     )
     return LiquidityParams(min_vol24_usd=min_vol, min_price_usd=min_price)
+
+
+_TRUTHY = {"1", "true", "yes", "on", "y"}
+_FALSY = {"0", "false", "no", "off", "n"}
+
+
+def is_liquidity_enabled() -> bool:
+    """
+    Увімкнення фільтра. Пріоритет flat > nested:
+      ENABLE_LIQUIDITY_FILTERS > LIQUIDITY__ENABLED > default False.
+    """
+    import os
+
+    val = os.getenv("ENABLE_LIQUIDITY_FILTERS", os.getenv("LIQUIDITY__ENABLED"))
+    if val is None:
+        return False
+    v = str(val).strip().lower()
+    if v in _TRUTHY:
+        return True
+    if v in _FALSY:
+        return False
+    return False
