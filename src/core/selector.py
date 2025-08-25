@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, Iterable, List, Mapping, Optional
 
 from src.core.filters.liquidity import enough_liquidity
 from src.infra.config import load_settings
@@ -241,3 +241,29 @@ def run_selection(
             }
         )
     return saved
+
+
+# --- Phase 6.3.3: optional liquidity filter ---------------------------------
+
+
+def _apply_liquidity_if_enabled(
+    rows: Iterable[Mapping[str, Any]],
+) -> List[Mapping[str, Any]]:
+    """
+    Застосувати фільтр ліквідності, якщо він увімкнений через env.
+    Безпечно: якщо вимкнено або сталася помилка — повертає rows як є.
+    Toggle читається з src.infra.liquidity_env.is_liquidity_enabled().
+    (На цьому кроці хелпер лише додається, у пайплайн відбору ще не підключаємо.)
+    """
+    try:
+        from src.infra.liquidity_env import is_liquidity_enabled
+
+        if not is_liquidity_enabled():
+            return list(rows)
+        from src.core.filters import make_liquidity_predicate
+
+        pred = make_liquidity_predicate()
+        return [r for r in rows if pred(r)]
+    except Exception:
+        # Нічого не ламаємо у проді: фільтр пропускаємо.
+        return list(rows)
