@@ -19,6 +19,7 @@ def main() -> int:
     text = re.sub(r"[ \t]+$", "", text, flags=re.M)
     text = re.sub(r"(?:\r?\n){3,}", "\n\n", text)
 
+    text = re.sub(r"<!--(?!\s*IRM:).*?-->", "", text, flags=re.S)
     DST.write_text(text, encoding="utf-8")
     print(f"Rendered {DST}")
     return 0
