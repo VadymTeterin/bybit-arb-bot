@@ -103,7 +103,7 @@ _Статуси_: **todo** — ще не почато, **doing** — в робо
 - [x] 6.3.0 Kickoff — мітка часу зафіксована (2025-08-24).
 - [x] 6.3.1 Схема SQLite (signals/quotes/meta) — done.
 - [x] 6.3.2 DAO + retention + тести — done.
-- [x] 6.3.3 Фільтри у `selector` (24h vol USD, мін. ціна, depth — опц.).
+- [x] 6.3.3 Фільтр ліквідності  done.
 - [ ] 6.3.4 Selector → alerts: cooldown + history-suppression.
 - [ ] 6.3.5 `/report`: звіт з SQLite + CSV/Parquet.
 - [ ] 6.3.6 Тести: unit + інтеграція (mock Bybit, E2E).
