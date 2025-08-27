@@ -65,6 +65,23 @@ def send_arbitrage_alert(signal: Any, enabled: bool = True) -> bool:
     vol_24h = _to_float(getattr(signal, "vol_24h", getattr(signal, "vol24h", 0.0)), 0.0)
     basis = _to_float(getattr(signal, "basis", getattr(signal, "basis_pct", 0.0)), 0.0)
 
+    # NEW: tolerate missing price fields expected by formatter
+    spot_price = _to_float(
+        getattr(signal, "spot_price", None)
+        or getattr(signal, "spot", None)
+        or getattr(signal, "price_spot", None)
+        or getattr(signal, "spot_last", None),
+        0.0,
+    )
+    mark_price = _to_float(
+        getattr(signal, "mark_price", None)
+        or getattr(signal, "mark", None)
+        or getattr(signal, "price_mark", None)
+        or getattr(signal, "futures_price", None)
+        or getattr(signal, "linear_last", None),
+        0.0,
+    )
+
     # Choose a per-symbol key for gate (prefer futures/linear, fallback to spot)
     symbol_key = (str(symbol_linear) or str(symbol_spot)).upper().strip()
     if not symbol_key:
@@ -86,6 +103,8 @@ def send_arbitrage_alert(signal: Any, enabled: bool = True) -> bool:
         "spread_pct": spread_pct,
         "vol_24h": vol_24h,
         "basis": basis,
+        "spot_price": spot_price,  # required keyword-only args in formatter
+        "mark_price": mark_price,  # required keyword-only args in formatter
     }
     text = format_arbitrage_alert(**params)  # type: ignore[call-arg]
 
