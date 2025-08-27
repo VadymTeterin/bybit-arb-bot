@@ -1,94 +1,129 @@
 from __future__ import annotations
 
+import os
 from typing import Any, Optional, cast
 
+try:
+    from loguru import logger  # type: ignore
+except Exception:  # pragma: no cover
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+# Local deps
 from src.infra import config
 from src.telegram.sender import TelegramSender
 
 
 def _load_settings_safe() -> Any | None:
-    """
-    Акуратно пробуємо отримати налаштування через load_settings(),
-    не фіксуючи саму функцію в змінній (щоб уникнути конфлікту типів з mypy).
-    """
-    try:
-        from src.infra.config import load_settings  # type: ignore[attr-defined]
-    except Exception:
-        return None
+    """Try to load settings from config without pinning to a specific function name."""
+    # We support either get_settings() or load_settings() depending on project stage.
+    for fname in ("get_settings", "load_settings"):
+        try:
+            fn = cast(Any, getattr(config, fname, None))
+            if fn:
+                return fn()
+        except Exception as e:  # pragma: no cover
+            logger.warning("%s() failed: %s", fname, e)
+    return None
 
+
+def _env_get(*names: str) -> Optional[str]:
+    for n in names:
+        v = os.getenv(n)
+        if v:
+            return v
+    return None
+
+
+def _chat_label(settings: Any | None) -> str:
+    """Resolve a short chat label/prefix.
+
+    Priority:
+      1) Explicit env vars: TELEGRAM__LABEL / TG_LABEL / ALERT_CHAT_LABEL
+      2) Settings fields if present: settings.telegram.label / settings.label
+      3) Derive from runtime env: dev -> "🧪 DEV", stage -> "🟨 STAGE", prod -> ""
+    """
+    v = _env_get("TELEGRAM__LABEL", "TG_LABEL", "ALERT_CHAT_LABEL")
+    if v:
+        return str(v).strip()
+
+    # Settings-based label
     try:
-        return load_settings()
+        tg = getattr(settings, "telegram", None)
+        if tg and getattr(tg, "label", None):
+            return str(getattr(tg, "label")).strip()
+        if getattr(settings, "label", None):
+            return str(getattr(settings, "label")).strip()
     except Exception:
-        return None
+        pass
+
+    # Derive from runtime.env
+    try:
+        env = str(getattr(getattr(settings, "runtime", object()), "env", "")).lower()
+    except Exception:
+        env = ""
+    if env in ("dev", "development"):
+        return "🧪 DEV"
+    if env in ("stage", "staging", "preprod", "uat"):
+        return "🟨 STAGE"
+    return ""  # production by default
 
 
 class TelegramNotifier:
-    """
-    Невтручальний адаптер для відправки повідомлень у Telegram.
+    """Thin wrapper around TelegramSender that applies a label prefix if configured."""
 
-    Джерела конфігурації (пріоритет зверху вниз):
-    1) Аргументи конструктора
-    2) Плоскі змінні в src.infra.config: TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID / TELEGRAM_COOLDOWN_SECONDS
-    3) Nested settings: load_settings().telegram.bot_token / .alert_chat_id, а також settings.alert_cooldown_sec
-    """
+    def __init__(self, enabled: bool = True) -> None:
+        self.enabled = bool(enabled)
+        self._settings = _load_settings_safe()
 
-    def __init__(
-        self,
-        token: Optional[str] = None,
-        chat_id: Optional[str] = None,
-        cooldown_s: Optional[int] = None,
-        enabled: bool = True,
-    ) -> None:
-        self.enabled = enabled
+        # Token
+        token = None
+        try:
+            if self._settings is not None and getattr(self._settings, "telegram", None):
+                token = getattr(self._settings.telegram, "bot_token", None) or getattr(
+                    self._settings, "tg_bot_token", None
+                )
+            token = token or _env_get("TG_BOT_TOKEN", "TELEGRAM_BOT_TOKEN")
+        except Exception:
+            token = token or _env_get("TG_BOT_TOKEN", "TELEGRAM_BOT_TOKEN")
 
-        # 1) аргументи або плоскі значення з config
-        _token = token or cast(
-            Optional[str], getattr(config, "TELEGRAM_BOT_TOKEN", None)
+        # Chat id
+        chat_id = None
+        try:
+            if self._settings is not None and getattr(self._settings, "telegram", None):
+                chat_id = getattr(self._settings.telegram, "chat_id", None) or getattr(
+                    self._settings, "tg_chat_id", None
+                )
+            chat_id = chat_id or _env_get("TG_CHAT_ID", "TELEGRAM_CHAT_ID")
+        except Exception:
+            chat_id = chat_id or _env_get("TG_CHAT_ID", "TELEGRAM_CHAT_ID")
+
+        if not token or not chat_id:
+            logger.warning("TelegramNotifier missing token/chat_id; disabled")
+            self.enabled = False
+
+        self._label = _chat_label(self._settings)
+        self._sender = TelegramSender(
+            token=str(token or ""), chat_id=str(chat_id or "")
         )
-        _chat = chat_id or cast(
-            Optional[str], getattr(config, "TELEGRAM_CHAT_ID", None)
-        )
-        _cooldown_opt = (
-            cooldown_s
-            if cooldown_s is not None
-            else cast(Optional[int], getattr(config, "TELEGRAM_COOLDOWN_SECONDS", None))
-        )
 
-        # 2) fallback на nested settings
-        if (not _token or not _chat) or _cooldown_opt is None:
-            settings = _load_settings_safe()
-            if settings is not None:
-                tg = getattr(settings, "telegram", None)
-                if tg is not None:
-                    if not _token:
-                        _token = cast(Optional[str], getattr(tg, "bot_token", None))
-                    if not _chat:
-                        _chat = cast(Optional[str], getattr(tg, "alert_chat_id", None))
-                if _cooldown_opt is None:
-                    _cooldown_opt = cast(
-                        Optional[int], getattr(settings, "alert_cooldown_sec", None)
-                    )
-
-        # 3) дефолт для cooldown
-        cooldown_final: int = _cooldown_opt if _cooldown_opt is not None else 30
-
-        # 4) конструктор відправника
-        self._sender: TelegramSender = TelegramSender(
-            token=_token or "",
-            chat_id=_chat or "",
-            cooldown_s=cooldown_final,
-        )
+    def _apply_label(self, text: str) -> str:
+        if not self._label:
+            return text
+        # avoid double-prefixing in case caller already added it
+        if text.startswith(self._label):
+            return text
+        return f"{self._label} | {text}"
 
     def send_text(self, text: str) -> bool:
         if not self.enabled:
             return False
-        return self._sender.send(text)
+        return self._sender.send(self._apply_label(text))
 
 
 def send_telegram(text: str, enabled: bool = True) -> bool:
-    """
-    Зручна функція-враппер для швидкої відправки повідомлення у Telegram.
-    """
+    """Convenience wrapper for quick Telegram send with optional label prefix."""
     if not enabled:
         return False
     notifier = TelegramNotifier(enabled=True)
