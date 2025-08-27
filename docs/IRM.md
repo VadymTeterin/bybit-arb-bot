@@ -1,4 +1,4 @@
-﻿# IMPLEMENTATION ROADMAP (IRM)
+# IMPLEMENTATION ROADMAP (IRM)
 Проєкт: **БОТ АРБІТРАЖНИЙ BYBIT**
 Версія документа: ** 1.7 1.6(IRM.md)** • Дата: ** 2025-08-24 (Europe/Kyiv)**
 Власник: VadymTeterin • Мітки: Implementation Roadmap (IRM), **Фаза 5 — WS (5.8.x)**, **Фаза 6 — Daily Digest (6.0/6.1)**, **Фаза 6.2 — WS Health/Resilience (6.2.x)**
@@ -104,9 +104,9 @@ _Статуси_: **todo** — ще не почато, **doing** — в робо
 - [x] 6.3.1 Схема SQLite (signals/quotes/meta) — done.
 - [x] 6.3.2 DAO + retention + тести — done.
 - [x] 6.3.3 Фільтр ліквідності  done.
-- [ ] 6.3.4 Selector → alerts: cooldown + history-suppression.
-- [ ] 6.3.5 `/report`: звіт з SQLite + CSV/Parquet.
-- [ ] 6.3.6 Тести: unit + інтеграція (mock Bybit, E2E).
+- [x] Крок 6.3.4  мітка чату & приглушення алертів
+- [x] Крок 6.3.5  персист стану Gate у SQLite
+- [ ] Крок 6.3.6  maintenance SQLite (retention/VACUUM)
 - [ ] 6.3.7 Документи: `docs/HISTORY_AND_FILTERS.md`, README, CHANGELOG.
 - [ ] 6.3.8 CI: покриття, бейдж.
 - [ ] Генерувати секцію з YAML
