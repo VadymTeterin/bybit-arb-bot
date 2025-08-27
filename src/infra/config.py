@@ -104,8 +104,17 @@ class AlertsConfig(BaseModel):
 
     model_config = ConfigDict(validate_assignment=True)
 
+    # Basis threshold (percentage points)
     threshold_pct: float = Field(default=1.0, ge=0.0, le=100.0)
+
+    # Cooldown to avoid spamming same symbol
     cooldown_sec: int = Field(default=300, ge=0, le=86_400)
+
+    # Suppression of near-duplicate alerts:
+    # - suppress if |Δbasis| < suppress_eps_pct (percentage points)
+    # - compare with the last sent alert for a symbol within a window
+    suppress_eps_pct: float = Field(default=0.2, ge=0.0, le=100.0)
+    suppress_window_min: int = Field(default=15, ge=0, le=10_080)  # up to 7 days
 
 
 class LiquidityConfig(BaseModel):
@@ -139,6 +148,10 @@ class AppSettings(BaseSettings):
     env: str = "dev"
     alert_threshold_pct: float = 1.0
     alert_cooldown_sec: int = 300
+    # new back-compat mirrors for suppression
+    alert_suppress_eps_pct: float = 0.2
+    alert_suppress_window_min: int = 15
+
     min_vol_24h_usd: float = 10_000_000.0
     min_price: float = 0.001
     db_path: str = "data/signals.db"
@@ -194,7 +207,7 @@ def _build_settings() -> AppSettings:
 
     Precedence within aliases:
       - Telegram: NESTED (TELEGRAM__*) → TG_CHAT_ID → TELEGRAM_CHAT_ID → TELEGRAM_ALERT_CHAT_ID
-      - Alerts:  FLAT (ALERT_*) → NESTED (ALERTS__*)    # <- flat має перекривати nested
+      - Alerts:  FLAT (ALERT_*) → NESTED (ALERTS__*)    # flat overrides nested (expected by tests)
       - Liquidity/Runtime: NESTED → FLAT
     """
     # Re-load .env if ENV_FILE changed between calls (idempotent & respects existing ENV)
@@ -233,7 +246,7 @@ def _build_settings() -> AppSettings:
         ws_sub_topics_spot=base.bybit.ws_sub_topics_spot,
     )
 
-    # Alerts: FLAT → NESTED (legacy flat overrides nested, як очікує тест flat_overrides_nested)
+    # Alerts: FLAT → NESTED (legacy flat overrides nested)
     alerts = AlertsConfig(
         threshold_pct=_from_env_many_float(
             "ALERT_THRESHOLD_PCT",
@@ -247,6 +260,18 @@ def _build_settings() -> AppSettings:
             default=base.alerts.cooldown_sec,
         )
         or base.alerts.cooldown_sec,
+        suppress_eps_pct=_from_env_many_float(
+            "ALERT_SUPPRESS_EPS_PCT",
+            "ALERTS__SUPPRESS_EPS_PCT",
+            default=base.alerts.suppress_eps_pct,
+        )
+        or base.alerts.suppress_eps_pct,
+        suppress_window_min=_from_env_many_int(
+            "ALERT_SUPPRESS_WINDOW_MIN",
+            "ALERTS__SUPPRESS_WINDOW_MIN",
+            default=base.alerts.suppress_window_min,
+        )
+        or base.alerts.suppress_window_min,
     )
 
     # Liquidity: NESTED → FLAT
@@ -289,6 +314,8 @@ def _build_settings() -> AppSettings:
         env=runtime.env,
         alert_threshold_pct=alerts.threshold_pct,
         alert_cooldown_sec=alerts.cooldown_sec,
+        alert_suppress_eps_pct=alerts.suppress_eps_pct,
+        alert_suppress_window_min=alerts.suppress_window_min,
         min_vol_24h_usd=liquidity.min_vol_24h_usd,
         min_price=liquidity.min_price,
         db_path=runtime.db_path,
