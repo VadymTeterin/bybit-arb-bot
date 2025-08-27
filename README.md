@@ -11,6 +11,7 @@
 ## Зміст
 - [Особливості](#особливості)
 - [WS Resilience (6.2.0)](#ws-resilience-620)
+- [Alerts (6.3.x)](#alerts-63x)
 - [Вимоги](#вимоги)
 - [Швидкий старт (PowerShell)](#швидкий-старт-powershell)
 - [Конфігурація](#конфігурація)
@@ -38,7 +39,7 @@
 - 💧 **Фільтри ліквідності**: 24h обсяг (USD), мінімальна ціна
 - 📨 **Telegram-алерти** з форматуванням, антиспам (**cooldown** на монету)
 - 🧱 **pydantic-settings v2**: валідовані секції конфігурації + **back-compat** зі старими ключами
-- 🗄️ **SQLite / Parquet** для історії (сигнали, котирування)
+- 🗄️ **SQLite / Parquet** для історії (сигнали, котирування) + **персист стану AlertGate** (6.3.5)
 - 🧪 **pytest** + **ruff/black/isort/mypy** через **pre-commit**
 - 🔧 Windows-орієнтований DX: інструкції лише для **PowerShell / VS Code “Термінал”**
 
@@ -52,7 +53,23 @@
 - **WS Multiplexer**: *ледача відписка* (`unsubscribe()` вимикає доставку, але запис зберігається до `clear_inactive()`), сумісний `stats()`; файл: `src/ws/multiplexer.py`.
 - **Каркас health-метрик** (SPOT/LINEAR counters, uptime, last_event_ts) — готово для `/status` у 6.2.1.
 
-Деталі: див. **[docs/WS_RESILIENCE.md](docs/WS_RESILIENCE.md)**.
+Деталі: див. **docs/WS_RESILIENCE.md**.
+
+---
+
+## Alerts (6.3.x)
+
+**6.3.4 — Приглушення майже-дублікатів + cooldown:**
+При повторних алертах по тому самому символу протягом `cooldown` ми приглушуємо повідомлення,
+якщо зміна базису менша за `SUPPRESS_EPS_PCT` (у відсоткових пунктах) протягом вікна `SUPPRESS_WINDOW_MIN`.
+Приглушення активне **лише під час дії cooldown**.
+
+**6.3.5 — Персист стану гейта у SQLite:**
+Записуємо останній надісланий сигнал (час + basis) у `alerts.db` — завдяки цьому
+троттлінг і приглушення виживають після рестартів. SQLite відкриваємо в WAL-режимі.
+
+**Telegram Chat Label (ENV-префікс):**
+Якщо задано `TELEGRAM__LABEL`, у повідомленнях Telegram додається префікс `"LABEL | ..."`. Зручно для `DEV`/`STAGE`.
 
 ---
 
@@ -60,7 +77,7 @@
 
 - Windows 11
 - Python **3.11+**
-- Інтернет (Wi‑Fi до 1 Гбіт, роутер Archer A64 — ок)
+- Інтернет (Wi-Fi до 1 Гбіт, роутер Archer A64 — ок)
 - Токени: **Telegram Bot Token**, **Telegram Chat ID**
 - (Опц.) **Bybit API Key/Secret** для приватних методів; публічні WS/REST працюють і без них
 
@@ -108,26 +125,21 @@ RUNTIME__TOP_N_REPORT=10
 
 TELEGRAM__TOKEN=
 TELEGRAM__CHAT_ID=
+TELEGRAM__LABEL=
 
 BYBIT__API_KEY=
 BYBIT__API_SECRET=
-# BYBIT__WS_PUBLIC_URL_LINEAR=wss://stream.bybit.com/v5/public/linear
-# BYBIT__WS_PUBLIC_URL_SPOT=wss://stream.bybit.com/v5/public/spot
-# BYBIT__WS_SUB_TOPICS_LINEAR=tickers.BTCUSDT,tickers.ETHUSDT
-# BYBIT__WS_SUB_TOPICS_SPOT=tickers.BTCUSDT,tickers.ETHUSDT
 
-ALERTS__THRESHOLD_PCT=1.0      # 0..100
-ALERTS__COOLDOWN_SEC=300       # 0..86400
+ALERTS__THRESHOLD_PCT=1.0        # 0..100
+ALERTS__COOLDOWN_SEC=300         # 0..86400
+ALERTS__SUPPRESS_EPS_PCT=0.2     # epsilon у відсоткових пунктах
+ALERTS__SUPPRESS_WINDOW_MIN=15   # хвилинне вікно для epsilon
+ALERTS__DB_PATH=./data/alerts.db # шлях до SQLite для гейта
+# (планується) ALERTS__KEEP_DAYS=7
 
 LIQUIDITY__MIN_VOL_24H_USD=10000000
 LIQUIDITY__MIN_PRICE=0.001
 ```
-
-**Валідація:**
-- `ALERTS__THRESHOLD_PCT` ∈ `[0..100]`
-- `ALERTS__COOLDOWN_SEC` ∈ `[0..86400]`
-- `LIQUIDITY__MIN_VOL_24H_USD` ≥ `0`, `LIQUIDITY__MIN_PRICE` ≥ `0`
-- `RUNTIME__TOP_N_REPORT` ∈ `[1..100]`
 
 ### Сумісність зі старими flat-ключами
 
@@ -141,21 +153,22 @@ LIQUIDITY__MIN_PRICE=0.001
 | `RUNTIME__ENABLE_ALERTS`                    | `ENABLE_ALERTS`                                             |
 | `TELEGRAM__TOKEN`                           | `TELEGRAM_TOKEN`, `TELEGRAM_BOT_TOKEN`                      |
 | `TELEGRAM__CHAT_ID`                         | `TELEGRAM_CHAT_ID`, `TG_CHAT_ID`, `TELEGRAM_ALERT_CHAT_ID`  |
+| `TELEGRAM__LABEL`                           | `TELEGRAM_LABEL`, `TG_LABEL`, `ALERT_CHAT_LABEL`            |
 | `BYBIT__API_KEY`                            | `BYBIT_API_KEY`                                             |
 | `BYBIT__API_SECRET`                         | `BYBIT_API_SECRET`                                          |
 | `ALERTS__THRESHOLD_PCT`                     | `ALERT_THRESHOLD_PCT`                                       |
 | `ALERTS__COOLDOWN_SEC`                      | `ALERT_COOLDOWN_SEC`                                        |
+| `ALERTS__SUPPRESS_EPS_PCT`                  | `ALERTS_SUPPRESS_EPS_PCT`                                   |
+| `ALERTS__SUPPRESS_WINDOW_MIN`               | `ALERTS_SUPPRESS_WINDOW_MIN`                                |
+| `ALERTS__DB_PATH`                           | `ALERTS_DB_PATH`                                            |
+| (план) `ALERTS__KEEP_DAYS`                  | `ALERTS_KEEP_DAYS`                                          |
 | `LIQUIDITY__MIN_VOL_24H_USD`                | `MIN_VOL_24H_USD`                                           |
 | `LIQUIDITY__MIN_PRICE`                      | `MIN_PRICE`                                                 |
-| `BYBIT__WS_PUBLIC_URL_LINEAR`               | `WS_PUBLIC_URL_LINEAR` *(override)*                         |
-| `BYBIT__WS_PUBLIC_URL_SPOT`                 | `WS_PUBLIC_URL_SPOT` *(override)*                           |
-| `BYBIT__WS_SUB_TOPICS_LINEAR`               | `WS_SUB_TOPICS_LINEAR` *(override)*                         |
-| `BYBIT__WS_SUB_TOPICS_SPOT`                 | `WS_SUB_TOPICS_SPOT` *(override)*                           |
 
 ### Мікроблок: Пріоритет ключів для alerts
 
 > Якщо одночасно задано `ALERTS__THRESHOLD_PCT` (nested) і `ALERT_THRESHOLD_PCT` (flat),
-> перемагає **flat**. Так само для `COOLDOWN_SEC`.
+> перемагає **flat**. Так само для `COOLDOWN_SEC`, `SUPPRESS_*`, `DB_PATH`.
 
 ### Програмний доступ
 
@@ -166,8 +179,8 @@ s = load_settings()
 print("env:", s.env)                                  # mirrors s.runtime.env
 print("enable_alerts:", s.enable_alerts)              # mirrors s.runtime.enable_alerts
 print("alerts:", s.alerts.threshold_pct, s.alerts.cooldown_sec)
-print("liquidity:", s.liquidity.min_vol_24h_usd, s.liquidity.min_price)
-print("telegram token present:", bool(s.telegram.token))  # never print secrets
+print("suppress:", s.alerts.suppress_eps_pct, s.alerts.suppress_window_min)
+print("alerts db:", s.alerts.db_path)
 ```
 
 ---
@@ -215,6 +228,7 @@ pytest -q
 pre-commit run -a
 ```
 
+**pytest**: **144 passed, 1 skipped** (локально).
 **pre-commit**: `ruff`, `ruff-format`, `isort`, `black`, `mypy`, trim-whitespace, EOF check.
 Комміти — у стилі **Conventional Commits**.
 
@@ -255,6 +269,7 @@ docs/
 ## Документація
 
 - **WS Resilience (6.2.0)** — `docs/WS_RESILIENCE.md`
+- **IRM** — оновлюється **лише генератором** (`Render IRM.view.md`)
 
 ---
 
@@ -263,7 +278,8 @@ docs/
 - **`pip install -r requirements.txt` падає через \x00** — не використовуйте `-Encoding Unicode` для `requirements.txt`; зберігайте файл у **UTF-8**.
 - **`git diff` «нескінченний»** — ви у пейджері; натисніть `q` або використайте `git --no-pager diff`.
 - **CRLF/LF попередження** — додайте `.gitattributes` із правилами EOL; Python-файли краще з **LF**.
-- **Digest не шле у Telegram** — перевірте `TELEGRAM_TOKEN/CHAT_ID` (секрети не логуються).
+- **PowerShell і лапки у git commit -m** — для складних повідомлень використовуйте одинарні лапки або `-F file.txt`.
+- **Digest не шле у Telegram** — перевірте `TELEGRAM__TOKEN/CHAT_ID` (секрети не логуються).
 
 ---
 

@@ -11,9 +11,44 @@
 
 ## [Unreleased]
 ### Planned
+- Phase 6 — SQLite maintenance (Step **6.3.6**): `purge_keep_days` + `VACUUM`.
 - Phase 6 — додатковий **config hardening**: маскування секретів у логах, статична валідація CI Secrets.
 - `/status`: показ джерела значень (ENV / .env / дефолти) *без* виводу секретів.
 - Документація: приклади `.env` для `dev`/`prod`, best practices для GitHub Secrets.
+
+---
+
+## [6.3.5] — 2025-08-27
+**Phase 6 — Step-6.3.4 / 6.3.5 · Alerts cooldown + suppression + persistence**
+
+### Added
+- **AlertGate**: троттлінг алертів + **приглушення майже-дублікатів** (epsilon у відсоткових пунктах)
+  — **приглушення застосовується лише під час дії cooldown-вікна**.
+  - Конфіг: `ALERTS__SUPPRESS_EPS_PCT`, `ALERTS__SUPPRESS_WINDOW_MIN` *(flat-дзеркала:*
+    `ALERTS_SUPPRESS_EPS_PCT`, `ALERTS_SUPPRESS_WINDOW_MIN`)*.
+  - 5/5 юніт-тестів для гейта (`tests/test_alerts_gate.py`).
+
+- **Персист стану гейта у SQLite** (`SqliteAlertGateRepo`):
+  - Зберігання останнього відправленого сигналу на символ (timestamp + basis).
+  - WAL-режим; живе через рестарти; інтегровано в `alerts_hook`.
+  - Конфіг шляху: `ALERTS_DB_PATH` (*альтернатива nested:* `ALERTS__DB_PATH`).
+
+- **Telegram chat label prefix** (позначка середовища на початку повідомлення):
+  - Джерело: `TELEGRAM__LABEL` (якщо не задано — може виводитись на основі `RUNTIME__ENV`).
+  - Збережено API `send_telegram(text, enabled=True)`.
+  - Юніт-тест: `tests/test_notify_telegram_label.py` (перевіряє префікс).
+
+- **pytest.ini**: обмежено пошук тестів до `tests/`, ігнор `dev/tmp` (щоб не ловити тимчасові файли).
+
+### Tests
+- Локально: **144 passed, 1 skipped**.
+
+### Migration Notes
+- Для активації приглушення задайте `ALERTS__SUPPRESS_EPS_PCT` (напр. `0.2`) і `ALERTS__SUPPRESS_WINDOW_MIN` (напр. `15`).
+- Щоб увімкнути префікс середовища у Telegram, задайте `TELEGRAM__LABEL` (напр. `DEV`).
+- Для персистенції стану гейта створіть/задайте шлях до БД: `ALERTS_DB_PATH=./data/alerts.db` (каталог буде створено автоматично).
+
+[6.3.5]: https://github.com/VadymTeterin/bybit-arb-bot/compare/v6.2.0...v6.3.5
 
 ---
 
