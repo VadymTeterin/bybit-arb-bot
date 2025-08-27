@@ -1,5 +1,17 @@
 # Bybit Arbitrage Bot
 
+## Quality & Delivery Standards
+
+This project follows **QS v1.0** aligned with **Working Agreements v2.0**.
+
+- **Quality Standard (QS v1.0):** see [docs/QUALITY.md](docs/QUALITY.md)
+- **Definition of Done:** see [docs/DoD.md](docs/DoD.md)
+- **Testing Guide:** see [docs/TESTING.md](docs/TESTING.md)
+- **Safe Rollout Plan:** see [docs/Plan_bezpechnogo_vprovadzhennya_po_etapakh.md](docs/Plan_bezpechnogo_vprovadzhennya_po_etapakh.md)
+
+> Tooling: `ruff.toml`, `isort.cfg`, `pre-commit-config.yaml`, `requirements-dev.txt` (at repo root).
+
+
 [![Digest E2E Smoke](https://github.com/VadymTeterin/bybit-arb-bot/actions/workflows/digest-e2e-smoke.yml/badge.svg?branch=main)](https://github.com/VadymTeterin/bybit-arb-bot/actions/workflows/digest-e2e-smoke.yml)
 
 > Windows 11 · Python 3.11+ · aiogram 3 · Bybit REST & WebSocket v5 · pydantic-settings v2
