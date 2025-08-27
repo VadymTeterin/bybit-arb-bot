@@ -1,0 +1,4 @@
+# Ruff configuration
+line-length = 100
+extend-select = ["E", "F", "I", "B", "W", "UP"]
+# Ignore list може бути доповнено після першого прогону (observe-only)
