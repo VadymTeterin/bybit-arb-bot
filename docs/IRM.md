@@ -100,15 +100,15 @@ _Статуси_: **todo** — ще не почато, **doing** — в робо
 <!-- IRM:END 6.2 -->
 
 ### Фаза 6.3 — Історія (SQLite) та фільтри ліквідності
-- [x] 6.3.0 Kickoff — мітка часу зафіксована (2025-08-24).
-- [x] 6.3.1 Схема SQLite (signals/quotes/meta) — done.
-- [x] 6.3.2 DAO + retention + тести — done.
-- [x] 6.3.3 Фільтр ліквідності  done.
-- [x] Крок 6.3.4  мітка чату & приглушення алертів
-- [x] Крок 6.3.5  персист стану Gate у SQLite
-- [ ] Крок 6.3.6  maintenance SQLite (retention/VACUUM)
-- [ ] 6.3.7 Документи: `docs/HISTORY_AND_FILTERS.md`, README, CHANGELOG.
-- [ ] 6.3.8 CI: покриття, бейдж.
+- [x] 6.3.0 Крок Kickoff — мітка часу зафіксована (2025-08-24).
+- [x] 6.3.1 Крок Схема SQLite (signals/quotes/meta) — done.
+- [x] 6.3.2 Крок DAO + retention + тести — done.
+- [x] 6.3.3 Крок Фільтр ліквідності — done.
+- [x] 6.3.4 Крок мітка чату & приглушення алертів
+- [x] 6.3.5 Крок персист стану Gate у SQLite
+- [ ] 6.3.6 Крок maintenance SQLite (retention/VACUUM)
+- [ ] 6.3.7 Крок Документи: `docs/HISTORY_AND_FILTERS.md`, README, CHANGELOG.
+- [ ] 6.3.8 Крок CI: покриття, бейдж.
 - [ ] Генерувати секцію з YAML
 
 ### Подальші фази (укрупнено)
