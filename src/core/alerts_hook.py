@@ -5,21 +5,22 @@ from typing import Any, Dict
 
 try:
     from loguru import logger  # type: ignore
-
-    _USE_LOGURU = True
 except Exception:  # pragma: no cover
     import logging
 
     logger = logging.getLogger(__name__)
-    _USE_LOGURU = False
 
 from src.core.alerts_gate import AlertGate
+from src.infra.alerts_repo import SqliteAlertGateRepo
 from src.infra.config import get_settings
 from src.infra.notify_telegram import send_telegram
 from src.telegram.formatters import format_arbitrage_alert
 
 _SETTINGS = get_settings()
+# New: persistent repo for AlertGate
+_REPO = SqliteAlertGateRepo.from_settings(_SETTINGS)
 _GATE = AlertGate.from_settings(_SETTINGS)
+_GATE.repo = _REPO  # wire persistence
 
 
 def _to_float(value: Any, default: float = 0.0) -> float:
@@ -46,6 +47,7 @@ def send_arbitrage_alert(signal: Any, enabled: bool = True) -> bool:
     """
     Build message and send it to Telegram through adapter, guarded by AlertGate.
     Returns False if disabled/missing fields or suppressed by cooldown/near-duplicate rules.
+    Persists last alert state in SQLite so cooldown survives restarts.
     """
     if not enabled or signal is None:
         return False
@@ -96,7 +98,6 @@ def send_arbitrage_alert(signal: Any, enabled: bool = True) -> bool:
     now = datetime.now(timezone.utc)
     allow, reason = _GATE.should_send(symbol_key, basis, now)
     if not allow:
-        # Use f-strings so it looks good both in loguru and std logging
         logger.info(f"Suppressed {symbol_key}: {reason}")
         return False
 
