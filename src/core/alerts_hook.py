@@ -5,10 +5,13 @@ from typing import Any, Dict
 
 try:
     from loguru import logger  # type: ignore
+
+    _USE_LOGURU = True
 except Exception:  # pragma: no cover
     import logging
 
     logger = logging.getLogger(__name__)
+    _USE_LOGURU = False
 
 from src.core.alerts_gate import AlertGate
 from src.infra.config import get_settings
@@ -65,7 +68,7 @@ def send_arbitrage_alert(signal: Any, enabled: bool = True) -> bool:
     vol_24h = _to_float(getattr(signal, "vol_24h", getattr(signal, "vol24h", 0.0)), 0.0)
     basis = _to_float(getattr(signal, "basis", getattr(signal, "basis_pct", 0.0)), 0.0)
 
-    # NEW: tolerate missing price fields expected by formatter
+    # tolerate missing price fields expected by formatter
     spot_price = _to_float(
         getattr(signal, "spot_price", None)
         or getattr(signal, "spot", None)
@@ -93,7 +96,8 @@ def send_arbitrage_alert(signal: Any, enabled: bool = True) -> bool:
     now = datetime.now(timezone.utc)
     allow, reason = _GATE.should_send(symbol_key, basis, now)
     if not allow:
-        logger.info("Suppressed %s: %s", symbol_key, reason)
+        # Use f-strings so it looks good both in loguru and std logging
+        logger.info(f"Suppressed {symbol_key}: {reason}")
         return False
 
     # Build final text and send
@@ -103,8 +107,8 @@ def send_arbitrage_alert(signal: Any, enabled: bool = True) -> bool:
         "spread_pct": spread_pct,
         "vol_24h": vol_24h,
         "basis": basis,
-        "spot_price": spot_price,  # required keyword-only args in formatter
-        "mark_price": mark_price,  # required keyword-only args in formatter
+        "spot_price": spot_price,
+        "mark_price": mark_price,
     }
     text = format_arbitrage_alert(**params)  # type: ignore[call-arg]
 
@@ -112,5 +116,5 @@ def send_arbitrage_alert(signal: Any, enabled: bool = True) -> bool:
     if ok:
         _GATE.commit(symbol_key, basis, now)
     else:
-        logger.warning("Telegram send failed for %s (no commit)", symbol_key)
+        logger.warning(f"Telegram send failed for {symbol_key} (no commit)")
     return ok
