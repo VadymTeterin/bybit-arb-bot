@@ -10,12 +10,33 @@
 ---
 
 ## [Unreleased]
-### Planned
-- Phase 6 — SQLite maintenance (Step **6.3.6**): `purge_keep_days` + `VACUUM`.
-- Phase 6 — додатковий **config hardening**: маскування секретів у логах, статична валідація CI Secrets.
-- `/status`: показ джерела значень (ENV / .env / дефолти) *без* виводу секретів.
-- Документація: приклади `.env` для `dev`/`prod`, best practices для GitHub Secrets.
 
+> Статус: **в черзі до релізу**. Зміни не впливають на виконання коду — це документація та CI.
+
+### Додано
+- **Quality Standard (QS) v1.0** — `docs/QUALITY.md`, узгоджено з **Working Agreements v2.0**.
+- **Definition of Done** — `docs/DoD.md`.
+- **Testing Guide** — `docs/TESTING.md`.
+- **План безпечного впровадження** — `docs/Plan_bezpechnogo_vprovadzhennya_po_etapakh.md`.
+- **Шаблон Pull Request** — `.github/PULL_REQUEST_TEMPLATE.md`.
+- Конфігурації інструментів якості на корені репозиторію:
+  - `ruff.toml`, `isort.cfg`, `pre-commit-config.yaml`, `requirements-dev.txt`.
+
+### Змінено
+- **README.md** — додано розділ *Quality & Delivery Standards* з посиланнями на QS/DoD/Testing/Plan. (PR #40)
+
+### CI
+- Для подій **pull_request** `pre-commit` запускається **лише по змінених файлах** — швидше та без зайвого шуму.
+- Для подій **push** лишається повний прогін `--all-files`.
+- Файл змін: `.github/workflows/ci.yml`. (PR #39)
+
+### Перевірка
+1. `pip install -r requirements-dev.txt`
+2. *(опціонально)* `pre-commit install`
+3. `pre-commit run -a` — всі хуки мають пройти.
+4. Відкрити `README.md` в `main` і перевірити, що лінки на QS/DoD/Testing/Plan працюють.
+
+---
 ---
 
 ## [6.3.5] — 2025-08-27
