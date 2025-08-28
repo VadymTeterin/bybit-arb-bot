@@ -2,4 +2,5 @@
 line-length = 120
 
 [lint]
-extend-select = ["E", "F", "I", "B", "W", "UP"]
+extend-select = ["E","F","B","W","UP"]
+
