@@ -41,14 +41,8 @@ def show_signals(limit: int = 10, last_hours: Optional[int] = None) -> None:
 if __name__ == "__main__":
     import argparse
 
-    p = argparse.ArgumentParser(
-        description="Show recent arbitrage signals from SQLite."
-    )
-    p.add_argument(
-        "--limit", type=int, default=10, help="How many rows to show (default: 10)"
-    )
-    p.add_argument(
-        "--last-hours", type=int, default=None, help="Only rows within the last N hours"
-    )
+    p = argparse.ArgumentParser(description="Show recent arbitrage signals from SQLite.")
+    p.add_argument("--limit", type=int, default=10, help="How many rows to show (default: 10)")
+    p.add_argument("--last-hours", type=int, default=None, help="Only rows within the last N hours")
     args = p.parse_args()
     show_signals(limit=args.limit, last_hours=args.last_hours)

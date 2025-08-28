@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 IRM Phase 6.2 generator (SSOT-lite) with guard healing
 - Reads docs/irm.phase6.yaml
@@ -60,9 +59,7 @@ BEGIN_LINE_RE = re.compile(r"(?m)^\s*<!-- IRM:BEGIN 6\.2 -->\s*$")
 END_LINE_RE = re.compile(r"(?m)^\s*<!-- IRM:END 6\.2 -->\s*$")
 
 # Full block pattern: BEGIN line ... END line (non-greedy), strict to full lines
-BLOCK_RE = re.compile(
-    r"(?ms)^\s*<!-- IRM:BEGIN 6\.2 -->\s*$.*?^\s*<!-- IRM:END 6\.2 -->\s*$"
-)
+BLOCK_RE = re.compile(r"(?ms)^\s*<!-- IRM:BEGIN 6\.2 -->\s*$.*?^\s*<!-- IRM:END 6\.2 -->\s*$")
 
 # Header if sentinels absent
 HEADER_RE = re.compile(r"^###\s+Фаза\s+6\.2\b.*$", re.MULTILINE)
@@ -95,9 +92,7 @@ def render_markdown(data: dict) -> str:
     out.append("")
     legend = data.get("status_legend", {})
     if legend:
-        out.append(
-            "_Статуси_: " + ", ".join(f"**{k}** — {v}" for k, v in legend.items())
-        )
+        out.append("_Статуси_: " + ", ".join(f"**{k}** — {v}" for k, v in legend.items()))
         out.append("")
     for s in sections:
         out.append(
@@ -202,12 +197,8 @@ def write_mode() -> int:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(
-        description="Sync Phase 6.2 IRM from YAML (with guard healing)"
-    )
-    ap.add_argument(
-        "--check", action="store_true", help="Check IRM diff; exit 1 if updates needed"
-    )
+    ap = argparse.ArgumentParser(description="Sync Phase 6.2 IRM from YAML (with guard healing)")
+    ap.add_argument("--check", action="store_true", help="Check IRM diff; exit 1 if updates needed")
     ap.add_argument("--write", action="store_true", help="Write IRM updates in-place")
     args = ap.parse_args()
     if args.check and args.write:

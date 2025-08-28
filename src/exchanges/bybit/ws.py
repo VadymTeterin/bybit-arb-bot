@@ -67,11 +67,7 @@ def exp_backoff_with_jitter(
     if cap is not None and max_delay is not None:
         max_d = min(cap, max_delay)
     else:
-        max_d = (
-            cap
-            if cap is not None
-            else (max_delay if max_delay is not None else float("inf"))
-        )
+        max_d = cap if cap is not None else (max_delay if max_delay is not None else float("inf"))
 
     k = max(0, int(attempt) - 1)  # 1-based -> 0-based exponent
     nominal = base * (factor**k)

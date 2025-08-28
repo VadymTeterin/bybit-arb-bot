@@ -113,12 +113,7 @@ def parse_ws_orderbook_top(
 
     def _first_price(levels: Any) -> float:
         # очікуємо [["price","qty"], ...]
-        if (
-            isinstance(levels, list)
-            and levels
-            and isinstance(levels[0], list)
-            and levels[0]
-        ):
+        if isinstance(levels, list) and levels and isinstance(levels[0], list) and levels[0]:
             return _to_float(levels[0][0])
         return 0.0
 
@@ -157,17 +152,13 @@ class _WsPublic:
     ) -> None:
         self.symbol = symbol
         self.on_ticker = on_ticker
-        self.category = (
-            category or os.getenv("BYBIT_DEFAULT_CATEGORY", "spot") or "spot"
-        ).lower()
+        self.category = (category or os.getenv("BYBIT_DEFAULT_CATEGORY", "spot") or "spot").lower()
 
         # Визначаємо testnet/mainnet за REST-URL з env
         public_url = os.getenv("BYBIT_PUBLIC_URL", "https://api.bybit.com")
         is_testnet = "testnet" in public_url.lower()
 
-        host = (
-            "wss://stream-testnet.bybit.com" if is_testnet else "wss://stream.bybit.com"
-        )
+        host = "wss://stream-testnet.bybit.com" if is_testnet else "wss://stream.bybit.com"
         self._url = f"{host}/v5/public/{self.category}"
 
         self._read_timeout_s = read_timeout_s
@@ -289,9 +280,7 @@ class _WsPublic:
 
                     # прийом повідомлень
                     while not self._stop_event.is_set():
-                        raw = await asyncio.wait_for(
-                            ws.recv(), timeout=self._read_timeout_s
-                        )
+                        raw = await asyncio.wait_for(ws.recv(), timeout=self._read_timeout_s)
                         msg = json.loads(raw)
                         await self._handle_message(msg)
 

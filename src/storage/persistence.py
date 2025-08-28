@@ -1,5 +1,4 @@
 # src/storage/persistence.py
-# -*- coding: utf-8 -*-
 """SQLite persistence layer for signals & quotes.
 
 Notes:

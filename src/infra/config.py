@@ -234,9 +234,7 @@ def _build_settings() -> AppSettings:
 
     # Bybit (simple aliasing for keys)
     bybit = BybitConfig(
-        api_key=_from_env_many(
-            "BYBIT__API_KEY", "BYBIT_API_KEY", default=base.bybit.api_key or ""
-        ),
+        api_key=_from_env_many("BYBIT__API_KEY", "BYBIT_API_KEY", default=base.bybit.api_key or ""),
         api_secret=_from_env_many(
             "BYBIT__API_SECRET", "BYBIT_API_SECRET", default=base.bybit.api_secret or ""
         ),
@@ -290,11 +288,8 @@ def _build_settings() -> AppSettings:
 
     # Runtime: NESTED → FLAT
     runtime = RuntimeConfig(
-        env=_from_env_many("RUNTIME__ENV", "ENV", default=base.runtime.env)
-        or base.runtime.env,
-        db_path=_from_env_many(
-            "RUNTIME__DB_PATH", "DB_PATH", default=base.runtime.db_path
-        )
+        env=_from_env_many("RUNTIME__ENV", "ENV", default=base.runtime.env) or base.runtime.env,
+        db_path=_from_env_many("RUNTIME__DB_PATH", "DB_PATH", default=base.runtime.db_path)
         or base.runtime.db_path,
         top_n_report=_from_env_many_int(
             "RUNTIME__TOP_N_REPORT", "TOP_N_REPORT", default=base.runtime.top_n_report

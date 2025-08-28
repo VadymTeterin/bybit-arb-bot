@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """SQLite-backed repo for AlertGate persistence (Step 6.3.5).
 
 API expected by AlertGate:
@@ -35,7 +34,7 @@ class SqliteAlertGateRepo:
         self._ensure_schema()
 
     @classmethod
-    def from_settings(cls, settings) -> "SqliteAlertGateRepo":
+    def from_settings(cls, settings) -> SqliteAlertGateRepo:
         # Priority: env ALERTS_DB_PATH -> settings.persistence.alerts_db -> ./data/alerts.db
         env_path = os.getenv("ALERTS_DB_PATH") or os.getenv("ALERTS__DB_PATH")
         if env_path:

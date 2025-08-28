@@ -102,12 +102,8 @@ def _collect_real_events(
     since_iso, until_iso = _iso(start_utc), _iso(end_utc)
 
     # COMMITS
-    commits_raw = list(
-        client.list_commits(owner, repo, since_iso=since_iso, until_iso=until_iso)
-    )
-    commits: List[CommitEvent] = [
-        parse_commit(item, default_branch="main") for item in commits_raw
-    ]
+    commits_raw = list(client.list_commits(owner, repo, since_iso=since_iso, until_iso=until_iso))
+    commits: List[CommitEvent] = [parse_commit(item, default_branch="main") for item in commits_raw]
 
     # MERGES (PRs)
     pulls_raw = list(client.list_pulls_merged(owner, repo))
@@ -161,11 +157,7 @@ def _send_telegram(text: str) -> None:
     Sends a plain-text message to Telegram via Bot API.
     Requires env vars: TG_BOT_TOKEN, TG_CHAT_ID
     """
-    token = (
-        os.getenv("TG_BOT_TOKEN")
-        or os.getenv("TG_TOKEN")
-        or os.getenv("TELEGRAM_BOT_TOKEN")
-    )
+    token = os.getenv("TG_BOT_TOKEN") or os.getenv("TG_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TG_CHAT_ID")
     if not token or not chat_id:
         raise RuntimeError(
@@ -205,9 +197,7 @@ def _send_telegram(text: str) -> None:
 
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="GitHub Daily Digest")
-    parser.add_argument(
-        "--date", type=str, help="Kyiv date YYYY-MM-DD (default: today in Kyiv)"
-    )
+    parser.add_argument("--date", type=str, help="Kyiv date YYYY-MM-DD (default: today in Kyiv)")
     parser.add_argument(
         "--owner",
         type=str,
@@ -226,9 +216,7 @@ def main(argv: List[str] | None = None) -> int:
         help="Send the digest message to Telegram (one per Kyiv-day; see --force)",
     )
     # Backward-compatible flags:
-    parser.add_argument(
-        "--mock", action="store_true", help="Use offline mock data (default)"
-    )
+    parser.add_argument("--mock", action="store_true", help="Use offline mock data (default)")
     parser.add_argument(
         "--no-mock",
         action="store_true",

@@ -52,9 +52,9 @@ def _chat_label(settings: Any | None) -> str:
     try:
         tg = getattr(settings, "telegram", None)
         if tg and getattr(tg, "label", None):
-            return str(getattr(tg, "label")).strip()
+            return str(tg.label).strip()
         if getattr(settings, "label", None):
-            return str(getattr(settings, "label")).strip()
+            return str(settings.label).strip()
     except Exception:
         pass
 
@@ -104,9 +104,7 @@ class TelegramNotifier:
             self.enabled = False
 
         self._label = _chat_label(self._settings)
-        self._sender = TelegramSender(
-            token=str(token or ""), chat_id=str(chat_id or "")
-        )
+        self._sender = TelegramSender(token=str(token or ""), chat_id=str(chat_id or ""))
 
     def _apply_label(self, text: str) -> str:
         if not self._label:

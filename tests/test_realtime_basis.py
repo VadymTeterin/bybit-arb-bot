@@ -22,29 +22,21 @@ def test_basis_computed_and_candidates_filters():
         assert basis > 0
 
         # 3) Кандидати мають пройти поріг 0.5%
-        rows = await cache.candidates(
-            threshold_pct=0.5, min_price=1.0, min_vol24h_usd=0.0
-        )
+        rows = await cache.candidates(threshold_pct=0.5, min_price=1.0, min_vol24h_usd=0.0)
         assert any(sym == "BTCUSDT" for sym, _ in rows)
 
         # 4) Відсікаємо мінімальною ціною
-        rows2 = await cache.candidates(
-            threshold_pct=0.5, min_price=60000.0, min_vol24h_usd=0.0
-        )
+        rows2 = await cache.candidates(threshold_pct=0.5, min_price=60000.0, min_vol24h_usd=0.0)
         assert not rows2
 
         # 5) Перевіряємо фільтр за обсягом
         await cache.update_vol24h("BTCUSDT", 1_000_000.0)
-        rows3 = await cache.candidates(
-            threshold_pct=0.5, min_price=1.0, min_vol24h_usd=2_000_000.0
-        )
+        rows3 = await cache.candidates(threshold_pct=0.5, min_price=1.0, min_vol24h_usd=2_000_000.0)
         assert not rows3
 
         # 6) Підвищуємо обсяг — тепер має пройти
         await cache.update_vol24h("BTCUSDT", 3_000_000.0)
-        rows4 = await cache.candidates(
-            threshold_pct=0.5, min_price=1.0, min_vol24h_usd=2_000_000.0
-        )
+        rows4 = await cache.candidates(threshold_pct=0.5, min_price=1.0, min_vol24h_usd=2_000_000.0)
         assert rows4 and rows4[0][0] == "BTCUSDT"
 
     asyncio.run(go())

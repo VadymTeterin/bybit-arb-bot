@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Basic smoke tests for IRM Phase 6 generator
 import importlib.util
 import re

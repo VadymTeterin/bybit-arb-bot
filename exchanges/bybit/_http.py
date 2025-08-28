@@ -35,9 +35,7 @@ class HTTPClient:
         client: Any = None,  # для тестів можна передати фейковий клієнт із методом .request()
     ):
         if httpx is None and client is None:
-            raise ImportError(
-                "httpx не встановлено. Додай пакет 'httpx' у requirements."
-            )
+            raise ImportError("httpx не встановлено. Додай пакет 'httpx' у requirements.")
         self._client = client or httpx.AsyncClient(base_url=base_url, timeout=timeout)
         self._limiter = limiter
         self._max_retries = max_retries
@@ -89,15 +87,10 @@ class HTTPClient:
                 data: Dict[str, Any] = resp.json() if hasattr(resp, "json") else {}
                 # BYBIT retCode != 0
                 if "retCode" in data and int(data["retCode"]) != 0:
-                    if (
-                        self._is_rate_limit_retcode(data["retCode"])
-                        and attempt < self._max_retries
-                    ):
+                    if self._is_rate_limit_retcode(data["retCode"]) and attempt < self._max_retries:
                         await self._sleep_backoff(attempt)
                         continue
-                    raise map_error(
-                        data.get("retCode"), data.get("retMsg", "unknown error")
-                    )
+                    raise map_error(data.get("retCode"), data.get("retMsg", "unknown error"))
                 return data
 
             except Exception as exc:  # noqa: BLE001
@@ -117,9 +110,7 @@ class HTTPClient:
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
-        return await self._request(
-            "GET", path, params=params, json=None, headers=headers
-        )
+        return await self._request("GET", path, params=params, json=None, headers=headers)
 
     async def post(
         self,
@@ -127,9 +118,7 @@ class HTTPClient:
         json: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
-        return await self._request(
-            "POST", path, params=None, json=json, headers=headers
-        )
+        return await self._request("POST", path, params=None, json=json, headers=headers)
 
     async def close(self) -> None:
         close = getattr(self._client, "aclose", None)

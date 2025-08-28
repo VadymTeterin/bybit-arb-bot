@@ -56,9 +56,7 @@ def _select_rows(
             params.append(until)
 
     elif last_hours is not None:
-        cutoff = (
-            datetime.now(timezone.utc) - timedelta(hours=int(last_hours))
-        ).isoformat()
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=int(last_hours))).isoformat()
 
         where.append("timestamp >= ?")
 
@@ -139,9 +137,7 @@ def export_signals(
 
     con = sqlite3.connect(db)
 
-    rows = _select_rows(
-        con, last_hours=last_hours, since=since, until=until, limit=limit
-    )
+    rows = _select_rows(con, last_hours=last_hours, since=since, until=until, limit=limit)
 
     con.close()
 
@@ -243,9 +239,7 @@ def main() -> None:
 
     path = export_signals(
         out_path=out,
-        last_hours=(
-            args.last_hours if (args.since is None and args.until is None) else None
-        ),
+        last_hours=(args.last_hours if (args.since is None and args.until is None) else None),
         since=args.since,
         until=args.until,
         limit=args.limit,

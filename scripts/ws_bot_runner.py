@@ -64,9 +64,7 @@ def _nested_bybit(s):
 
     url_linear = url_linear or getattr(s, "ws_public_url_linear", None)
     url_spot = url_spot or getattr(s, "ws_public_url_spot", None)
-    topics_linear = topics_linear or _csv_list(
-        getattr(s, "ws_topics_list_linear", None)
-    )
+    topics_linear = topics_linear or _csv_list(getattr(s, "ws_topics_list_linear", None))
     topics_spot = topics_spot or _csv_list(getattr(s, "ws_topics_list_spot", None))
 
     return {
@@ -140,9 +138,7 @@ async def main() -> None:
             else None
         )
         if not ws_linear and not ws_spot:
-            logger.warning(
-                "WS config has neither LINEAR nor SPOT endpoints/topics configured."
-            )
+            logger.warning("WS config has neither LINEAR nor SPOT endpoints/topics configured.")
         mux = WSMultiplexer(name="core")
         alerts_sub = AlertsSubscriber(mux)
         alerts_sub.start()
@@ -163,11 +159,7 @@ async def main() -> None:
             if debug_symbols and symbol not in debug_symbols:
                 return
             data = evt_norm.get("data")
-            items = (
-                1
-                if isinstance(data, dict)
-                else (len(data) if isinstance(data, list) else 0)
-            )
+            items = 1 if isinstance(data, dict) else (len(data) if isinstance(data, list) else 0)
             key = (source, channel, symbol)
             now = _t.monotonic()
             last = _last_log.get(key, 0.0)
@@ -254,21 +246,15 @@ async def main() -> None:
                         for sym in (set(spot_vol) & set(lin_vol))
                     }
                     await cache.update_vol24h_bulk(combined)
-                    logger.bind(tag="RTMETA").info(
-                        f"Refreshed vol24h for {len(combined)} symbols"
-                    )
+                    logger.bind(tag="RTMETA").info(f"Refreshed vol24h for {len(combined)} symbols")
                 except Exception as e:
                     logger.bind(tag="RTMETA").warning(f"Meta refresh failed: {e!r}")
                 await asyncio.sleep(max(30, int(getattr(s, "rt_meta_refresh_sec", 30))))
 
         if ws_spot:
-            tasks.append(
-                asyncio.create_task(ws_spot.run(on_message_spot), name="ws_spot")
-            )
+            tasks.append(asyncio.create_task(ws_spot.run(on_message_spot), name="ws_spot"))
         if ws_linear:
-            tasks.append(
-                asyncio.create_task(ws_linear.run(on_message_linear), name="ws_linear")
-            )
+            tasks.append(asyncio.create_task(ws_linear.run(on_message_linear), name="ws_linear"))
         tasks.append(asyncio.create_task(refresh_meta_task(), name="rt_meta"))
 
     if bot_available:
@@ -281,9 +267,7 @@ async def main() -> None:
         except Exception as e:  # noqa: BLE001
             logger.error("aiogram is not available: {}", e)
         else:
-            bot = Bot(
-                token=token, default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN)
-            )
+            bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN))
             dp = Dispatcher()
 
             @dp.message(Command("start"))
@@ -316,9 +300,7 @@ async def main() -> None:
             tasks.append(asyncio.create_task(dp.start_polling(bot), name="tg_polling"))
 
     if not tasks:
-        logger.error(
-            "Nothing to run: WS disabled/unavailable and no Telegram token provided."
-        )
+        logger.error("Nothing to run: WS disabled/unavailable and no Telegram token provided.")
         return
 
     logger.success("Runner started: {} task(s). Ctrl+C to stop.", len(tasks))

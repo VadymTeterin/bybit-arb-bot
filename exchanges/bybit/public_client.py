@@ -50,9 +50,7 @@ def parse_ticker(payload: Dict[str, Any], symbol_req: str) -> Ticker:
     raw_ts = t.get("updateTime") or result.get("ts") or payload.get("time") or 0
     ts = _to_dt(raw_ts)
 
-    return Ticker(
-        symbol=normalize_symbol(symbol_req), bid=bid, ask=ask, last=last, ts=ts
-    )
+    return Ticker(symbol=normalize_symbol(symbol_req), bid=bid, ask=ask, last=last, ts=ts)
 
 
 def parse_order_book(payload: Dict[str, Any], symbol_req: str) -> OrderBook:
@@ -70,9 +68,7 @@ def parse_order_book(payload: Dict[str, Any], symbol_req: str) -> OrderBook:
     return OrderBook(symbol=normalize_symbol(symbol_req), bids=bids, asks=asks, ts=ts)
 
 
-def parse_candles(
-    payload: Dict[str, Any], symbol_req: str, interval: Interval
-) -> List[Candle]:
+def parse_candles(payload: Dict[str, Any], symbol_req: str, interval: Interval) -> List[Candle]:
     if int(payload.get("retCode", -1)) != 0:
         raise map_error(payload.get("retCode"), payload.get("retMsg", "unknown error"))
 
@@ -134,9 +130,7 @@ class BybitPublicClient(IExchangePublic):
         data = await self.http.get("/v5/market/orderbook", params=params)
         return parse_order_book(data, symbol)
 
-    async def get_candles(
-        self, symbol: str, interval: Interval, limit: int = 200
-    ) -> List[Candle]:
+    async def get_candles(self, symbol: str, interval: Interval, limit: int = 200) -> List[Candle]:
         bybit_interval = _INTERVAL_MAP[interval]
         params = {
             "category": self._category,

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Generate a pseudo "Daily Digest" artifact from the current repo state.
 This is used for E2E smoke testing in CI.
@@ -37,9 +36,7 @@ def recent_commits(limit: int) -> List[CommitItem]:
     Collect recent commits using git. ISO date for easy parsing.
     """
     fmt = "%h|%ad|%an|%s"
-    out = run(
-        ["git", "log", f"-n{limit}", f"--pretty=format:{fmt}", "--date=iso-strict"]
-    )
+    out = run(["git", "log", f"-n{limit}", f"--pretty=format:{fmt}", "--date=iso-strict"])
     items: List[CommitItem] = []
     for line in out.splitlines():
         parts = line.split("|", 3)
@@ -79,9 +76,7 @@ def build_markdown(repo: str, branch: str, sha: str, commits: List[CommitItem]) 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate pseudo daily digest.")
     parser.add_argument("--out", required=True, help="Path to output markdown file.")
-    parser.add_argument(
-        "--json", default="", help="Optional path to output JSON metadata."
-    )
+    parser.add_argument("--json", default="", help="Optional path to output JSON metadata.")
     parser.add_argument(
         "--limit", type=int, default=10, help="Number of recent commits to include."
     )
@@ -94,9 +89,7 @@ def main() -> int:
         out_json.parent.mkdir(parents=True, exist_ok=True)
 
     repo = os.getenv("GITHUB_REPOSITORY", "local/repo")
-    branch = os.getenv(
-        "GITHUB_REF_NAME", run(["git", "rev-parse", "--abbrev-ref", "HEAD"])
-    )
+    branch = os.getenv("GITHUB_REF_NAME", run(["git", "rev-parse", "--abbrev-ref", "HEAD"]))
     sha = os.getenv("GITHUB_SHA", run(["git", "rev-parse", "HEAD"]))
 
     commits = recent_commits(limit=args.limit)
@@ -112,9 +105,7 @@ def main() -> int:
             "limit": args.limit,
             "commits": [asdict(c) for c in commits],
         }
-        out_json.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        out_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(f"[digest_smoke] Wrote: {out_md}")
     if out_json:

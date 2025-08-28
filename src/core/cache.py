@@ -61,9 +61,7 @@ class QuoteCache:
 
             # перерахунок basis, якщо можливо
             if row["spot"] and row["linear_mark"] and row["spot"] > 0:
-                row["basis_pct"] = (
-                    (row["linear_mark"] - row["spot"]) / row["spot"] * 100.0
-                )
+                row["basis_pct"] = (row["linear_mark"] - row["spot"]) / row["spot"] * 100.0
                 row["ts_basis"] = float(ts)
             return row["basis_pct"]
 

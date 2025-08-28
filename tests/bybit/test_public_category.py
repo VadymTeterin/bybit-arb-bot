@@ -13,9 +13,7 @@ class _FakeHTTP:
     def __init__(self):
         self.last_params: Dict[str, Any] = {}
 
-    async def get(
-        self, path: str, params: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    async def get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         self.last_params = params or {}
         # Повертаємо валідний payload для парсерів тикера
         return {

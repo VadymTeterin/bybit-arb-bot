@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 AlertGate (Step 6.3.4) — cooldown + suppression
 
@@ -64,7 +63,7 @@ class AlertGate:
         self._mem: Dict[str, _LastEvent] = {}
 
     @classmethod
-    def from_settings(cls, settings) -> "AlertGate":
+    def from_settings(cls, settings) -> AlertGate:
         a = settings.alerts
         return cls(
             cooldown_sec=int(getattr(a, "cooldown_sec", 300)),
@@ -98,9 +97,7 @@ class AlertGate:
 
     # ---------- public API ----------
 
-    def should_send(
-        self, symbol: str, basis_pct: float, ts: datetime
-    ) -> Tuple[bool, str]:
+    def should_send(self, symbol: str, basis_pct: float, ts: datetime) -> Tuple[bool, str]:
         """Decide whether an alert should be sent."""
         ts = _to_utc(ts)
         t_epoch = ts.timestamp()
@@ -130,6 +127,4 @@ class AlertGate:
 
     def commit(self, symbol: str, basis_pct: float, ts: datetime) -> None:
         ts = _to_utc(ts)
-        self._store_last(
-            symbol, _LastEvent(ts_epoch=ts.timestamp(), basis_pct=float(basis_pct))
-        )
+        self._store_last(symbol, _LastEvent(ts_epoch=ts.timestamp(), basis_pct=float(basis_pct)))

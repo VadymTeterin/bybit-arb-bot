@@ -17,9 +17,7 @@ async def test_e2e_wallet_balances_smoke():
     cfg = BybitConfig(
         enabled=True,
         base_url_public=os.getenv("BYBIT_PUBLIC_URL", "https://api-testnet.bybit.com"),
-        base_url_private=os.getenv(
-            "BYBIT_PRIVATE_URL", "https://api-testnet.bybit.com"
-        ),
+        base_url_private=os.getenv("BYBIT_PRIVATE_URL", "https://api-testnet.bybit.com"),
         default_category=os.getenv("BYBIT_DEFAULT_CATEGORY", "spot"),
     )
     acc = BybitAccountClient(cfg)

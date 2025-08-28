@@ -79,9 +79,7 @@ def _nested_bybit(s):
         topics_spot = _csv_list(getattr(by, "ws_sub_topics_spot", None))
     url_linear = url_linear or getattr(s, "ws_public_url_linear", None)
     url_spot = url_spot or getattr(s, "ws_public_url_spot", None)
-    topics_linear = topics_linear or _csv_list(
-        getattr(s, "ws_topics_list_linear", None)
-    )
+    topics_linear = topics_linear or _csv_list(getattr(s, "ws_topics_list_linear", None))
     topics_spot = topics_spot or _csv_list(getattr(s, "ws_topics_list_spot", None))
     return {
         "url_linear": url_linear,
@@ -112,9 +110,7 @@ async def ws_spot_loop(ws_url: str, topics: List[str], shared, metrics, debug):
                     return
                 data = evt_norm.get("data")
                 items = (
-                    1
-                    if isinstance(data, dict)
-                    else (len(data) if isinstance(data, list) else 0)
+                    1 if isinstance(data, dict) else (len(data) if isinstance(data, list) else 0)
                 )
                 key = ("SPOT", channel, symbol)
                 now = time.monotonic()
@@ -152,9 +148,7 @@ async def ws_spot_loop(ws_url: str, topics: List[str], shared, metrics, debug):
             logger.info("SPOT loop: connecting to {}", ws_url)
             bo.reset()
             await ws.run(on_message_spot)
-            logger.warning(
-                "SPOT loop ended without exception (socket closed). Reconnecting..."
-            )
+            logger.warning("SPOT loop ended without exception (socket closed). Reconnecting...")
         except Exception as e:
             delay = bo.next_delay()
             logger.exception("SPOT loop crashed: {}. Reconnect in {:.1f}s", e, delay)
@@ -182,9 +176,7 @@ async def ws_linear_loop(ws_url: str, topics: List[str], shared, metrics, debug)
                     return
                 data = evt_norm.get("data")
                 items = (
-                    1
-                    if isinstance(data, dict)
-                    else (len(data) if isinstance(data, list) else 0)
+                    1 if isinstance(data, dict) else (len(data) if isinstance(data, list) else 0)
                 )
                 key = ("LINEAR", channel, symbol)
                 now = time.monotonic()
@@ -222,9 +214,7 @@ async def ws_linear_loop(ws_url: str, topics: List[str], shared, metrics, debug)
             logger.info("LINEAR loop: connecting to {}", ws_url)
             bo.reset()
             await ws.run(on_message_linear)
-            logger.warning(
-                "LINEAR loop ended without exception (socket closed). Reconnecting..."
-            )
+            logger.warning("LINEAR loop ended without exception (socket closed). Reconnecting...")
         except Exception as e:
             delay = bo.next_delay()
             logger.exception("LINEAR loop crashed: {}. Reconnect in {:.1f}s", e, delay)
@@ -263,9 +253,7 @@ async def meta_refresh_loop(shared, refresh_sec: int):
                         for sym in (set(spot_vol) & set(lin_vol))
                     }
                     await shared["cache"].update_vol24h_bulk(combined)
-                    logger.bind(tag="RTMETA").info(
-                        f"Refreshed vol24h for {len(combined)} symbols"
-                    )
+                    logger.bind(tag="RTMETA").info(f"Refreshed vol24h for {len(combined)} symbols")
                 except Exception as e:
                     logger.bind(tag="RTMETA").warning(f"Meta refresh failed: {e!r}")
                 await asyncio.sleep(max(30, int(refresh_sec)))
@@ -290,9 +278,7 @@ async def bot_polling_loop(metrics, allow_chat: Optional[int]):
 
     while True:
         try:
-            bot = Bot(
-                token=token, default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN)
-            )
+            bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN))
             dp = Dispatcher()
 
             @dp.message(Command("start"))
@@ -325,14 +311,10 @@ async def bot_polling_loop(metrics, allow_chat: Optional[int]):
             bo.reset()
             logger.info("Telegram bot polling: start")
             await dp.start_polling(bot)
-            logger.warning(
-                "Telegram bot polling stopped without exception. Restarting..."
-            )
+            logger.warning("Telegram bot polling stopped without exception. Restarting...")
         except Exception as e:
             delay = bo.next_delay()
-            logger.exception(
-                "Telegram bot loop crashed: {}. Restart in {:.1f}s", e, delay
-            )
+            logger.exception("Telegram bot loop crashed: {}. Restart in {:.1f}s", e, delay)
             await asyncio.sleep(delay)
 
 
@@ -406,24 +388,16 @@ async def main() -> None:
             )
         tasks.append(
             asyncio.create_task(
-                meta_refresh_loop(
-                    shared, refresh_sec=int(getattr(s, "rt_meta_refresh_sec", 30))
-                ),
+                meta_refresh_loop(shared, refresh_sec=int(getattr(s, "rt_meta_refresh_sec", 30))),
                 name="meta_refresh_loop",
             )
         )
 
     if _get_token():
-        tasks.append(
-            asyncio.create_task(
-                bot_polling_loop(metrics, allow_chat), name="tg_polling"
-            )
-        )
+        tasks.append(asyncio.create_task(bot_polling_loop(metrics, allow_chat), name="tg_polling"))
 
     if not tasks:
-        logger.error(
-            "Nothing to run: WS disabled/unavailable and no Telegram token provided."
-        )
+        logger.error("Nothing to run: WS disabled/unavailable and no Telegram token provided.")
         return
 
     logger.success("Supervisor started: {} task(s). Ctrl+C to stop.", len(tasks))

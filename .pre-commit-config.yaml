@@ -23,5 +23,3 @@
     hooks:
       - id: isort
         stages: [manual]
-
-

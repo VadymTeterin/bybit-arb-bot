@@ -145,22 +145,16 @@ def run_selection(
 
     # підтримуємо ОБИДВА варіанти allow/deny:
     if hasattr(s, "allow_list"):
-        allow: List[str] = getattr(s, "allow_list")  # type: ignore[assignment]
+        allow: List[str] = s.allow_list  # type: ignore[assignment]
     else:
         raw_allow = getattr(s, "allow_symbols", "")
-        allow = (
-            raw_allow
-            if isinstance(raw_allow, list)
-            else _parse_symbols_value(raw_allow)
-        )
+        allow = raw_allow if isinstance(raw_allow, list) else _parse_symbols_value(raw_allow)
 
     if hasattr(s, "deny_list"):
-        deny: List[str] = getattr(s, "deny_list")  # type: ignore[assignment]
+        deny: List[str] = s.deny_list  # type: ignore[assignment]
     else:
         raw_deny = getattr(s, "deny_symbols", "")
-        deny = (
-            raw_deny if isinstance(raw_deny, list) else _parse_symbols_value(raw_deny)
-        )
+        deny = raw_deny if isinstance(raw_deny, list) else _parse_symbols_value(raw_deny)
 
     # відкладений імпорт реального клієнта
     if client is None:

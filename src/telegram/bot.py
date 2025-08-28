@@ -36,9 +36,7 @@ def _get_token() -> str:
     token = os.getenv("TELEGRAM__BOT_TOKEN") or os.getenv("TELEGRAM__TOKEN") or ""
     token = token.strip()
     if not token:
-        raise RuntimeError(
-            "Telegram token is not set. Provide TELEGRAM__BOT_TOKEN in .env"
-        )
+        raise RuntimeError("Telegram token is not set. Provide TELEGRAM__BOT_TOKEN in .env")
     return token
 
 

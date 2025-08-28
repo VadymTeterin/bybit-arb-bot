@@ -34,9 +34,7 @@ class GitHubClient:
     ) -> None:
         self.token = token or os.getenv("GH_TOKEN") or os.getenv("GITHUB_TOKEN")
         self.base_url = base_url.rstrip("/")
-        self.timeout = (
-            timeout if isinstance(timeout, httpx.Timeout) else httpx.Timeout(timeout)
-        )
+        self.timeout = timeout if isinstance(timeout, httpx.Timeout) else httpx.Timeout(timeout)
         self.max_retries = max(1, int(max_retries))
         self.backoff_factor = float(backoff_factor)
         self.max_sleep_on_reset = int(max_sleep_on_reset)
@@ -242,7 +240,7 @@ class GitHubClient:
     def close(self) -> None:
         self._client.close()
 
-    def __enter__(self) -> "GitHubClient":
+    def __enter__(self) -> GitHubClient:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:  # type: ignore[override]

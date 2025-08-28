@@ -11,12 +11,8 @@ from typing import Any, Awaitable, Callable, Dict, Optional, cast
 try:
     from src.telegram import formatters as _formatters
 
-    _FORMAT_SIGNAL: Callable[..., str] = cast(
-        Callable[..., str], _formatters.format_signal
-    )
-except (
-    Exception
-):  # pragma: no cover - захист від відсутності модулів у середовищі тестів
+    _FORMAT_SIGNAL: Callable[..., str] = cast(Callable[..., str], _formatters.format_signal)
+except Exception:  # pragma: no cover - захист від відсутності модулів у середовищі тестів
 
     def _FORMAT_SIGNAL(*_args: Any, **_kwargs: Any) -> str:
         # мінімальний запасний варіант для розробницького режиму

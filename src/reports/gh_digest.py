@@ -97,9 +97,9 @@ def parse_commit(item: Dict[str, Any], default_branch: str = "main") -> CommitEv
     branch = item.get("branch") or default_branch
 
     # Dates: prefer item["commit"]["author"]["date"] (ISO8601)
-    committed_iso = (commit.get("author") or {}).get("date") or (
-        commit.get("committer") or {}
-    ).get("date")
+    committed_iso = (commit.get("author") or {}).get("date") or (commit.get("committer") or {}).get(
+        "date"
+    )
     committed_at = (
         datetime.fromisoformat(committed_iso.replace("Z", "+00:00"))
         if committed_iso
@@ -174,15 +174,11 @@ def render_text_report(d: Digest) -> str:
     lines.append(f"Date (Kyiv): {d.date_kyiv.isoformat()}")
     lines.append(f"UTC window: {start.isoformat()} → {end.isoformat()}")
     s = d.stats
-    lines.append(
-        f"Stats: commits={s['commits']} | merges={s['merges']} | tags={s['tags']}"
-    )
+    lines.append(f"Stats: commits={s['commits']} | merges={s['merges']} | tags={s['tags']}")
     if d.merges:
         lines.append("\nMerged PRs:")
         for pr in d.merges:
-            lines.append(
-                f"  • #{pr.number} {pr.title} (by {pr.merged_by}, base {pr.base_branch})"
-            )
+            lines.append(f"  • #{pr.number} {pr.title} (by {pr.merged_by}, base {pr.base_branch})")
     if d.tags:
         lines.append("\nTags:")
         for tag in d.tags:

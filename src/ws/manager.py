@@ -53,9 +53,7 @@ class WSManager:
     last_msg_ts: Optional[float] = None
     last_heartbeat_ts: Optional[float] = None
 
-    _lock: threading.Lock = field(
-        default_factory=threading.Lock, init=False, repr=False
-    )
+    _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
     # --- topics
     def set_topics(self, topics: Iterable[str]) -> None:

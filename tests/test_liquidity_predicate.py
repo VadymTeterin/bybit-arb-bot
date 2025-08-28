@@ -12,12 +12,8 @@ def test_make_liquidity_predicate_env(monkeypatch):
     importlib.reload(le)
 
     pred = make_liquidity_predicate()
-    assert (
-        pred({"price": 0.4, "turnover_usd": 25_000_000}) is False
-    )  # ціна нижча за 0.5
-    assert (
-        pred({"price": 0.6, "turnover_usd": 15_000_000}) is False
-    )  # обіг нижчий за 20M
+    assert pred({"price": 0.4, "turnover_usd": 25_000_000}) is False  # ціна нижча за 0.5
+    assert pred({"price": 0.6, "turnover_usd": 15_000_000}) is False  # обіг нижчий за 20M
     assert pred({"price": 0.6, "turnover_usd": 25_000_000}) is True  # проходить
 
 

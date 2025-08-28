@@ -65,9 +65,7 @@ async def main() -> None:
         await http.close()
 
     print("\n== /v5/account/wallet-balance (швидка перевірка) ==")
-    account_type = os.getenv(
-        "BYBIT_BAL_ACCOUNT_TYPE", "UNIFIED"
-    )  # SPOT|UNIFIED|CONTRACT
+    account_type = os.getenv("BYBIT_BAL_ACCOUNT_TYPE", "UNIFIED")  # SPOT|UNIFIED|CONTRACT
     http = SignedHTTPClient(
         base_url=cfg.base_url_private,
         api_key=api_key,
@@ -75,9 +73,7 @@ async def main() -> None:
         recv_window_ms=cfg.recv_window_ms,
     )
     try:
-        data = await http.get(
-            "/v5/account/wallet-balance", params={"accountType": account_type}
-        )
+        data = await http.get("/v5/account/wallet-balance", params={"accountType": account_type})
         # Скорочений підсумок: скільки активів ненульові
         result = data.get("result") or {}
         list_ = result.get("list") or []

@@ -53,9 +53,7 @@ def test_recent_signal_exists(tmp_path, monkeypatch):
     persistence.init_db()
 
     now = datetime.now(timezone.utc)
-    persistence.save_signal(
-        "AAAUSDT", 2.0, 2.04, 2.0, 12_000_000, now - timedelta(seconds=10)
-    )
+    persistence.save_signal("AAAUSDT", 2.0, 2.04, 2.0, 12_000_000, now - timedelta(seconds=10))
     # cooldown 30s -> should be True (recent)
     assert persistence.recent_signal_exists("AAAUSDT", cooldown_sec=30) is True
     # cooldown 5s  -> should be False (too old for the short window)

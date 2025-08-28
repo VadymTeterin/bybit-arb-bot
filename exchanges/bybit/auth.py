@@ -11,9 +11,7 @@ def canonical_query(params: Dict[str, Any] | None) -> str:
     """Сортує та з’єднує params у 'k=v&k2=v2' (без URL-екодингу; None пропускаємо)."""
     if not params:
         return ""
-    items: Iterable[Tuple[str, Any]] = (
-        (k, v) for k, v in params.items() if v is not None
-    )
+    items: Iterable[Tuple[str, Any]] = ((k, v) for k, v in params.items() if v is not None)
     sorted_items = sorted(items, key=lambda kv: kv[0])
     return "&".join(f"{k}={v}" for k, v in sorted_items)
 
@@ -33,6 +31,4 @@ def sign_v5(
     Повертаємо hex-рядок у нижньому регістрі.
     """
     prehash = f"{timestamp_ms}{api_key}{recv_window_ms}{body_str}"
-    return hmac.new(
-        api_secret.encode("utf-8"), prehash.encode("utf-8"), sha256
-    ).hexdigest()
+    return hmac.new(api_secret.encode("utf-8"), prehash.encode("utf-8"), sha256).hexdigest()

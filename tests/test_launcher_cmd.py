@@ -22,9 +22,7 @@ def test_launcher_cmd_structure():
         "  ", " "
     ), "launcher should ensure logs dir"
     assert "python.exe" in content.lower(), "launcher should run some python executable"
-    assert (
-        r"scripts\export_signals.py" in content
-    ), "launcher should call export_signals.py"
+    assert r"scripts\export_signals.py" in content, "launcher should call export_signals.py"
     assert r">> logs\export.log 2>&1" in content.replace(
         "  ", " "
     ), "launcher should redirect output to logs/export.log"

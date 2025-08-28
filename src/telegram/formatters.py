@@ -49,9 +49,7 @@ def _fmt_ts(ts_unix: Optional[float]) -> str:
         return "n/a"
     try:
         ts = float(ts_unix)
-        return datetime.fromtimestamp(ts, tz=timezone.utc).strftime(
-            "%Y-%m-%d %H:%M UTC"
-        )
+        return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     except Exception:
         return "n/a"
 

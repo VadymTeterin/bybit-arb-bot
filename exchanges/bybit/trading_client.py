@@ -81,9 +81,7 @@ class BybitTradingClient(ITradingClient):
 
     async def _ensure_http(self) -> SignedHTTPClient:
         if self.http is None:
-            raise RuntimeError(
-                "BYBIT ключі не задані (BYBIT_API_KEY/BYBIT_API_SECRET)."
-            )
+            raise RuntimeError("BYBIT ключі не задані (BYBIT_API_KEY/BYBIT_API_SECRET).")
         return self.http
 
     async def create_order(

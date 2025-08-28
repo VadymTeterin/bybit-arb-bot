@@ -36,9 +36,7 @@ def _pick_first(
     return default
 
 
-def enough_liquidity(
-    row: Mapping[str, Any], min_vol_usd: float, min_price: float
-) -> bool:
+def enough_liquidity(row: Mapping[str, Any], min_vol_usd: float, min_price: float) -> bool:
     """
     Перевіряє базову ліквідність SPOT-рядка:
       - min_price: мінімальна ціна активу (щоб відсіяти пені-коіни)

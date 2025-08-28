@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -26,17 +25,11 @@ def test_alertgate_with_sqlite_repo_persists(tmp_path: Path):
     db = tmp_path / "alerts.db"
     repo = SqliteAlertGateRepo(str(db))
 
-    gate = AlertGate(
-        cooldown_sec=300, suppress_eps_pct=0.2, suppress_window_min=15, repo=repo
-    )
+    gate = AlertGate(cooldown_sec=300, suppress_eps_pct=0.2, suppress_window_min=15, repo=repo)
     t0 = datetime(2025, 8, 27, 12, 0, 0, tzinfo=timezone.utc)
     gate.commit("ETHUSDT", basis_pct=1.7, ts=t0)
 
     # New instance reads from DB
-    gate2 = AlertGate(
-        cooldown_sec=300, suppress_eps_pct=0.2, suppress_window_min=15, repo=repo
-    )
-    ok, reason = gate2.should_send(
-        "ETHUSDT", basis_pct=1.8, ts=t0 + timedelta(seconds=10)
-    )
+    gate2 = AlertGate(cooldown_sec=300, suppress_eps_pct=0.2, suppress_window_min=15, repo=repo)
+    ok, reason = gate2.should_send("ETHUSDT", basis_pct=1.8, ts=t0 + timedelta(seconds=10))
     assert not ok and "cooldown" in reason

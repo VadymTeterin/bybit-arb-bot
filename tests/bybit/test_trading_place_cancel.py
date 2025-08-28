@@ -69,9 +69,7 @@ async def test_create_limit_linear_requires_price_and_sets_it():
 
     # без ціни має впасти
     with pytest.raises(ValueError):
-        await tr.create_order(
-            symbol="BTC/USDT", side="sell", type="limit", qty=1, market="perp"
-        )
+        await tr.create_order(symbol="BTC/USDT", side="sell", type="limit", qty=1, market="perp")
 
     # з ціною — ок
     data = await tr.create_order(

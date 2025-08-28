@@ -28,14 +28,10 @@ class BybitAccountClient(IAccountClient):
 
     async def _ensure_http(self) -> SignedHTTPClient:
         if self.http is None:
-            raise RuntimeError(
-                "BYBIT ключі не задані (BYBIT_API_KEY/BYBIT_API_SECRET)."
-            )
+            raise RuntimeError("BYBIT ключі не задані (BYBIT_API_KEY/BYBIT_API_SECRET).")
         return self.http
 
-    async def get_balances(
-        self, assets: Optional[Iterable[str]] = None
-    ) -> List[Balance]:
+    async def get_balances(self, assets: Optional[Iterable[str]] = None) -> List[Balance]:
         http = await self._ensure_http()
         # За замовчуванням — spot/unified. Можна параметризувати через cfg.extra згодом.
         params: Dict[str, Any] = {"accountType": "UNIFIED"}

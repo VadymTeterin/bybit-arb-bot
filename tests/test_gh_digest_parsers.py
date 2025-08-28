@@ -20,12 +20,8 @@ def test_kyiv_day_bounds_basic():
     # Sanity: window is 24h in UTC
     assert (end_utc - start_utc) == timedelta(days=1)
     # Must be timezone-aware UTC datetimes
-    assert start_utc.tzinfo is not None and start_utc.tzinfo.utcoffset(
-        start_utc
-    ) == timedelta(0)
-    assert end_utc.tzinfo is not None and end_utc.tzinfo.utcoffset(
-        end_utc
-    ) == timedelta(0)
+    assert start_utc.tzinfo is not None and start_utc.tzinfo.utcoffset(start_utc) == timedelta(0)
+    assert end_utc.tzinfo is not None and end_utc.tzinfo.utcoffset(end_utc) == timedelta(0)
 
 
 def test_digest_aggregation_and_rendering():

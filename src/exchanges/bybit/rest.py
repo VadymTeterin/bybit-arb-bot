@@ -53,9 +53,7 @@ class BybitRest:
         self.api_secret: Optional[str] = api_secret
         self.log: logging.Logger = logger or logging.getLogger(__name__)
 
-        self.session.headers.update(
-            {"User-Agent": "bybit-arb-bot/0.0 (rest.py typesafe client)"}
-        )
+        self.session.headers.update({"User-Agent": "bybit-arb-bot/0.0 (rest.py typesafe client)"})
 
     # -------------------------- внутрішні утиліти --------------------------
 
@@ -133,11 +131,7 @@ class BybitRest:
                     symbol = row.get("symbol")
                     base = row.get("baseCoin")
                     quote = row.get("quoteCoin")
-                    if (
-                        isinstance(symbol, str)
-                        and isinstance(base, str)
-                        and isinstance(quote, str)
-                    ):
+                    if isinstance(symbol, str) and isinstance(base, str) and isinstance(quote, str):
                         symbols[symbol] = {"base": base, "quote": quote}
         return symbols
 
@@ -157,11 +151,7 @@ class BybitRest:
                     symbol = row.get("symbol")
                     base = row.get("baseCoin")
                     quote = row.get("quoteCoin")
-                    if (
-                        isinstance(symbol, str)
-                        and isinstance(base, str)
-                        and isinstance(quote, str)
-                    ):
+                    if isinstance(symbol, str) and isinstance(base, str) and isinstance(quote, str):
                         symbols[symbol] = {"base": base, "quote": quote}
         return symbols
 

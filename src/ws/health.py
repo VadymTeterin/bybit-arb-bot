@@ -13,9 +13,7 @@ def _fmt_utc(ts: Optional[float]) -> Optional[str]:
     if not ts:
         return None
     try:
-        return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime(
-            "%Y-%m-%d %H:%M:%S UTC"
-        )
+        return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     except Exception:
         return None
 
@@ -52,7 +50,7 @@ class WSHealth:
 class MetricsRegistry:
     """Thread-safe singleton registry of WS health metrics."""
 
-    _instance: "MetricsRegistry|None" = None
+    _instance: MetricsRegistry | None = None
     _lock = threading.Lock()
 
     def __init__(self) -> None:
@@ -60,7 +58,7 @@ class MetricsRegistry:
         self._state = WSHealth(started_ts=time.time())
 
     @classmethod
-    def get(cls) -> "MetricsRegistry":
+    def get(cls) -> MetricsRegistry:
         with cls._lock:
             if cls._instance is None:
                 cls._instance = MetricsRegistry()

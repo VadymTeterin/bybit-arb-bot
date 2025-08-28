@@ -120,13 +120,9 @@ def normalize(raw: Dict[str, Any]) -> Dict[str, Any]:
             payload = payload[0]
         out: Dict[str, Any] = {
             "last_price": _safe_float(_get_first(payload, "lastPrice", "last_price")),
-            "index_price": _safe_float(
-                _get_first(payload, "indexPrice", "index_price")
-            ),
+            "index_price": _safe_float(_get_first(payload, "indexPrice", "index_price")),
             "mark_price": _safe_float(_get_first(payload, "markPrice", "mark_price")),
-            "open_interest": _safe_float(
-                _get_first(payload, "openInterest", "open_interest")
-            ),
+            "open_interest": _safe_float(_get_first(payload, "openInterest", "open_interest")),
             "turnover_24h": _safe_float(_get_first(payload, "turnover24h")),
             "volume_24h": _safe_float(_get_first(payload, "volume24h")),
         }

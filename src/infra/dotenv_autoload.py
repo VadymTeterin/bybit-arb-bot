@@ -113,7 +113,7 @@ def autoload_env(override: bool = False) -> Optional[str]:
         return None
 
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             lines = f.read().splitlines()
     except OSError:
         return None

@@ -89,9 +89,7 @@ def test_export_last_24h(tmp_path, monkeypatch):
 
     out = tmp_path / "signals_test.csv"
 
-    path = export_signals.export_signals(
-        out_path=out, last_hours=24, limit=None, tz=None
-    )
+    path = export_signals.export_signals(out_path=out, last_hours=24, limit=None, tz=None)
 
     # CSV створено
 
