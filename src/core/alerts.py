@@ -91,13 +91,7 @@ class RealtimeAlerter:
             # sender ще не підключили — нема куди слати
             return False
 
-        if (
-            symbol is None
-            or spot_price is None
-            or mark_price is None
-            or basis_pct is None
-            or math.isnan(basis_pct)
-        ):
+        if symbol is None or spot_price is None or mark_price is None or basis_pct is None or math.isnan(basis_pct):
             return False
 
         now = ts if ts is not None else time.time()

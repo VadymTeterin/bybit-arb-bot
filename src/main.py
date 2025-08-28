@@ -117,9 +117,7 @@ def load_settings():
 
     # WS / RT meta (optional)
     s.ws_enabled = _env_bool("WS_ENABLED", True)
-    s.ws_public_url_linear = os.getenv(
-        "WS_PUBLIC_URL_LINEAR", "wss://stream.bybit.com/v5/public/linear"
-    )
+    s.ws_public_url_linear = os.getenv("WS_PUBLIC_URL_LINEAR", "wss://stream.bybit.com/v5/public/linear")
     s.ws_public_url_spot = os.getenv("WS_PUBLIC_URL_SPOT", "wss://stream.bybit.com/v5/public/spot")
     s.ws_topics_list_linear = _env_csv("WS_SUB_TOPICS_LINEAR")
     s.ws_topics_list_spot = _env_csv("WS_SUB_TOPICS_SPOT")
@@ -406,9 +404,7 @@ def _alerts_allowed(s) -> bool:
     return bool(getattr(s, "enable_alerts", False))
 
 
-def _format_alert_text(
-    rows: list[tuple[str, float, float, float, float]], threshold: float, min_vol: float
-) -> str:
+def _format_alert_text(rows: list[tuple[str, float, float, float, float]], threshold: float, min_vol: float) -> str:
     if rows:
         header = f"Top {len(rows)} basis (≥ {threshold:.2f}%, MinVol ${min_vol:,.0f})"
         if _tg_formatters and hasattr(_tg_formatters, "format_basis_top"):
@@ -418,9 +414,7 @@ def _format_alert_text(
         lines = [header]
         for i, (sym, sp, fu, b, vol) in enumerate(rows, 1):
             sign = "+" if b >= 0 else ""
-            lines.append(
-                f"{i}. {sym}: spot={sp:g} fut={fu:g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}"
-            )
+            lines.append(f"{i}. {sym}: spot={sp:g} fut={fu:g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}")
         return "\n".join(lines)
     else:
         header = f"Basis scan: no pairs ≥ {threshold:.2f}% at MinVol ${min_vol:,.0f}."
@@ -515,9 +509,7 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
     limit = int(args.limit)
     token, chat_id = _tg_fields(s)
     if not token or not chat_id:
-        print(
-            "Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env"
-        )
+        print("Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env")
         return 1
 
     rows_pass, _ = _basis_rows(min_vol=min_vol, threshold=threshold)
@@ -534,9 +526,7 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
     rows = rows_pass[:limit]
     text = _format_alert_text(rows, threshold, min_vol)
 
-    used_custom_rows_formatter = bool(
-        _tg_formatters and hasattr(_tg_formatters, "format_basis_top")
-    )
+    used_custom_rows_formatter = bool(_tg_formatters and hasattr(_tg_formatters, "format_basis_top"))
     if rows and not used_custom_rows_formatter:
         client = BybitRest()
         lines = []
@@ -571,9 +561,7 @@ def cmd_tg_send(args: argparse.Namespace) -> int:
         return 0
     token, chat_id = _tg_fields(s)
     if not token or not chat_id:
-        print(
-            "Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env"
-        )
+        print("Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env")
         return 1
     text = args.text or "Test message from bybit-arb-bot"
     try:
@@ -608,9 +596,7 @@ def cmd_report_send(args: argparse.Namespace) -> int:
         return 0
     token, chat_id = _tg_fields(s)
     if not token or not chat_id:
-        print(
-            "Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env"
-        )
+        print("Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env")
         return 1
     hours = int(args.hours)
     limit = int(args.limit) if args.limit is not None else int(s.top_n_report)
@@ -799,9 +785,7 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         if (now - last) * 1000.0 < max(0, debug_sample_ms):
             return
         _last_log[key] = now
-        logger.bind(tag="WS").debug(
-            f"{source} normalized: channel={channel} symbol={symbol} items={items}"
-        )
+        logger.bind(tag="WS").debug(f"{source} normalized: channel={channel} symbol={symbol} items={items}")
 
     async def refresh_meta_task():
         client = BybitRest()
@@ -826,9 +810,7 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
                 spot_vol = _vol_map(spot_rows)
                 lin_vol = _vol_map(lin_rows)
 
-                combined = {
-                    sym: min(spot_vol[sym], lin_vol[sym]) for sym in (set(spot_vol) & set(lin_vol))
-                }
+                combined = {sym: min(spot_vol[sym], lin_vol[sym]) for sym in (set(spot_vol) & set(lin_vol))}
                 await cache.update_vol24h_bulk(combined)
                 logger.bind(tag="RTMETA").info(f"Refreshed vol24h for {len(combined)} symbols")
             except Exception as e:
@@ -957,9 +939,7 @@ def main() -> None:
     sub.add_parser("bybit:ping").set_defaults(func=cmd_bybit_ping)
 
     p_top = sub.add_parser("bybit:top")
-    p_top.add_argument(
-        "--category", default="spot", choices=["spot", "linear", "inverse", "option"]
-    )
+    p_top.add_argument("--category", default="spot", choices=["spot", "linear", "inverse", "option"])
     p_top.add_argument("--limit", type=int, default=5)
     p_top.set_defaults(func=cmd_bybit_top)
 

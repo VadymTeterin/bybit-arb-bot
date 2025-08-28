@@ -65,9 +65,7 @@ def test_selector_filters_by_depth(monkeypatch):
     # Відключаємо реальну БД
     saved = []
     monkeypatch.setattr(selector.persistence, "init_db", lambda: None)
-    monkeypatch.setattr(
-        selector.persistence, "recent_signal_exists", lambda symbol, cooldown_sec: False
-    )
+    monkeypatch.setattr(selector.persistence, "recent_signal_exists", lambda symbol, cooldown_sec: False)
     monkeypatch.setattr(selector.persistence, "save_signal", lambda *a, **k: saved.append(a))
 
     # Мокаємо has_enough_depth так, щоб:

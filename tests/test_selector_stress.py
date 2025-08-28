@@ -60,12 +60,8 @@ def test_selector_stress_sorted_and_limited(monkeypatch):
     # відключаємо реальну БД
     saved = []
     monkeypatch.setattr(selector.persistence, "init_db", lambda: None)
-    monkeypatch.setattr(
-        selector.persistence, "recent_signal_exists", lambda symbol, cooldown_sec: False
-    )
-    monkeypatch.setattr(
-        selector.persistence, "save_signal", lambda *args, **kwargs: saved.append(args)
-    )
+    monkeypatch.setattr(selector.persistence, "recent_signal_exists", lambda symbol, cooldown_sec: False)
+    monkeypatch.setattr(selector.persistence, "save_signal", lambda *args, **kwargs: saved.append(args))
 
     fake = _FakeBybitRest(n=240)
     res = selector.run_selection(limit=7, client=fake)

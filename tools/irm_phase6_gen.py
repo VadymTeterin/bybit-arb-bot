@@ -94,9 +94,7 @@ def render_markdown(data: dict) -> str:
         out.append("_Статуси_: " + ", ".join(f"**{k}** — {v}" for k, v in legend.items()))
         out.append("")
     for s in sections:
-        out.append(
-            f"- [{'x' if s.status == 'done' else ' '}] **{s.id} — {s.name}**  `status: {s.status}`"
-        )
+        out.append(f"- [{'x' if s.status == 'done' else ' '}] **{s.id} — {s.name}**  `status: {s.status}`")
         if s.tasks:
             for t in s.tasks:
                 out.append(f"  - [ ] {t}")

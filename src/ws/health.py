@@ -41,9 +41,7 @@ class WSHealth:
             "last_spot_at_utc": _fmt_utc(self.last_spot_ts),
             "last_linear_at_utc": _fmt_utc(self.last_linear_ts),
             "reconnects_total": self.reconnects_total,
-            "last_msg_age_ms": (
-                int((now - self.last_event_ts) * 1000) if self.last_event_ts else None
-            ),
+            "last_msg_age_ms": (int((now - self.last_event_ts) * 1000) if self.last_event_ts else None),
         }
 
 

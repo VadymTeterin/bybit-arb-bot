@@ -98,13 +98,9 @@ def parse_commit(item: dict[str, Any], default_branch: str = "main") -> CommitEv
     branch = item.get("branch") or default_branch
 
     # Dates: prefer item["commit"]["author"]["date"] (ISO8601)
-    committed_iso = (commit.get("author") or {}).get("date") or (commit.get("committer") or {}).get(
-        "date"
-    )
+    committed_iso = (commit.get("author") or {}).get("date") or (commit.get("committer") or {}).get("date")
     committed_at = (
-        datetime.fromisoformat(committed_iso.replace("Z", "+00:00"))
-        if committed_iso
-        else datetime.now(timezone.utc)
+        datetime.fromisoformat(committed_iso.replace("Z", "+00:00")) if committed_iso else datetime.now(timezone.utc)
     )
     return CommitEvent(
         sha=sha,
@@ -121,9 +117,7 @@ def parse_merge_pr(item: dict[str, Any], base_fallback: str = "main") -> MergeEv
     merged_by = ((item.get("merged_by") or {}) or {}).get("login") or "bot"
     merged_at_iso = item.get("merged_at")
     merged_at = (
-        datetime.fromisoformat(merged_at_iso.replace("Z", "+00:00"))
-        if merged_at_iso
-        else datetime.now(timezone.utc)
+        datetime.fromisoformat(merged_at_iso.replace("Z", "+00:00")) if merged_at_iso else datetime.now(timezone.utc)
     )
     base_branch = ((item.get("base") or {}) or {}).get("ref") or base_fallback
     return MergeEvent(

@@ -159,9 +159,7 @@ class SignedHTTPClient(HTTPClient):
         self._recv_window = recv_window_ms
         self._now_ms = now_ms or (lambda: int(time.time() * 1000))
 
-    def _common_headers(
-        self, timestamp_ms: str, sign: str, content_type_json: bool = False
-    ) -> dict[str, str]:
+    def _common_headers(self, timestamp_ms: str, sign: str, content_type_json: bool = False) -> dict[str, str]:
         headers: dict[str, str] = {
             "X-BAPI-API-KEY": self._api_key,
             "X-BAPI-SIGN": sign,

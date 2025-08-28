@@ -169,9 +169,7 @@ def run_selection(
     pairs = _build_pairs(spot_map, linear_map)
 
     # чи є у клієнта методи ордербука (для depth-фільтра)?
-    client_has_orderbook = all(
-        hasattr(client, name) for name in ("get_orderbook_spot", "get_orderbook_linear")
-    )
+    client_has_orderbook = all(hasattr(client, name) for name in ("get_orderbook_spot", "get_orderbook_linear"))
 
     candidates: list[_Pair] = []
     for p in pairs:

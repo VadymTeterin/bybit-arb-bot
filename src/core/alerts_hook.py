@@ -54,10 +54,7 @@ def send_arbitrage_alert(signal: Any, enabled: bool = True) -> bool:
 
     # Gather expected fields for formatter (robust to legacy names)
     symbol_spot = (
-        getattr(signal, "symbol_spot", None)
-        or getattr(signal, "symbol_a", None)
-        or getattr(signal, "base", None)
-        or ""
+        getattr(signal, "symbol_spot", None) or getattr(signal, "symbol_a", None) or getattr(signal, "base", None) or ""
     )
     symbol_linear = (
         getattr(signal, "symbol_linear", None)

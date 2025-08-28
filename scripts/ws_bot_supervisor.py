@@ -109,18 +109,14 @@ async def ws_spot_loop(ws_url: str, topics: list[str], shared, metrics, debug):
                 if debug["symbols"] and symbol not in debug["symbols"]:
                     return
                 data = evt_norm.get("data")
-                items = (
-                    1 if isinstance(data, dict) else (len(data) if isinstance(data, list) else 0)
-                )
+                items = 1 if isinstance(data, dict) else (len(data) if isinstance(data, list) else 0)
                 key = ("SPOT", channel, symbol)
                 now = time.monotonic()
                 last = debug["last"].get(key, 0.0)
                 if (now - last) * 1000.0 < max(0, debug["sample_ms"]):
                     return
                 debug["last"][key] = now
-                logger.bind(tag="WS").debug(
-                    f"SPOT normalized: channel={channel} symbol={symbol} items={items}"
-                )
+                logger.bind(tag="WS").debug(f"SPOT normalized: channel={channel} symbol={symbol} items={items}")
 
             async def on_message_spot(msg: dict):
                 try:
@@ -175,18 +171,14 @@ async def ws_linear_loop(ws_url: str, topics: list[str], shared, metrics, debug)
                 if debug["symbols"] and symbol not in debug["symbols"]:
                     return
                 data = evt_norm.get("data")
-                items = (
-                    1 if isinstance(data, dict) else (len(data) if isinstance(data, list) else 0)
-                )
+                items = 1 if isinstance(data, dict) else (len(data) if isinstance(data, list) else 0)
                 key = ("LINEAR", channel, symbol)
                 now = time.monotonic()
                 last = debug["last"].get(key, 0.0)
                 if (now - last) * 1000.0 < max(0, debug["sample_ms"]):
                     return
                 debug["last"][key] = now
-                logger.bind(tag="WS").debug(
-                    f"LINEAR normalized: channel={channel} symbol={symbol} items={items}"
-                )
+                logger.bind(tag="WS").debug(f"LINEAR normalized: channel={channel} symbol={symbol} items={items}")
 
             async def on_message_linear(msg: dict):
                 try:
@@ -248,10 +240,7 @@ async def meta_refresh_loop(shared, refresh_sec: int):
 
                     spot_vol = _vol_map(spot_rows)
                     lin_vol = _vol_map(lin_rows)
-                    combined = {
-                        sym: min(spot_vol[sym], lin_vol[sym])
-                        for sym in (set(spot_vol) & set(lin_vol))
-                    }
+                    combined = {sym: min(spot_vol[sym], lin_vol[sym]) for sym in (set(spot_vol) & set(lin_vol))}
                     await shared["cache"].update_vol24h_bulk(combined)
                     logger.bind(tag="RTMETA").info(f"Refreshed vol24h for {len(combined)} symbols")
                 except Exception as e:

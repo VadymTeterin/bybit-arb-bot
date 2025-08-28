@@ -14,9 +14,7 @@ _SENSITIVE_KEY_RE = re.compile(
 
 # Патерни для маскування в сирому тексті (логи, дампи)
 _TEXT_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(
-        r'(?i)("?(x-bapi-[a-z0-9\-]+|authorization|api-?key|api[_-]?secret|signature)"?\s*[:=]\s*")([^"]+)(")'
-    ),
+    re.compile(r'(?i)("?(x-bapi-[a-z0-9\-]+|authorization|api-?key|api[_-]?secret|signature)"?\s*[:=]\s*")([^"]+)(")'),
     re.compile(r"(?i)\b(api_key|apiSecret|signature|api-secret|api-key)\s*=\s*([^\s&]+)"),
     re.compile(r"(?i)\b(BEARER|Bearer)\s+([A-Za-z0-9\.\-_]+)"),
 ]
@@ -53,9 +51,7 @@ def redact_json(obj: Any) -> Any:
         result: dict[str, Any] = {}
         for k, v in obj.items():
             if _SENSITIVE_KEY_RE.search(str(k)):
-                result[str(k)] = _redact_value(
-                    v if isinstance(v, (str, bytes)) else json.dumps(v, ensure_ascii=False)
-                )
+                result[str(k)] = _redact_value(v if isinstance(v, (str, bytes)) else json.dumps(v, ensure_ascii=False))
             else:
                 result[str(k)] = redact_json(v)
         return result

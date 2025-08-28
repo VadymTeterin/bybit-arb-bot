@@ -235,9 +235,7 @@ def _build_settings() -> AppSettings:
     # Bybit (simple aliasing for keys)
     bybit = BybitConfig(
         api_key=_from_env_many("BYBIT__API_KEY", "BYBIT_API_KEY", default=base.bybit.api_key or ""),
-        api_secret=_from_env_many(
-            "BYBIT__API_SECRET", "BYBIT_API_SECRET", default=base.bybit.api_secret or ""
-        ),
+        api_secret=_from_env_many("BYBIT__API_SECRET", "BYBIT_API_SECRET", default=base.bybit.api_secret or ""),
         ws_public_url_linear=base.bybit.ws_public_url_linear,
         ws_public_url_spot=base.bybit.ws_public_url_spot,
         ws_sub_topics_linear=base.bybit.ws_sub_topics_linear,
@@ -280,20 +278,15 @@ def _build_settings() -> AppSettings:
             default=base.liquidity.min_vol_24h_usd,
         )
         or base.liquidity.min_vol_24h_usd,
-        min_price=_from_env_many_float(
-            "LIQUIDITY__MIN_PRICE", "MIN_PRICE", default=base.liquidity.min_price
-        )
+        min_price=_from_env_many_float("LIQUIDITY__MIN_PRICE", "MIN_PRICE", default=base.liquidity.min_price)
         or base.liquidity.min_price,
     )
 
     # Runtime: NESTED → FLAT
     runtime = RuntimeConfig(
         env=_from_env_many("RUNTIME__ENV", "ENV", default=base.runtime.env) or base.runtime.env,
-        db_path=_from_env_many("RUNTIME__DB_PATH", "DB_PATH", default=base.runtime.db_path)
-        or base.runtime.db_path,
-        top_n_report=_from_env_many_int(
-            "RUNTIME__TOP_N_REPORT", "TOP_N_REPORT", default=base.runtime.top_n_report
-        )
+        db_path=_from_env_many("RUNTIME__DB_PATH", "DB_PATH", default=base.runtime.db_path) or base.runtime.db_path,
+        top_n_report=_from_env_many_int("RUNTIME__TOP_N_REPORT", "TOP_N_REPORT", default=base.runtime.top_n_report)
         or base.runtime.top_n_report,
         enable_alerts=_from_env_many_bool(
             "RUNTIME__ENABLE_ALERTS",

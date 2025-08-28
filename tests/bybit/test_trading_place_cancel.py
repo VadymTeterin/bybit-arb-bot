@@ -41,9 +41,7 @@ async def test_create_market_spot_minimal():
     fake = _FakeSignedHTTP()
     tr = BybitTradingClient(cfg, http_client=fake)  # інжектуємо фейковий HTTP
 
-    data = await tr.create_order(
-        symbol="BTC/USDT", side="buy", type="market", qty=0.0001, market="spot"
-    )
+    data = await tr.create_order(symbol="BTC/USDT", side="buy", type="market", qty=0.0001, market="spot")
     assert data["retCode"] == 0
     assert fake.last_path == "/v5/order/create"
     assert fake.last_json is not None
@@ -72,9 +70,7 @@ async def test_create_limit_linear_requires_price_and_sets_it():
         await tr.create_order(symbol="BTC/USDT", side="sell", type="limit", qty=1, market="perp")
 
     # з ціною — ок
-    data = await tr.create_order(
-        symbol="BTC/USDT", side="sell", type="limit", qty=1, price=10000, market="perp"
-    )
+    data = await tr.create_order(symbol="BTC/USDT", side="sell", type="limit", qty=1, price=10000, market="perp")
     assert data["retCode"] == 0
     j = fake.last_json or {}
     assert j["category"] == "linear"

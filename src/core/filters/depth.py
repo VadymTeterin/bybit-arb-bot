@@ -10,9 +10,7 @@ def _to_float(x, default: float = 0.0) -> float:
         return float(default)
 
 
-def _levels_in_window(
-    levels: Iterable[tuple[float, float]], lo: float, hi: float
-) -> list[tuple[float, float]]:
+def _levels_in_window(levels: Iterable[tuple[float, float]], lo: float, hi: float) -> list[tuple[float, float]]:
     """Фільтрує рівні книги за ціновим вікном [lo, hi]."""
     out: list[tuple[float, float]] = []
     for p, q in levels:
@@ -41,22 +39,12 @@ def _normalize_ob(
     """
     bids_raw = orderbook.get("b") or orderbook.get("bids") or []
     asks_raw = orderbook.get("a") or orderbook.get("asks") or []
-    bids = [
-        (_to_float(r[0]), _to_float(r[1]))
-        for r in bids_raw
-        if isinstance(r, (list, tuple)) and len(r) >= 2
-    ]
-    asks = [
-        (_to_float(r[0]), _to_float(r[1]))
-        for r in asks_raw
-        if isinstance(r, (list, tuple)) and len(r) >= 2
-    ]
+    bids = [(_to_float(r[0]), _to_float(r[1])) for r in bids_raw if isinstance(r, (list, tuple)) and len(r) >= 2]
+    asks = [(_to_float(r[0]), _to_float(r[1])) for r in asks_raw if isinstance(r, (list, tuple)) and len(r) >= 2]
     return bids, asks
 
 
-def calc_window_depth_usd(
-    orderbook: dict, mid_price: float, window_pct: float
-) -> tuple[float, float, int]:
+def calc_window_depth_usd(orderbook: dict, mid_price: float, window_pct: float) -> tuple[float, float, int]:
     """
     Розраховує сумарний нотіонал у межах ±window_pct від mid_price.
     Повертає: (bid_usd, ask_usd, levels_in_window_total).

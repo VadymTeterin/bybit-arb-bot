@@ -88,9 +88,7 @@ def test_alerts_formatter_used_when_no_rows(monkeypatch):
 
     # 4) гарантуємо наявність функції format_no_candidates
     fmt = importlib.import_module("src.telegram.formatters")
-    monkeypatch.setattr(
-        fmt, "format_no_candidates", lambda header=None: "FAKE_NO_ROWS", raising=False
-    )
+    monkeypatch.setattr(fmt, "format_no_candidates", lambda header=None: "FAKE_NO_ROWS", raising=False)
 
     # 5) викликаємо команду
     ns = SimpleNamespace(limit=3, threshold=1.0, min_vol=1_000.0)

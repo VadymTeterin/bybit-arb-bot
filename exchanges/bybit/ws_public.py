@@ -211,9 +211,7 @@ class _WsPublic:
 
             msg = json.loads(raw)
             # ACK Bybit: {"op":"subscribe","success":true,...} або retCode=0
-            if msg.get("op") == "subscribe" and (
-                msg.get("success") is True or msg.get("retCode") == 0
-            ):
+            if msg.get("op") == "subscribe" and (msg.get("success") is True or msg.get("retCode") == 0):
                 return
 
             # Може прилетіти перший тікер/ордербук ще до ACK

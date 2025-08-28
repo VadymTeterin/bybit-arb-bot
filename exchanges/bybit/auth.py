@@ -24,9 +24,7 @@ def canonical_json(body: dict[str, Any] | None) -> str:
     return json.dumps(body, separators=(",", ":"), ensure_ascii=False)
 
 
-def sign_v5(
-    api_key: str, api_secret: str, recv_window_ms: int, timestamp_ms: str, body_str: str
-) -> str:
+def sign_v5(api_key: str, api_secret: str, recv_window_ms: int, timestamp_ms: str, body_str: str) -> str:
     """
     Bybit v5: sign = HMAC_SHA256(secret, timestamp + api_key + recvWindow + body)
     Повертаємо hex-рядок у нижньому регістрі.

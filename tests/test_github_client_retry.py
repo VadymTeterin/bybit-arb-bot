@@ -81,9 +81,7 @@ def test_rate_limit_reset_header_triggers_wait_then_succeeds(monkeypatch):
         return sequence[idx]
 
     transport = httpx.MockTransport(handler)
-    client = GitHubClient(
-        client=httpx.Client(transport=transport), max_retries=2, max_sleep_on_reset=1
-    )
+    client = GitHubClient(client=httpx.Client(transport=transport), max_retries=2, max_sleep_on_reset=1)
     client._sleep = sleeper
 
     resp = client._request("GET", "/any")

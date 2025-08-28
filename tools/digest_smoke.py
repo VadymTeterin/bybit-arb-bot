@@ -76,9 +76,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate pseudo daily digest.")
     parser.add_argument("--out", required=True, help="Path to output markdown file.")
     parser.add_argument("--json", default="", help="Optional path to output JSON metadata.")
-    parser.add_argument(
-        "--limit", type=int, default=10, help="Number of recent commits to include."
-    )
+    parser.add_argument("--limit", type=int, default=10, help="Number of recent commits to include.")
     args = parser.parse_args()
 
     out_md = Path(args.out)

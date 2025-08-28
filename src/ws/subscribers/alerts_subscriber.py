@@ -99,12 +99,8 @@ class AlertsSubscriber:
             except Exception as e:  # noqa: BLE001
                 logger.exception("AlertsSubscriber handler failed: {}", e)
 
-        self._unsubs.append(
-            self._mux.subscribe(handler=_on_evt, source="SPOT", channel="tickers", symbol="*")
-        )
-        self._unsubs.append(
-            self._mux.subscribe(handler=_on_evt, source="LINEAR", channel="tickers", symbol="*")
-        )
+        self._unsubs.append(self._mux.subscribe(handler=_on_evt, source="SPOT", channel="tickers", symbol="*"))
+        self._unsubs.append(self._mux.subscribe(handler=_on_evt, source="LINEAR", channel="tickers", symbol="*"))
         logger.info(
             "AlertsSubscriber started: threshold={:.2f}% cooldown={}s allow={} deny={}",
             self._threshold,

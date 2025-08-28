@@ -128,15 +128,9 @@ async def main() -> None:
     if ws_available and ws_enabled:
         cache = QuoteCache()
         ws_linear = (
-            BybitWS(ws_cfg["url_linear"], ws_cfg["topics_linear"] or ["tickers"])
-            if ws_cfg["url_linear"]
-            else None
+            BybitWS(ws_cfg["url_linear"], ws_cfg["topics_linear"] or ["tickers"]) if ws_cfg["url_linear"] else None
         )
-        ws_spot = (
-            BybitWS(ws_cfg["url_spot"], ws_cfg["topics_spot"] or ["tickers"])
-            if ws_cfg["url_spot"]
-            else None
-        )
+        ws_spot = BybitWS(ws_cfg["url_spot"], ws_cfg["topics_spot"] or ["tickers"]) if ws_cfg["url_spot"] else None
         if not ws_linear and not ws_spot:
             logger.warning("WS config has neither LINEAR nor SPOT endpoints/topics configured.")
         mux = WSMultiplexer(name="core")
@@ -166,9 +160,7 @@ async def main() -> None:
             if (now - last) * 1000.0 < max(0, debug_sample_ms):
                 return
             _last_log[key] = now
-            logger.bind(tag="WS").debug(
-                f"{source} normalized: channel={channel} symbol={symbol} items={items}"
-            )
+            logger.bind(tag="WS").debug(f"{source} normalized: channel={channel} symbol={symbol} items={items}")
 
         async def on_message_spot(msg: dict):
             try:
@@ -241,10 +233,7 @@ async def main() -> None:
                     spot_vol = _vol_map(spot_rows)
                     lin_vol = _vol_map(lin_rows)
 
-                    combined = {
-                        sym: min(spot_vol[sym], lin_vol[sym])
-                        for sym in (set(spot_vol) & set(lin_vol))
-                    }
+                    combined = {sym: min(spot_vol[sym], lin_vol[sym]) for sym in (set(spot_vol) & set(lin_vol))}
                     await cache.update_vol24h_bulk(combined)
                     logger.bind(tag="RTMETA").info(f"Refreshed vol24h for {len(combined)} symbols")
                 except Exception as e:

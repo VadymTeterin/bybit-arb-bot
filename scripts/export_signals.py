@@ -189,9 +189,7 @@ def _default_out_name(prefix: str = "signals") -> str:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(
-        description="Export arbitrage signals from SQLite to CSV (Windows-friendly)."
-    )
+    p = argparse.ArgumentParser(description="Export arbitrage signals from SQLite to CSV (Windows-friendly).")
 
     p.add_argument(
         "--out",

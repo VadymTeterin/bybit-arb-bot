@@ -24,9 +24,7 @@ try:
     from aiogram.filters import Command
     from aiogram.types import Message
 except Exception as e:  # noqa: BLE001
-    raise RuntimeError(
-        "aiogram not available or incompatible. Ensure aiogram v3 is installed."
-    ) from e
+    raise RuntimeError("aiogram not available or incompatible. Ensure aiogram v3 is installed.") from e
 
 from ..ws.health import MetricsRegistry
 
@@ -74,11 +72,7 @@ async def main() -> None:
         if allow_chat is not None and msg.chat.id != allow_chat:
             await msg.answer("Access denied: this chat is not allowlisted.")
             return
-        text = (
-            "Hi! I'm the WS status bot.\n"
-            "Commands:\n"
-            "• /status — show current WS metrics (uptime & counters)\n"
-        )
+        text = "Hi! I'm the WS status bot.\n" "Commands:\n" "• /status — show current WS metrics (uptime & counters)\n"
         await msg.answer(text)
 
     @dp.message(Command("status"))

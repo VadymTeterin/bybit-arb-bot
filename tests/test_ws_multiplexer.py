@@ -24,9 +24,7 @@ def test_exact_subscription_receives_event():
 
     mux.subscribe(handler=handler, source="SPOT", channel="book_ticker", symbol="BTCUSDT")
 
-    fired = mux.publish(
-        make_evt(source="SPOT", channel="book_ticker", symbol="BTCUSDT", payload={"x": 1})
-    )
+    fired = mux.publish(make_evt(source="SPOT", channel="book_ticker", symbol="BTCUSDT", payload={"x": 1}))
 
     assert fired == 1
     assert len(received) == 1
