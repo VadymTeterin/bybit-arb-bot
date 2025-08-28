@@ -76,9 +76,7 @@ def test_selector_respects_cooldown(tmp_path):
 
     # Початково збережемо свіжий сигнал для AAAUSDT
     now = datetime.now(timezone.utc)
-    persistence.save_signal(
-        "AAAUSDT", 2.0, 2.02, 1.0, 12_000_000, now - timedelta(seconds=30)
-    )
+    persistence.save_signal("AAAUSDT", 2.0, 2.02, 1.0, 12_000_000, now - timedelta(seconds=30))
 
     # Ті ж дані, AAA знов проходить пороги — але має відсіятись кулдауном
     spot = {

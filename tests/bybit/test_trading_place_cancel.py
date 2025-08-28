@@ -1,7 +1,7 @@
 # tests/bybit/test_trading_place_cancel.py
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pytest
 
@@ -11,15 +11,15 @@ from exchanges.bybit.types import BybitConfig
 
 class _FakeSignedHTTP:
     def __init__(self) -> None:
-        self.last_path: Optional[str] = None
-        self.last_json: Optional[Dict[str, Any]] = None
+        self.last_path: str | None = None
+        self.last_json: dict[str, Any] | None = None
 
     async def post(
         self,
         path: str,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         self.last_path = path
         self.last_json = dict(json or {})
         # імітуємо успішну відповідь Bybit
@@ -41,9 +41,7 @@ async def test_create_market_spot_minimal():
     fake = _FakeSignedHTTP()
     tr = BybitTradingClient(cfg, http_client=fake)  # інжектуємо фейковий HTTP
 
-    data = await tr.create_order(
-        symbol="BTC/USDT", side="buy", type="market", qty=0.0001, market="spot"
-    )
+    data = await tr.create_order(symbol="BTC/USDT", side="buy", type="market", qty=0.0001, market="spot")
     assert data["retCode"] == 0
     assert fake.last_path == "/v5/order/create"
     assert fake.last_json is not None
@@ -69,14 +67,10 @@ async def test_create_limit_linear_requires_price_and_sets_it():
 
     # без ціни має впасти
     with pytest.raises(ValueError):
-        await tr.create_order(
-            symbol="BTC/USDT", side="sell", type="limit", qty=1, market="perp"
-        )
+        await tr.create_order(symbol="BTC/USDT", side="sell", type="limit", qty=1, market="perp")
 
     # з ціною — ок
-    data = await tr.create_order(
-        symbol="BTC/USDT", side="sell", type="limit", qty=1, price=10000, market="perp"
-    )
+    data = await tr.create_order(symbol="BTC/USDT", side="sell", type="limit", qty=1, price=10000, market="perp")
     assert data["retCode"] == 0
     j = fake.last_json or {}
     assert j["category"] == "linear"

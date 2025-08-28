@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pytest
 
@@ -10,11 +10,11 @@ from exchanges.bybit._http import HTTPClient
 
 
 class _FakeResp:
-    def __init__(self, status_code: int, payload: Dict[str, Any]):
+    def __init__(self, status_code: int, payload: dict[str, Any]):
         self.status_code = status_code
         self._payload = payload
 
-    def json(self) -> Dict[str, Any]:
+    def json(self) -> dict[str, Any]:
         return self._payload
 
     async def aclose(self) -> None:  # для сумісності, хоча не використовується тут
@@ -36,8 +36,8 @@ class _FakeClient:
         self,
         method: str,
         path: str,
-        params: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
     ) -> _FakeResp:
         idx = min(self.calls, len(self.sequence) - 1)
         self.calls += 1

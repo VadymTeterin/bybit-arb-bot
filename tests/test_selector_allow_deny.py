@@ -36,9 +36,7 @@ def test_allow_deny_filters(monkeypatch):
     # відключаємо реальні виклики до SQLite
     saved = []
     monkeypatch.setattr(selector.persistence, "init_db", lambda: None)
-    monkeypatch.setattr(
-        selector.persistence, "recent_signal_exists", lambda symbol, cooldown_sec: False
-    )
+    monkeypatch.setattr(selector.persistence, "recent_signal_exists", lambda symbol, cooldown_sec: False)
     monkeypatch.setattr(
         selector.persistence,
         "save_signal",

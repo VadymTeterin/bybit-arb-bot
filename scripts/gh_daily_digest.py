@@ -7,7 +7,6 @@ import os
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import List, Tuple
 
 import httpx
 
@@ -57,7 +56,7 @@ def _today_kyiv() -> date:
     return datetime.utcnow().date()
 
 
-def _mock_events(d: date) -> Tuple[List[CommitEvent], List[MergeEvent], List[TagEvent]]:
+def _mock_events(d: date) -> tuple[list[CommitEvent], list[MergeEvent], list[TagEvent]]:
     start_utc, end_utc = kyiv_day_bounds(d)
     mid = start_utc + (end_utc - start_utc) / 2
 
@@ -97,21 +96,17 @@ def _iso(dt: datetime) -> str:
 
 def _collect_real_events(
     d: date, owner: str, repo: str, client: GitHubClient
-) -> Tuple[List[CommitEvent], List[MergeEvent], List[TagEvent]]:
+) -> tuple[list[CommitEvent], list[MergeEvent], list[TagEvent]]:
     start_utc, end_utc = kyiv_day_bounds(d)
     since_iso, until_iso = _iso(start_utc), _iso(end_utc)
 
     # COMMITS
-    commits_raw = list(
-        client.list_commits(owner, repo, since_iso=since_iso, until_iso=until_iso)
-    )
-    commits: List[CommitEvent] = [
-        parse_commit(item, default_branch="main") for item in commits_raw
-    ]
+    commits_raw = list(client.list_commits(owner, repo, since_iso=since_iso, until_iso=until_iso))
+    commits: list[CommitEvent] = [parse_commit(item, default_branch="main") for item in commits_raw]
 
     # MERGES (PRs)
     pulls_raw = list(client.list_pulls_merged(owner, repo))
-    merges: List[MergeEvent] = []
+    merges: list[MergeEvent] = []
     for pr in pulls_raw:
         merged_at_iso = pr.get("merged_at")
         if not merged_at_iso:
@@ -122,7 +117,7 @@ def _collect_real_events(
 
     # TAGS (require commit date lookup)
     tags_raw = list(client.list_tags(owner, repo))
-    tags: List[TagEvent] = []
+    tags: list[TagEvent] = []
     for t in tags_raw:
         te = parse_tag(t)
         sha = te.sha
@@ -161,16 +156,10 @@ def _send_telegram(text: str) -> None:
     Sends a plain-text message to Telegram via Bot API.
     Requires env vars: TG_BOT_TOKEN, TG_CHAT_ID
     """
-    token = (
-        os.getenv("TG_BOT_TOKEN")
-        or os.getenv("TG_TOKEN")
-        or os.getenv("TELEGRAM_BOT_TOKEN")
-    )
+    token = os.getenv("TG_BOT_TOKEN") or os.getenv("TG_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("TG_CHAT_ID")
     if not token or not chat_id:
-        raise RuntimeError(
-            "Telegram credentials are missing: set TG_BOT_TOKEN and TG_CHAT_ID in environment/.env"
-        )
+        raise RuntimeError("Telegram credentials are missing: set TG_BOT_TOKEN and TG_CHAT_ID in environment/.env")
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     # We intentionally do NOT set parse_mode to avoid escaping headaches; text is plain.
@@ -193,9 +182,7 @@ def _send_telegram(text: str) -> None:
             res = data.get("result", {}) or {}
             msg_id = res.get("message_id")
             chat_dbg = (res.get("chat") or {}).get("id")
-            print(
-                f"[debug] telegram response: ok={data.get('ok')} msg_id={msg_id} chat_id={chat_dbg}"
-            )
+            print(f"[debug] telegram response: ok={data.get('ok')} msg_id={msg_id} chat_id={chat_dbg}")
         except Exception:
             pass
 
@@ -203,11 +190,9 @@ def _send_telegram(text: str) -> None:
             raise RuntimeError(f"Telegram sendMessage failed: {data}")
 
 
-def main(argv: List[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="GitHub Daily Digest")
-    parser.add_argument(
-        "--date", type=str, help="Kyiv date YYYY-MM-DD (default: today in Kyiv)"
-    )
+    parser.add_argument("--date", type=str, help="Kyiv date YYYY-MM-DD (default: today in Kyiv)")
     parser.add_argument(
         "--owner",
         type=str,
@@ -226,18 +211,14 @@ def main(argv: List[str] | None = None) -> int:
         help="Send the digest message to Telegram (one per Kyiv-day; see --force)",
     )
     # Backward-compatible flags:
-    parser.add_argument(
-        "--mock", action="store_true", help="Use offline mock data (default)"
-    )
+    parser.add_argument("--mock", action="store_true", help="Use offline mock data (default)")
     parser.add_argument(
         "--no-mock",
         action="store_true",
         help="Use real GitHub API instead of offline mock data",
     )
     # Throttle control:
-    parser.add_argument(
-        "--force", action="store_true", help="Bypass daily throttle and send anyway"
-    )
+    parser.add_argument("--force", action="store_true", help="Bypass daily throttle and send anyway")
     args = parser.parse_args(argv)
 
     d = date.fromisoformat(args.date) if args.date else _today_kyiv()
@@ -262,9 +243,7 @@ def main(argv: List[str] | None = None) -> int:
 
     if args.send:
         if not args.force and not _should_send_today(d):
-            print(
-                "\n[send] Skipped: daily throttle (already sent for this Kyiv-day). Use --force to override."
-            )
+            print("\n[send] Skipped: daily throttle (already sent for this Kyiv-day). Use --force to override.")
             return 0
         try:
             _send_telegram(text)

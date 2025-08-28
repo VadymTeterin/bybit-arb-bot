@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """SQLite-backed repo for AlertGate persistence (Step 6.3.5).
 
 API expected by AlertGate:
@@ -12,7 +11,6 @@ import os
 import sqlite3
 import threading
 import time
-from typing import Optional, Tuple
 
 try:
     from loguru import logger  # type: ignore
@@ -35,7 +33,7 @@ class SqliteAlertGateRepo:
         self._ensure_schema()
 
     @classmethod
-    def from_settings(cls, settings) -> "SqliteAlertGateRepo":
+    def from_settings(cls, settings) -> SqliteAlertGateRepo:
         # Priority: env ALERTS_DB_PATH -> settings.persistence.alerts_db -> ./data/alerts.db
         env_path = os.getenv("ALERTS_DB_PATH") or os.getenv("ALERTS__DB_PATH")
         if env_path:
@@ -69,7 +67,7 @@ class SqliteAlertGateRepo:
             conn.commit()
 
     # ---- Public API ----
-    def get_last(self, symbol: str) -> Optional[Tuple[float, float]]:
+    def get_last(self, symbol: str) -> tuple[float, float] | None:
         sym = (symbol or "").upper().strip()
         if not sym:
             return None

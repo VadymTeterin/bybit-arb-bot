@@ -42,10 +42,7 @@ def test_has_enough_depth_positive():
     bids = [(49.9, 100), (49.8, 100)]
     asks = [(50.1, 100), (50.2, 100)]
     ob = _mk_book(bids, asks)
-    assert (
-        has_enough_depth(ob, mp, min_depth_usd=3_000, window_pct=0.5, min_levels=2)
-        is True
-    )
+    assert has_enough_depth(ob, mp, min_depth_usd=3_000, window_pct=0.5, min_levels=2) is True
 
 
 def test_has_enough_depth_not_enough_usd():
@@ -56,10 +53,7 @@ def test_has_enough_depth_not_enough_usd():
     bids = [(9.95, 10)]  # ~99.5$
     asks = [(10.02, 10)]  # ~100.2$
     ob = _mk_book(bids, asks)
-    assert (
-        has_enough_depth(ob, mp, min_depth_usd=500, window_pct=0.5, min_levels=2)
-        is False
-    )
+    assert has_enough_depth(ob, mp, min_depth_usd=500, window_pct=0.5, min_levels=2) is False
 
 
 def test_has_enough_depth_not_enough_levels():
@@ -71,10 +65,7 @@ def test_has_enough_depth_not_enough_levels():
     asks = [(10.01, 1000)]
     ob = _mk_book(bids, asks)
     # нотіонал великий, але рівнів мало (2 < 3)
-    assert (
-        has_enough_depth(ob, mp, min_depth_usd=1_000, window_pct=0.5, min_levels=3)
-        is False
-    )
+    assert has_enough_depth(ob, mp, min_depth_usd=1_000, window_pct=0.5, min_levels=3) is False
 
 
 def test_handles_alt_format_keys():

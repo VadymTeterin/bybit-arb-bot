@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import Optional
 
 try:
     # aiogram v3 style imports
@@ -25,9 +24,7 @@ try:
     from aiogram.filters import Command
     from aiogram.types import Message
 except Exception as e:  # noqa: BLE001
-    raise RuntimeError(
-        "aiogram not available or incompatible. Ensure aiogram v3 is installed."
-    ) from e
+    raise RuntimeError("aiogram not available or incompatible. Ensure aiogram v3 is installed.") from e
 
 from ..ws.health import MetricsRegistry
 
@@ -36,13 +33,11 @@ def _get_token() -> str:
     token = os.getenv("TELEGRAM__BOT_TOKEN") or os.getenv("TELEGRAM__TOKEN") or ""
     token = token.strip()
     if not token:
-        raise RuntimeError(
-            "Telegram token is not set. Provide TELEGRAM__BOT_TOKEN in .env"
-        )
+        raise RuntimeError("Telegram token is not set. Provide TELEGRAM__BOT_TOKEN in .env")
     return token
 
 
-def _allowed_chat_id() -> Optional[int]:
+def _allowed_chat_id() -> int | None:
     cid = os.getenv("TELEGRAM__ALERT_CHAT_ID") or os.getenv("TELEGRAM__CHAT_ID") or ""
     cid = cid.strip()
     try:
@@ -77,11 +72,7 @@ async def main() -> None:
         if allow_chat is not None and msg.chat.id != allow_chat:
             await msg.answer("Access denied: this chat is not allowlisted.")
             return
-        text = (
-            "Hi! I'm the WS status bot.\n"
-            "Commands:\n"
-            "• /status — show current WS metrics (uptime & counters)\n"
-        )
+        text = "Hi! I'm the WS status bot.\n" "Commands:\n" "• /status — show current WS metrics (uptime & counters)\n"
         await msg.answer(text)
 
     @dp.message(Command("status"))

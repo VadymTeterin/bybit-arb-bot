@@ -1,7 +1,7 @@
 # tests/bybit/test_private_headers.py
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pytest
 
@@ -9,11 +9,11 @@ from exchanges.bybit._http import SignedHTTPClient
 
 
 class _FakeResp:
-    def __init__(self, status_code: int, payload: Dict[str, Any]):
+    def __init__(self, status_code: int, payload: dict[str, Any]):
         self.status_code = status_code
         self._payload = payload
 
-    def json(self) -> Dict[str, Any]:
+    def json(self) -> dict[str, Any]:
         return self._payload
 
     async def aclose(self) -> None:
@@ -26,17 +26,17 @@ class _FakeResp:
 
 class _CaptureClient:
     def __init__(self):
-        self.last_headers: Dict[str, str] = {}
-        self.last_params: Optional[Dict[str, Any]] = None
-        self.last_json: Optional[Dict[str, Any]] = None
+        self.last_headers: dict[str, str] = {}
+        self.last_params: dict[str, Any] | None = None
+        self.last_json: dict[str, Any] | None = None
 
     async def request(
         self,
         method: str,
         path: str,
-        params: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
     ):
         self.last_params = params
         self.last_json = json

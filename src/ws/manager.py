@@ -4,21 +4,21 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable, List, Optional, Set
 
 
 @dataclass
 class WSManagerSnapshot:
     ts: float
-    topics: List[str]
+    topics: list[str]
     reconnects_total: int
-    last_connect_ts: Optional[float]
-    last_disconnect_ts: Optional[float]
-    last_msg_ts: Optional[float]
-    last_heartbeat_ts: Optional[float]
+    last_connect_ts: float | None
+    last_disconnect_ts: float | None
+    last_msg_ts: float | None
+    last_heartbeat_ts: float | None
 
-    def last_msg_age_ms(self) -> Optional[int]:
+    def last_msg_age_ms(self) -> int | None:
         if self.last_msg_ts is None:
             return None
         return int((self.ts - self.last_msg_ts) * 1000)
@@ -46,16 +46,14 @@ class WSManager:
       - no I/O; call on_connect/on_message/on_disconnect from your WS loop
     """
 
-    topics: Set[str] = field(default_factory=set)
+    topics: set[str] = field(default_factory=set)
     reconnects_total: int = 0
-    last_connect_ts: Optional[float] = None
-    last_disconnect_ts: Optional[float] = None
-    last_msg_ts: Optional[float] = None
-    last_heartbeat_ts: Optional[float] = None
+    last_connect_ts: float | None = None
+    last_disconnect_ts: float | None = None
+    last_msg_ts: float | None = None
+    last_heartbeat_ts: float | None = None
 
-    _lock: threading.Lock = field(
-        default_factory=threading.Lock, init=False, repr=False
-    )
+    _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
     # --- topics
     def set_topics(self, topics: Iterable[str]) -> None:
@@ -74,12 +72,12 @@ class WSManager:
             for t in topics:
                 self.topics.discard(str(t).strip())
 
-    def resubscribe_args(self) -> List[str]:
+    def resubscribe_args(self) -> list[str]:
         with self._lock:
             return sorted(self.topics)
 
     # --- lifecycle hooks
-    def on_connect(self) -> List[str]:
+    def on_connect(self) -> list[str]:
         with self._lock:
             self.last_connect_ts = time.time()
             # after (re)connect we want to replay all current topics

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Literal
 
 Interval = Literal["15m", "30m", "1h", "4h"]
 MarketType = Literal["spot", "perp", "margin"]
@@ -25,4 +25,4 @@ class BybitConfig:
     base_url_private: str = "https://api.bybit.com"
     testnet: bool = False
     default_category: Category = "spot"  # <— нове: "spot" або "linear"
-    extra: Optional[Dict[str, Any]] = None
+    extra: dict[str, Any] | None = None

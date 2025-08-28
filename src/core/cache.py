@@ -4,7 +4,6 @@ from __future__ import annotations
 import asyncio
 import math
 from time import time
-from typing import Dict, List, Optional, Tuple
 
 
 class QuoteCache:
@@ -24,16 +23,16 @@ class QuoteCache:
 
     def __init__(self) -> None:
         self._lock = asyncio.Lock()
-        self._data: Dict[str, Dict[str, float]] = {}
-        self._vol24h: Dict[str, float] = {}
+        self._data: dict[str, dict[str, float]] = {}
+        self._vol24h: dict[str, float] = {}
 
     async def update(
         self,
         symbol: str,
         *,
-        spot: Optional[float] = None,
-        linear_mark: Optional[float] = None,
-        ts: Optional[float] = None,
+        spot: float | None = None,
+        linear_mark: float | None = None,
+        ts: float | None = None,
     ) -> float:
         """
         Оновлює spot/linear_mark. Повертає поточний basis_pct (або NaN, якщо його ще не можна порахувати).
@@ -61,25 +60,23 @@ class QuoteCache:
 
             # перерахунок basis, якщо можливо
             if row["spot"] and row["linear_mark"] and row["spot"] > 0:
-                row["basis_pct"] = (
-                    (row["linear_mark"] - row["spot"]) / row["spot"] * 100.0
-                )
+                row["basis_pct"] = (row["linear_mark"] - row["spot"]) / row["spot"] * 100.0
                 row["ts_basis"] = float(ts)
             return row["basis_pct"]
 
-    async def update_vol24h(self, symbol: str, vol_usd: Optional[float]) -> None:
+    async def update_vol24h(self, symbol: str, vol_usd: float | None) -> None:
         async with self._lock:
             if vol_usd is None:
                 self._vol24h.pop(symbol, None)
             else:
                 self._vol24h[symbol] = float(vol_usd)
 
-    async def update_vol24h_bulk(self, vol_map: Dict[str, float]) -> None:
+    async def update_vol24h_bulk(self, vol_map: dict[str, float]) -> None:
         async with self._lock:
             for k, v in vol_map.items():
                 self._vol24h[k] = float(v)
 
-    async def get_row(self, symbol: str) -> Dict[str, float]:
+    async def get_row(self, symbol: str) -> dict[str, float]:
         async with self._lock:
             row = self._data.get(symbol, None)
             if row is None:
@@ -93,13 +90,13 @@ class QuoteCache:
                 }
             return dict(row)
 
-    async def snapshot(self) -> Dict[str, Tuple[float, float, float]]:
+    async def snapshot(self) -> dict[str, tuple[float, float, float]]:
         """
         BACKWARD‑COMPAT: повертає {symbol: (spot, linear_mark, ts)}
         де ts = max(ts_spot, ts_linear, ts_basis).
         """
         async with self._lock:
-            out: Dict[str, Tuple[float, float, float]] = {}
+            out: dict[str, tuple[float, float, float]] = {}
             for k, v in self._data.items():
                 ts = max(
                     float(v.get("ts_spot", 0.0)),
@@ -115,12 +112,12 @@ class QuoteCache:
 
     async def snapshot_extended(
         self,
-    ) -> Dict[str, Tuple[float, float, float, float, float, float]]:
+    ) -> dict[str, tuple[float, float, float, float, float, float]]:
         """
         Розширена версія снапшоту: {symbol: (spot, linear_mark, basis_pct, ts_spot, ts_linear, ts_basis)}
         """
         async with self._lock:
-            out: Dict[str, Tuple[float, float, float, float, float, float]] = {}
+            out: dict[str, tuple[float, float, float, float, float, float]] = {}
             for k, v in self._data.items():
                 out[k] = (
                     float(v.get("spot", math.nan)),
@@ -138,9 +135,9 @@ class QuoteCache:
         threshold_pct: float,
         min_price: float = 0.0,
         min_vol24h_usd: float = 0.0,
-        allow: Optional[List[str]] = None,
-        deny: Optional[List[str]] = None,
-    ) -> List[Tuple[str, float]]:
+        allow: list[str] | None = None,
+        deny: list[str] | None = None,
+    ) -> list[tuple[str, float]]:
         """
         Повертає список (symbol, basis_pct), що проходять фільтри:
           - abs(basis_pct) >= threshold_pct

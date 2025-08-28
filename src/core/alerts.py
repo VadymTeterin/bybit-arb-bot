@@ -4,19 +4,16 @@ from __future__ import annotations
 import asyncio
 import math
 import time
+from collections.abc import Awaitable
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable, Dict, Optional, cast
+from typing import Any, Callable, cast
 
 # --- безпечне підключення форматера сигналів ---
 try:
     from src.telegram import formatters as _formatters
 
-    _FORMAT_SIGNAL: Callable[..., str] = cast(
-        Callable[..., str], _formatters.format_signal
-    )
-except (
-    Exception
-):  # pragma: no cover - захист від відсутності модулів у середовищі тестів
+    _FORMAT_SIGNAL: Callable[..., str] = cast(Callable[..., str], _formatters.format_signal)
+except Exception:  # pragma: no cover - захист від відсутності модулів у середовищі тестів
 
     def _FORMAT_SIGNAL(*_args: Any, **_kwargs: Any) -> str:
         # мінімальний запасний варіант для розробницького режиму
@@ -66,8 +63,8 @@ class RealtimeAlerter:
 
     def __init__(self, cfg: AlerterConfig, sender: SendFunc | None = None) -> None:
         self._cfg = cfg
-        self._sender: Optional[SendFunc] = sender
-        self._last_sent: Dict[str, float] = {}
+        self._sender: SendFunc | None = sender
+        self._last_sent: dict[str, float] = {}
         self._lock = asyncio.Lock()
 
     def set_sender(self, sender: SendFunc) -> None:
@@ -77,11 +74,11 @@ class RealtimeAlerter:
     async def maybe_send(
         self,
         symbol: str,
-        spot_price: Optional[float],
-        mark_price: Optional[float],
-        basis_pct: Optional[float],
-        vol24h_usd: Optional[float],
-        ts: Optional[float] = None,
+        spot_price: float | None,
+        mark_price: float | None,
+        basis_pct: float | None,
+        vol24h_usd: float | None,
+        ts: float | None = None,
     ) -> bool:
         """
         Повертає True якщо повідомлення відправлено, інакше False.
@@ -94,13 +91,7 @@ class RealtimeAlerter:
             # sender ще не підключили — нема куди слати
             return False
 
-        if (
-            symbol is None
-            or spot_price is None
-            or mark_price is None
-            or basis_pct is None
-            or math.isnan(basis_pct)
-        ):
+        if symbol is None or spot_price is None or mark_price is None or basis_pct is None or math.isnan(basis_pct):
             return False
 
         now = ts if ts is not None else time.time()

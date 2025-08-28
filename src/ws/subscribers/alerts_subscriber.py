@@ -4,7 +4,8 @@ from __future__ import annotations
 import asyncio
 import math
 import time
-from typing import Any, Awaitable, Callable, Dict, Iterable, Mapping, Optional
+from collections.abc import Awaitable, Iterable, Mapping
+from typing import Any, Callable
 
 from loguru import logger
 
@@ -13,13 +14,13 @@ from src.telegram.sender import TelegramSender
 from src.ws.multiplexer import WsEvent, WSMultiplexer
 
 
-def _upper_set(items: Optional[Iterable[str]]) -> set[str]:
+def _upper_set(items: Iterable[str] | None) -> set[str]:
     if not items:
         return set()
     return {str(x).upper() for x in items}
 
 
-def _safe_float(x: object | None) -> Optional[float]:
+def _safe_float(x: object | None) -> float | None:
     """Акуратно конвертує у float, повертає None, якщо неможливо."""
     if x is None:
         return None
@@ -42,17 +43,17 @@ class AlertsSubscriber:
     def __init__(
         self,
         mux: WSMultiplexer,
-        settings: Optional[AppSettings] = None,
+        settings: AppSettings | None = None,
         *,
-        send_async: Optional[Callable[[str], Awaitable[None]]] = None,
+        send_async: Callable[[str], Awaitable[None]] | None = None,
     ) -> None:
         self._mux = mux
         self._s = settings or load_settings()
 
         # Runtime state
-        self._last_spot: Dict[str, float] = {}
-        self._last_mark: Dict[str, float] = {}
-        self._last_sent_ts: Dict[str, float] = {}
+        self._last_spot: dict[str, float] = {}
+        self._last_mark: dict[str, float] = {}
+        self._last_sent_ts: dict[str, float] = {}
 
         # Config shortcuts
         self._enabled: bool = bool(self._s.enable_alerts)
@@ -77,9 +78,7 @@ class AlertsSubscriber:
                     return
                 ok = await asyncio.to_thread(sender.send, text)
                 if not ok:
-                    logger.warning(
-                        "AlertsSubscriber: TelegramSender.send returned False"
-                    )
+                    logger.warning("AlertsSubscriber: TelegramSender.send returned False")
 
             self._send_async = _default_send
         else:
@@ -100,16 +99,8 @@ class AlertsSubscriber:
             except Exception as e:  # noqa: BLE001
                 logger.exception("AlertsSubscriber handler failed: {}", e)
 
-        self._unsubs.append(
-            self._mux.subscribe(
-                handler=_on_evt, source="SPOT", channel="tickers", symbol="*"
-            )
-        )
-        self._unsubs.append(
-            self._mux.subscribe(
-                handler=_on_evt, source="LINEAR", channel="tickers", symbol="*"
-            )
-        )
+        self._unsubs.append(self._mux.subscribe(handler=_on_evt, source="SPOT", channel="tickers", symbol="*"))
+        self._unsubs.append(self._mux.subscribe(handler=_on_evt, source="LINEAR", channel="tickers", symbol="*"))
         logger.info(
             "AlertsSubscriber started: threshold={:.2f}% cooldown={}s allow={} deny={}",
             self._threshold,

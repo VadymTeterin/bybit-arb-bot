@@ -10,9 +10,7 @@ except Exception:  # noqa: BLE001
 class BybitWebSocketManager:
     def __init__(self, ws_url: str):
         if websockets is None:
-            raise ImportError(
-                "websockets не встановлено. Додай пакет 'websockets' або 'aiohttp'."
-            )
+            raise ImportError("websockets не встановлено. Додай пакет 'websockets' або 'aiohttp'.")
         self.ws_url = ws_url
 
     async def connect(self) -> None:

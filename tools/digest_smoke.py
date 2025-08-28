@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Generate a pseudo "Daily Digest" artifact from the current repo state.
 This is used for E2E smoke testing in CI.
@@ -14,7 +13,6 @@ import subprocess
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List
 from zoneinfo import ZoneInfo
 
 
@@ -26,21 +24,19 @@ class CommitItem:
     subject: str
 
 
-def run(cmd: List[str]) -> str:
+def run(cmd: list[str]) -> str:
     """Run a shell command and return stdout (stripped)."""
     res = subprocess.run(cmd, capture_output=True, text=True, check=True)
     return res.stdout.strip()
 
 
-def recent_commits(limit: int) -> List[CommitItem]:
+def recent_commits(limit: int) -> list[CommitItem]:
     """
     Collect recent commits using git. ISO date for easy parsing.
     """
     fmt = "%h|%ad|%an|%s"
-    out = run(
-        ["git", "log", f"-n{limit}", f"--pretty=format:{fmt}", "--date=iso-strict"]
-    )
-    items: List[CommitItem] = []
+    out = run(["git", "log", f"-n{limit}", f"--pretty=format:{fmt}", "--date=iso-strict"])
+    items: list[CommitItem] = []
     for line in out.splitlines():
         parts = line.split("|", 3)
         if len(parts) != 4:
@@ -51,7 +47,7 @@ def recent_commits(limit: int) -> List[CommitItem]:
     return items
 
 
-def build_markdown(repo: str, branch: str, sha: str, commits: List[CommitItem]) -> str:
+def build_markdown(repo: str, branch: str, sha: str, commits: list[CommitItem]) -> str:
     """Render markdown digest."""
     now = datetime.now(ZoneInfo("Europe/Kyiv"))
     header = (
@@ -79,12 +75,8 @@ def build_markdown(repo: str, branch: str, sha: str, commits: List[CommitItem]) 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate pseudo daily digest.")
     parser.add_argument("--out", required=True, help="Path to output markdown file.")
-    parser.add_argument(
-        "--json", default="", help="Optional path to output JSON metadata."
-    )
-    parser.add_argument(
-        "--limit", type=int, default=10, help="Number of recent commits to include."
-    )
+    parser.add_argument("--json", default="", help="Optional path to output JSON metadata.")
+    parser.add_argument("--limit", type=int, default=10, help="Number of recent commits to include.")
     args = parser.parse_args()
 
     out_md = Path(args.out)
@@ -94,9 +86,7 @@ def main() -> int:
         out_json.parent.mkdir(parents=True, exist_ok=True)
 
     repo = os.getenv("GITHUB_REPOSITORY", "local/repo")
-    branch = os.getenv(
-        "GITHUB_REF_NAME", run(["git", "rev-parse", "--abbrev-ref", "HEAD"])
-    )
+    branch = os.getenv("GITHUB_REF_NAME", run(["git", "rev-parse", "--abbrev-ref", "HEAD"]))
     sha = os.getenv("GITHUB_SHA", run(["git", "rev-parse", "HEAD"]))
 
     commits = recent_commits(limit=args.limit)
@@ -112,9 +102,7 @@ def main() -> int:
             "limit": args.limit,
             "commits": [asdict(c) for c in commits],
         }
-        out_json.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        out_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(f"[digest_smoke] Wrote: {out_md}")
     if out_json:

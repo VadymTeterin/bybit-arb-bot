@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 IRM Phase 6.2 generator (SSOT-lite) with guard healing
 - Reads docs/irm.phase6.yaml
@@ -19,7 +18,6 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
 
 
 # --- Ensure UTF-8 stdio on Windows runners (cp1252 would fail on Cyrillic) ---
@@ -60,9 +58,7 @@ BEGIN_LINE_RE = re.compile(r"(?m)^\s*<!-- IRM:BEGIN 6\.2 -->\s*$")
 END_LINE_RE = re.compile(r"(?m)^\s*<!-- IRM:END 6\.2 -->\s*$")
 
 # Full block pattern: BEGIN line ... END line (non-greedy), strict to full lines
-BLOCK_RE = re.compile(
-    r"(?ms)^\s*<!-- IRM:BEGIN 6\.2 -->\s*$.*?^\s*<!-- IRM:END 6\.2 -->\s*$"
-)
+BLOCK_RE = re.compile(r"(?ms)^\s*<!-- IRM:BEGIN 6\.2 -->\s*$.*?^\s*<!-- IRM:END 6\.2 -->\s*$")
 
 # Header if sentinels absent
 HEADER_RE = re.compile(r"^###\s+Фаза\s+6\.2\b.*$", re.MULTILINE)
@@ -73,7 +69,7 @@ class Section:
     id: str
     name: str
     status: str
-    tasks: List[str]
+    tasks: list[str]
 
 
 def load_yaml() -> dict:
@@ -88,21 +84,17 @@ def render_markdown(data: dict) -> str:
     title = data.get("title", "").strip()
     updated = data.get("updated_utc", "").strip()
     sections = [Section(**s) for s in data.get("sections", [])]
-    out: List[str] = []
+    out: list[str] = []
     out.append(f"### Фаза 6.2 — {title}")
     if updated:
         out.append(f"> Оновлено: {updated}")
     out.append("")
     legend = data.get("status_legend", {})
     if legend:
-        out.append(
-            "_Статуси_: " + ", ".join(f"**{k}** — {v}" for k, v in legend.items())
-        )
+        out.append("_Статуси_: " + ", ".join(f"**{k}** — {v}" for k, v in legend.items()))
         out.append("")
     for s in sections:
-        out.append(
-            f"- [{'x' if s.status == 'done' else ' '}] **{s.id} — {s.name}**  `status: {s.status}`"
-        )
+        out.append(f"- [{'x' if s.status == 'done' else ' '}] **{s.id} — {s.name}**  `status: {s.status}`")
         if s.tasks:
             for t in s.tasks:
                 out.append(f"  - [ ] {t}")
@@ -202,12 +194,8 @@ def write_mode() -> int:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(
-        description="Sync Phase 6.2 IRM from YAML (with guard healing)"
-    )
-    ap.add_argument(
-        "--check", action="store_true", help="Check IRM diff; exit 1 if updates needed"
-    )
+    ap = argparse.ArgumentParser(description="Sync Phase 6.2 IRM from YAML (with guard healing)")
+    ap.add_argument("--check", action="store_true", help="Check IRM diff; exit 1 if updates needed")
     ap.add_argument("--write", action="store_true", help="Write IRM updates in-place")
     args = ap.parse_args()
     if args.check and args.write:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
-from typing import List, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -17,7 +17,7 @@ autoload_env()
 # ------------------- helpers -------------------
 
 
-def _csv_list(x: object) -> List[str]:
+def _csv_list(x: object) -> list[str]:
     """Normalize CSV/list into List[str]."""
     if x is None:
         return []
@@ -71,32 +71,32 @@ def _from_env_many_bool(*names: str, default: bool | None = None) -> bool | None
 class TelegramConfig(BaseModel):
     """Telegram settings."""
 
-    token: Optional[str] = None
-    chat_id: Optional[str] = None
+    token: str | None = None
+    chat_id: str | None = None
 
     # Back-compat properties
     @property
-    def bot_token(self) -> Optional[str]:
+    def bot_token(self) -> str | None:
         return self.token
 
     @property
-    def alert_chat_id(self) -> Optional[str]:
+    def alert_chat_id(self) -> str | None:
         return self.chat_id
 
 
 class BybitConfig(BaseModel):
     """Bybit settings (API & WS)."""
 
-    api_key: Optional[str] = None
-    api_secret: Optional[str] = None
+    api_key: str | None = None
+    api_secret: str | None = None
 
     # Default WS endpoints
-    ws_public_url_linear: Optional[str] = "wss://stream.bybit.com/v5/public/linear"
-    ws_public_url_spot: Optional[str] = "wss://stream.bybit.com/v5/public/spot"
+    ws_public_url_linear: str | None = "wss://stream.bybit.com/v5/public/linear"
+    ws_public_url_spot: str | None = "wss://stream.bybit.com/v5/public/spot"
 
     # Topics can be CSV or list via .env
-    ws_sub_topics_linear: Optional[str | List[str]] = "tickers.BTCUSDT,tickers.ETHUSDT"
-    ws_sub_topics_spot: Optional[str | List[str]] = "tickers.BTCUSDT,tickers.ETHUSDT"
+    ws_sub_topics_linear: str | list[str] | None = "tickers.BTCUSDT,tickers.ETHUSDT"
+    ws_sub_topics_spot: str | list[str] | None = "tickers.BTCUSDT,tickers.ETHUSDT"
 
 
 class AlertsConfig(BaseModel):
@@ -158,15 +158,15 @@ class AppSettings(BaseSettings):
     top_n_report: int = 10
     enable_alerts: bool = True
 
-    allow_symbols: Optional[str | List[str]] = None
-    deny_symbols: Optional[str | List[str]] = None
+    allow_symbols: str | list[str] | None = None
+    deny_symbols: str | list[str] | None = None
 
     ws_enabled: bool = True
-    ws_public_url_linear: Optional[str] = None
-    ws_public_url_spot: Optional[str] = None
-    ws_sub_topics_linear: Optional[str | List[str]] = None
-    ws_sub_topics_spot: Optional[str | List[str]] = None
-    ws_reconnect_max_sec: Optional[int] = 30
+    ws_public_url_linear: str | None = None
+    ws_public_url_spot: str | None = None
+    ws_sub_topics_linear: str | list[str] | None = None
+    ws_sub_topics_spot: str | list[str] | None = None
+    ws_reconnect_max_sec: int | None = 30
 
     rt_meta_refresh_sec: int = 30
     rt_log_passes: int = 1
@@ -180,20 +180,20 @@ class AppSettings(BaseSettings):
 
     # convenience properties
     @property
-    def allow_symbols_list(self) -> List[str]:
+    def allow_symbols_list(self) -> list[str]:
         return _csv_list(self.allow_symbols)
 
     @property
-    def deny_symbols_list(self) -> List[str]:
+    def deny_symbols_list(self) -> list[str]:
         return _csv_list(self.deny_symbols)
 
     @property
-    def ws_topics_list_linear(self) -> List[str]:
+    def ws_topics_list_linear(self) -> list[str]:
         src = self.ws_sub_topics_linear or self.bybit.ws_sub_topics_linear
         return _csv_list(src)
 
     @property
-    def ws_topics_list_spot(self) -> List[str]:
+    def ws_topics_list_spot(self) -> list[str]:
         src = self.ws_sub_topics_spot or self.bybit.ws_sub_topics_spot
         return _csv_list(src)
 
@@ -234,12 +234,8 @@ def _build_settings() -> AppSettings:
 
     # Bybit (simple aliasing for keys)
     bybit = BybitConfig(
-        api_key=_from_env_many(
-            "BYBIT__API_KEY", "BYBIT_API_KEY", default=base.bybit.api_key or ""
-        ),
-        api_secret=_from_env_many(
-            "BYBIT__API_SECRET", "BYBIT_API_SECRET", default=base.bybit.api_secret or ""
-        ),
+        api_key=_from_env_many("BYBIT__API_KEY", "BYBIT_API_KEY", default=base.bybit.api_key or ""),
+        api_secret=_from_env_many("BYBIT__API_SECRET", "BYBIT_API_SECRET", default=base.bybit.api_secret or ""),
         ws_public_url_linear=base.bybit.ws_public_url_linear,
         ws_public_url_spot=base.bybit.ws_public_url_spot,
         ws_sub_topics_linear=base.bybit.ws_sub_topics_linear,
@@ -282,23 +278,15 @@ def _build_settings() -> AppSettings:
             default=base.liquidity.min_vol_24h_usd,
         )
         or base.liquidity.min_vol_24h_usd,
-        min_price=_from_env_many_float(
-            "LIQUIDITY__MIN_PRICE", "MIN_PRICE", default=base.liquidity.min_price
-        )
+        min_price=_from_env_many_float("LIQUIDITY__MIN_PRICE", "MIN_PRICE", default=base.liquidity.min_price)
         or base.liquidity.min_price,
     )
 
     # Runtime: NESTED → FLAT
     runtime = RuntimeConfig(
-        env=_from_env_many("RUNTIME__ENV", "ENV", default=base.runtime.env)
-        or base.runtime.env,
-        db_path=_from_env_many(
-            "RUNTIME__DB_PATH", "DB_PATH", default=base.runtime.db_path
-        )
-        or base.runtime.db_path,
-        top_n_report=_from_env_many_int(
-            "RUNTIME__TOP_N_REPORT", "TOP_N_REPORT", default=base.runtime.top_n_report
-        )
+        env=_from_env_many("RUNTIME__ENV", "ENV", default=base.runtime.env) or base.runtime.env,
+        db_path=_from_env_many("RUNTIME__DB_PATH", "DB_PATH", default=base.runtime.db_path) or base.runtime.db_path,
+        top_n_report=_from_env_many_int("RUNTIME__TOP_N_REPORT", "TOP_N_REPORT", default=base.runtime.top_n_report)
         or base.runtime.top_n_report,
         enable_alerts=_from_env_many_bool(
             "RUNTIME__ENABLE_ALERTS",

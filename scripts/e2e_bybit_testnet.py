@@ -13,9 +13,7 @@ async def main() -> None:
     cfg = BybitConfig(
         enabled=True,
         base_url_public=os.getenv("BYBIT_PUBLIC_URL", "https://api-testnet.bybit.com"),
-        base_url_private=os.getenv(
-            "BYBIT_PRIVATE_URL", "https://api-testnet.bybit.com"
-        ),
+        base_url_private=os.getenv("BYBIT_PRIVATE_URL", "https://api-testnet.bybit.com"),
         default_category=os.getenv("BYBIT_DEFAULT_CATEGORY", "spot"),
     )
 
@@ -56,9 +54,7 @@ async def main() -> None:
         print("Create result:", created)
         order_id = (created.get("result") or {}).get("orderId")
         if order_id:
-            canceled = await tr.cancel_order(
-                symbol=symbol, order_id=order_id, market=market
-            )  # type: ignore[arg-type]
+            canceled = await tr.cancel_order(symbol=symbol, order_id=order_id, market=market)  # type: ignore[arg-type]
             print("Cancel result:", canceled)
         else:
             print("No orderId returned; cannot cancel.")

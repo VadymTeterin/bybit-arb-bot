@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable
 
 import httpx
 
@@ -10,9 +10,9 @@ from exchanges.common.redact import redact_headers, redact_json, redact_text
 
 
 def make_event_hooks(
-    logger: Optional[Callable[[str], None]] = None,
+    logger: Callable[[str], None] | None = None,
     include_body: bool = True,
-) -> Dict[str, List]:
+) -> dict[str, list]:
     """
     Повертає event_hooks для httpx.AsyncClient з редагуванням секретів.
     Використання:
@@ -39,9 +39,7 @@ def make_event_hooks(
                     body_json = json.loads(request.content.decode("utf-8"))
                     body_preview = redact_json(body_json)
                 except Exception:
-                    body_preview = redact_text(
-                        request.content.decode("utf-8", errors="ignore")
-                    )
+                    body_preview = redact_text(request.content.decode("utf-8", errors="ignore"))
             msg = {
                 "type": "request",
                 "method": request.method,
@@ -51,11 +49,7 @@ def make_event_hooks(
             }
             logger(json.dumps(msg, ensure_ascii=False))
         except Exception as e:  # без зривів бізнес-логіки
-            logger(
-                json.dumps(
-                    {"type": "request-log-error", "error": repr(e)}, ensure_ascii=False
-                )
-            )
+            logger(json.dumps({"type": "request-log-error", "error": repr(e)}, ensure_ascii=False))
 
     async def on_response(response: httpx.Response) -> None:
         try:
@@ -75,10 +69,6 @@ def make_event_hooks(
             }
             logger(json.dumps(msg, ensure_ascii=False))
         except Exception as e:
-            logger(
-                json.dumps(
-                    {"type": "response-log-error", "error": repr(e)}, ensure_ascii=False
-                )
-            )
+            logger(json.dumps({"type": "response-log-error", "error": repr(e)}, ensure_ascii=False))
 
     return {"request": [on_request], "response": [on_response]}

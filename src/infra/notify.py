@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import requests
 
 
@@ -9,7 +7,7 @@ def send_telegram_message(
     token: str,
     chat_id: str | int,
     text: str,
-    parse_mode: Optional[str] = None,
+    parse_mode: str | None = None,
 ) -> dict:
     """
     Надсилає повідомлення у Telegram без aiogram (через Bot API).

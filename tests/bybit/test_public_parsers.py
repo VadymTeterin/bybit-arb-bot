@@ -78,10 +78,5 @@ def test_parse_candles_ok():
     assert len(candles) == 2
     c0 = candles[0]
     assert c0.symbol == "BTC/USDT" and c0.interval == "15m"
-    assert (
-        c0.open == 64000.0
-        and c0.high == 65100.0
-        and c0.low == 63900.0
-        and c0.close == 65000.0
-    )
+    assert c0.open == 64000.0 and c0.high == 65100.0 and c0.low == 63900.0 and c0.close == 65000.0
     assert c0.volume == 123.45 and c0.open_time == _ts(1739900000000)

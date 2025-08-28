@@ -6,11 +6,7 @@ import os
 def test_autoload_env_basic(monkeypatch, tmp_path):
     envp = tmp_path / ".env.test"
     envp.write_text(
-        "  # comment line\n"
-        'export TELEGRAM__TOKEN="abc123"\n'
-        "TG_CHAT_ID='999'\n"
-        "FOO=bar\n"
-        "BAR=${FOO}-baz\n",
+        "  # comment line\n" 'export TELEGRAM__TOKEN="abc123"\n' "TG_CHAT_ID='999'\n" "FOO=bar\n" "BAR=${FOO}-baz\n",
         encoding="utf-8",
     )
     # ensure a clean room — clear both before relying on autoload

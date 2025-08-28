@@ -74,9 +74,7 @@ def test_selector_end_to_end_with_cooldown(monkeypatch):
         saved.append(args)
 
     monkeypatch.setattr(selector.persistence, "init_db", fake_init_db)
-    monkeypatch.setattr(
-        selector.persistence, "recent_signal_exists", fake_recent_signal_exists
-    )
+    monkeypatch.setattr(selector.persistence, "recent_signal_exists", fake_recent_signal_exists)
     monkeypatch.setattr(selector.persistence, "save_signal", fake_save_signal)
 
     fake = _FakeBybitRest()

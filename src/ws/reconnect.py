@@ -6,7 +6,6 @@ from __future__ import annotations
 import random
 import time
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -41,9 +40,7 @@ class ReconnectPolicy:
         self._attempt = 0
 
 
-def heartbeat_late(
-    now_ms: int, last_heartbeat_ms: Optional[int], timeout_ms: int
-) -> bool:
+def heartbeat_late(now_ms: int, last_heartbeat_ms: int | None, timeout_ms: int) -> bool:
     """Return True if heartbeat is late (or missing) beyond timeout_ms."""
     if last_heartbeat_ms is None:
         return True

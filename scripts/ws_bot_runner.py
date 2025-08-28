@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from dotenv import load_dotenv  # NEW: load .env
 from loguru import logger
@@ -25,7 +25,7 @@ from src.ws.health import MetricsRegistry
 load_dotenv(override=False)
 
 
-def _csv_list(x: Any) -> List[str]:
+def _csv_list(x: Any) -> list[str]:
     if x is None:
         return []
     if isinstance(x, (list, tuple)):
@@ -53,8 +53,8 @@ def _nested_bybit(s):
     by = getattr(s, "bybit", None)
     url_linear = None
     url_spot = None
-    topics_linear: List[str] = []
-    topics_spot: List[str] = []
+    topics_linear: list[str] = []
+    topics_spot: list[str] = []
 
     if by is not None:
         url_linear = getattr(by, "ws_public_url_linear", None)
@@ -64,9 +64,7 @@ def _nested_bybit(s):
 
     url_linear = url_linear or getattr(s, "ws_public_url_linear", None)
     url_spot = url_spot or getattr(s, "ws_public_url_spot", None)
-    topics_linear = topics_linear or _csv_list(
-        getattr(s, "ws_topics_list_linear", None)
-    )
+    topics_linear = topics_linear or _csv_list(getattr(s, "ws_topics_list_linear", None))
     topics_spot = topics_spot or _csv_list(getattr(s, "ws_topics_list_spot", None))
 
     return {
@@ -77,7 +75,7 @@ def _nested_bybit(s):
     }
 
 
-def _allowed_chat_id() -> Optional[int]:
+def _allowed_chat_id() -> int | None:
     cid = os.getenv("TELEGRAM__ALERT_CHAT_ID") or os.getenv("TELEGRAM__CHAT_ID") or ""
     cid = cid.strip()
     try:
@@ -86,7 +84,7 @@ def _allowed_chat_id() -> Optional[int]:
         return None
 
 
-def _get_token() -> Optional[str]:
+def _get_token() -> str | None:
     tok = os.getenv("TELEGRAM__BOT_TOKEN") or os.getenv("TELEGRAM__TOKEN") or ""
     tok = tok.strip()
     return tok or None
@@ -104,7 +102,7 @@ async def main() -> None:
     debug_channels = set(_csv_list(os.getenv("WS_DEBUG_FILTER_CHANNELS", "ticker")))
     debug_symbols = set(_csv_list(os.getenv("WS_DEBUG_FILTER_SYMBOLS", "")))
     debug_sample_ms = _env_int("WS_DEBUG_SAMPLE_MS", 1000)
-    _last_log: Dict[Tuple[str, str, str], float] = {}
+    _last_log: dict[tuple[str, str, str], float] = {}
 
     try:
         from src.core.cache import QuoteCache
@@ -125,24 +123,16 @@ async def main() -> None:
     if not bot_available:
         logger.warning("Telegram token is not set. /status bot will not run.")
 
-    tasks: List[asyncio.Task] = []
+    tasks: list[asyncio.Task] = []
 
     if ws_available and ws_enabled:
         cache = QuoteCache()
         ws_linear = (
-            BybitWS(ws_cfg["url_linear"], ws_cfg["topics_linear"] or ["tickers"])
-            if ws_cfg["url_linear"]
-            else None
+            BybitWS(ws_cfg["url_linear"], ws_cfg["topics_linear"] or ["tickers"]) if ws_cfg["url_linear"] else None
         )
-        ws_spot = (
-            BybitWS(ws_cfg["url_spot"], ws_cfg["topics_spot"] or ["tickers"])
-            if ws_cfg["url_spot"]
-            else None
-        )
+        ws_spot = BybitWS(ws_cfg["url_spot"], ws_cfg["topics_spot"] or ["tickers"]) if ws_cfg["url_spot"] else None
         if not ws_linear and not ws_spot:
-            logger.warning(
-                "WS config has neither LINEAR nor SPOT endpoints/topics configured."
-            )
+            logger.warning("WS config has neither LINEAR nor SPOT endpoints/topics configured.")
         mux = WSMultiplexer(name="core")
         alerts_sub = AlertsSubscriber(mux)
         alerts_sub.start()
@@ -163,20 +153,14 @@ async def main() -> None:
             if debug_symbols and symbol not in debug_symbols:
                 return
             data = evt_norm.get("data")
-            items = (
-                1
-                if isinstance(data, dict)
-                else (len(data) if isinstance(data, list) else 0)
-            )
+            items = 1 if isinstance(data, dict) else (len(data) if isinstance(data, list) else 0)
             key = (source, channel, symbol)
             now = _t.monotonic()
             last = _last_log.get(key, 0.0)
             if (now - last) * 1000.0 < max(0, debug_sample_ms):
                 return
             _last_log[key] = now
-            logger.bind(tag="WS").debug(
-                f"{source} normalized: channel={channel} symbol={symbol} items={items}"
-            )
+            logger.bind(tag="WS").debug(f"{source} normalized: channel={channel} symbol={symbol} items={items}")
 
         async def on_message_spot(msg: dict):
             try:
@@ -233,8 +217,8 @@ async def main() -> None:
                     spot_rows = client.get_tickers("spot") or []
                     lin_rows = client.get_tickers("linear") or []
 
-                    def _vol_map(rows: List[Dict[str, Any]]) -> Dict[str, float]:
-                        m: Dict[str, float] = {}
+                    def _vol_map(rows: list[dict[str, Any]]) -> dict[str, float]:
+                        m: dict[str, float] = {}
                         for r in rows:
                             sym = r.get("symbol")
                             if not sym:
@@ -249,26 +233,17 @@ async def main() -> None:
                     spot_vol = _vol_map(spot_rows)
                     lin_vol = _vol_map(lin_rows)
 
-                    combined = {
-                        sym: min(spot_vol[sym], lin_vol[sym])
-                        for sym in (set(spot_vol) & set(lin_vol))
-                    }
+                    combined = {sym: min(spot_vol[sym], lin_vol[sym]) for sym in (set(spot_vol) & set(lin_vol))}
                     await cache.update_vol24h_bulk(combined)
-                    logger.bind(tag="RTMETA").info(
-                        f"Refreshed vol24h for {len(combined)} symbols"
-                    )
+                    logger.bind(tag="RTMETA").info(f"Refreshed vol24h for {len(combined)} symbols")
                 except Exception as e:
                     logger.bind(tag="RTMETA").warning(f"Meta refresh failed: {e!r}")
                 await asyncio.sleep(max(30, int(getattr(s, "rt_meta_refresh_sec", 30))))
 
         if ws_spot:
-            tasks.append(
-                asyncio.create_task(ws_spot.run(on_message_spot), name="ws_spot")
-            )
+            tasks.append(asyncio.create_task(ws_spot.run(on_message_spot), name="ws_spot"))
         if ws_linear:
-            tasks.append(
-                asyncio.create_task(ws_linear.run(on_message_linear), name="ws_linear")
-            )
+            tasks.append(asyncio.create_task(ws_linear.run(on_message_linear), name="ws_linear"))
         tasks.append(asyncio.create_task(refresh_meta_task(), name="rt_meta"))
 
     if bot_available:
@@ -281,9 +256,7 @@ async def main() -> None:
         except Exception as e:  # noqa: BLE001
             logger.error("aiogram is not available: {}", e)
         else:
-            bot = Bot(
-                token=token, default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN)
-            )
+            bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN))
             dp = Dispatcher()
 
             @dp.message(Command("start"))
@@ -316,9 +289,7 @@ async def main() -> None:
             tasks.append(asyncio.create_task(dp.start_polling(bot), name="tg_polling"))
 
     if not tasks:
-        logger.error(
-            "Nothing to run: WS disabled/unavailable and no Telegram token provided."
-        )
+        logger.error("Nothing to run: WS disabled/unavailable and no Telegram token provided.")
         return
 
     logger.success("Runner started: {} task(s). Ctrl+C to stop.", len(tasks))

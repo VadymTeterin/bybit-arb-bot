@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import requests
 from loguru import logger
@@ -34,13 +34,13 @@ except Exception:  # noqa: BLE001
 
 
 # Optional/back-compat modules (used if present)
-_core_alerts: Optional[ModuleType]
+_core_alerts: ModuleType | None
 try:
     from .core import alerts as _core_alerts  # type: ignore[assignment]
 except Exception:  # noqa: BLE001
     _core_alerts = None
 
-_tg_formatters: Optional[ModuleType]
+_tg_formatters: ModuleType | None
 try:
     from .telegram import formatters as _tg_formatters  # type: ignore[assignment]
 except Exception:  # noqa: BLE001
@@ -77,7 +77,7 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
-def _env_csv(name: str) -> List[str]:
+def _env_csv(name: str) -> list[str]:
     raw = os.getenv(name, "")
     return [t.strip() for t in raw.split(",") if t.strip()]
 
@@ -117,12 +117,8 @@ def load_settings():
 
     # WS / RT meta (optional)
     s.ws_enabled = _env_bool("WS_ENABLED", True)
-    s.ws_public_url_linear = os.getenv(
-        "WS_PUBLIC_URL_LINEAR", "wss://stream.bybit.com/v5/public/linear"
-    )
-    s.ws_public_url_spot = os.getenv(
-        "WS_PUBLIC_URL_SPOT", "wss://stream.bybit.com/v5/public/spot"
-    )
+    s.ws_public_url_linear = os.getenv("WS_PUBLIC_URL_LINEAR", "wss://stream.bybit.com/v5/public/linear")
+    s.ws_public_url_spot = os.getenv("WS_PUBLIC_URL_SPOT", "wss://stream.bybit.com/v5/public/spot")
     s.ws_topics_list_linear = _env_csv("WS_SUB_TOPICS_LINEAR")
     s.ws_topics_list_spot = _env_csv("WS_SUB_TOPICS_SPOT")
     s.ws_reconnect_max_sec = _env_int("WS_RECONNECT_MAX_SEC", 30)
@@ -136,9 +132,7 @@ def load_settings():
     tg = _T()
     tg.token = os.getenv("TELEGRAM__BOT_TOKEN") or os.getenv("TELEGRAM__TOKEN") or ""
     tg.bot_token = tg.token
-    tg.chat_id = (
-        os.getenv("TELEGRAM__ALERT_CHAT_ID") or os.getenv("TELEGRAM__CHAT_ID") or ""
-    )
+    tg.chat_id = os.getenv("TELEGRAM__ALERT_CHAT_ID") or os.getenv("TELEGRAM__CHAT_ID") or ""
     tg.alert_chat_id = tg.chat_id
     s.telegram = tg
 
@@ -151,12 +145,8 @@ def load_settings():
     by.api_secret = os.getenv("BYBIT__API_SECRET", "")
     by.ws_public_url_linear = s.ws_public_url_linear
     by.ws_public_url_spot = s.ws_public_url_spot
-    by.ws_sub_topics_linear = (
-        ",".join(s.ws_topics_list_linear) if s.ws_topics_list_linear else ""
-    )
-    by.ws_sub_topics_spot = (
-        ",".join(s.ws_topics_list_spot) if s.ws_topics_list_spot else ""
-    )
+    by.ws_sub_topics_linear = ",".join(s.ws_topics_list_linear) if s.ws_topics_list_linear else ""
+    by.ws_sub_topics_spot = ",".join(s.ws_topics_list_spot) if s.ws_topics_list_spot else ""
     s.bybit = by
 
     return s
@@ -188,7 +178,7 @@ def safe_print(text: str) -> None:
         sys.stdout.buffer.write(b"\n")
 
 
-def _csv_list(x: Any) -> List[str]:
+def _csv_list(x: Any) -> list[str]:
     if x is None:
         return []
     if isinstance(x, (list, tuple)):
@@ -202,8 +192,8 @@ def _nested_bybit(s):
     by = getattr(s, "bybit", None)
     url_linear = None
     url_spot = None
-    topics_linear: List[str] = []
-    topics_spot: List[str] = []
+    topics_linear: list[str] = []
+    topics_spot: list[str] = []
     reconnect_max_sec = getattr(s, "ws_reconnect_max_sec", None)
 
     if by is not None:
@@ -214,9 +204,7 @@ def _nested_bybit(s):
 
     url_linear = url_linear or getattr(s, "ws_public_url_linear", None)
     url_spot = url_spot or getattr(s, "ws_public_url_spot", None)
-    topics_linear = topics_linear or _csv_list(
-        getattr(s, "ws_topics_list_linear", None)
-    )
+    topics_linear = topics_linear or _csv_list(getattr(s, "ws_topics_list_linear", None))
     topics_spot = topics_spot or _csv_list(getattr(s, "ws_topics_list_spot", None))
 
     return {
@@ -328,7 +316,7 @@ def cmd_bybit_ping(_: argparse.Namespace) -> int:
     return 0
 
 
-def _turnover_usd(row: Dict[str, Any]) -> float:
+def _turnover_usd(row: dict[str, Any]) -> float:
     for k in ("turnover24h", "turnoverUsd", "turnover_usd"):
         v = row.get(k)
         if v is not None:
@@ -368,8 +356,8 @@ def _basis_rows(
         spot_rows = client.get_tickers("spot") or []
         lin_rows = client.get_tickers("linear") or []
 
-        def _map_from_tickers(rows: List[Dict[str, Any]]):
-            m: Dict[str, Dict[str, float]] = {}
+        def _map_from_tickers(rows: list[dict[str, Any]]):
+            m: dict[str, dict[str, float]] = {}
             for r in rows:
                 sym = r.get("symbol")
                 if not sym:
@@ -387,8 +375,8 @@ def _basis_rows(
         spot_map = _map_from_tickers(spot_rows)
         lin_map = _map_from_tickers(lin_rows)
 
-    rows_all: List[tuple[str, float, float, float, float]] = []
-    rows_pass: List[tuple[str, float, float, float, float]] = []
+    rows_all: list[tuple[str, float, float, float, float]] = []
+    rows_pass: list[tuple[str, float, float, float, float]] = []
 
     common = set(spot_map.keys()) & set(lin_map.keys())
     for sym in common:
@@ -416,38 +404,28 @@ def _alerts_allowed(s) -> bool:
     return bool(getattr(s, "enable_alerts", False))
 
 
-def _format_alert_text(
-    rows: list[tuple[str, float, float, float, float]], threshold: float, min_vol: float
-) -> str:
+def _format_alert_text(rows: list[tuple[str, float, float, float, float]], threshold: float, min_vol: float) -> str:
     if rows:
         header = f"Top {len(rows)} basis (≥ {threshold:.2f}%, MinVol ${min_vol:,.0f})"
         if _tg_formatters and hasattr(_tg_formatters, "format_basis_top"):
-            txt = _safe_call(
-                getattr(_tg_formatters, "format_basis_top", None), rows, header
-            )
+            txt = _safe_call(getattr(_tg_formatters, "format_basis_top", None), rows, header)
             if isinstance(txt, str) and txt.strip():
                 return txt
         lines = [header]
         for i, (sym, sp, fu, b, vol) in enumerate(rows, 1):
             sign = "+" if b >= 0 else ""
-            lines.append(
-                f"{i}. {sym}: spot={sp:g} fut={fu:g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}"
-            )
+            lines.append(f"{i}. {sym}: spot={sp:g} fut={fu:g} basis={sign}{b:.2f}%  vol*=${vol:,.0f}")
         return "\n".join(lines)
     else:
         header = f"Basis scan: no pairs ≥ {threshold:.2f}% at MinVol ${min_vol:,.0f}."
         if _tg_formatters and hasattr(_tg_formatters, "format_no_candidates"):
-            txt = _safe_call(
-                getattr(_tg_formatters, "format_no_candidates", None), header
-            )
+            txt = _safe_call(getattr(_tg_formatters, "format_no_candidates", None), header)
             if isinstance(txt, str) and txt.strip():
                 return txt
         return header + "\nTry lowering threshold or MinVol."
 
 
-def preview_message(
-    symbol: str, spot: float, mark: float, vol: float, threshold: float
-) -> str:
+def preview_message(symbol: str, spot: float, mark: float, vol: float, threshold: float) -> str:
     if spot <= 0 or mark <= 0:
         return "Invalid prices for preview."
     basis = (mark - spot) / spot * 100.0
@@ -463,9 +441,7 @@ def _fmt_ts(ts: float | None) -> str:
     if not ts:
         return "n/a"
     try:
-        return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime(
-            "%Y-%m-%d %H:%M UTC"
-        )
+        return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     except Exception:
         return "n/a"
 
@@ -476,9 +452,7 @@ def cmd_alerts_preview(args: argparse.Namespace) -> int:
     spot = float(args.spot)
     mark = float(args.mark)
     vol = float(args.vol)
-    threshold = float(
-        args.threshold if args.threshold is not None else s.alert_threshold_pct
-    )
+    threshold = float(args.threshold if args.threshold is not None else s.alert_threshold_pct)
 
     text = preview_message(symbol, spot, mark, vol, threshold)
     safe_print(text)
@@ -501,13 +475,11 @@ def cmd_alerts_preview(args: argparse.Namespace) -> int:
     return 0
 
 
-_FUND_CACHE: Dict[str, Tuple[float, Optional[float], Optional[float]]] = {}
+_FUND_CACHE: dict[str, tuple[float, float | None, float | None]] = {}
 _FUND_TTL_SEC = 8 * 60  # 8 hours
 
 
-def _get_funding_with_cache(
-    client: BybitRest, symbol: str
-) -> tuple[Optional[float], Optional[float]]:
+def _get_funding_with_cache(client: BybitRest, symbol: str) -> tuple[float | None, float | None]:
     now = time.time()
     cached = _FUND_CACHE.get(symbol)
     if cached and (now - cached[0] < _FUND_TTL_SEC):
@@ -533,15 +505,11 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
         return 0
 
     min_vol = float(args.min_vol if args.min_vol is not None else s.min_vol_24h_usd)
-    threshold = float(
-        args.threshold if args.threshold is not None else s.alert_threshold_pct
-    )
+    threshold = float(args.threshold if args.threshold is not None else s.alert_threshold_pct)
     limit = int(args.limit)
     token, chat_id = _tg_fields(s)
     if not token or not chat_id:
-        print(
-            "Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env"
-        )
+        print("Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env")
         return 1
 
     rows_pass, _ = _basis_rows(min_vol=min_vol, threshold=threshold)
@@ -558,9 +526,7 @@ def cmd_basis_alert(args: argparse.Namespace) -> int:
     rows = rows_pass[:limit]
     text = _format_alert_text(rows, threshold, min_vol)
 
-    used_custom_rows_formatter = bool(
-        _tg_formatters and hasattr(_tg_formatters, "format_basis_top")
-    )
+    used_custom_rows_formatter = bool(_tg_formatters and hasattr(_tg_formatters, "format_basis_top"))
     if rows and not used_custom_rows_formatter:
         client = BybitRest()
         lines = []
@@ -595,9 +561,7 @@ def cmd_tg_send(args: argparse.Namespace) -> int:
         return 0
     token, chat_id = _tg_fields(s)
     if not token or not chat_id:
-        print(
-            "Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env"
-        )
+        print("Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env")
         return 1
     text = args.text or "Test message from bybit-arb-bot"
     try:
@@ -632,9 +596,7 @@ def cmd_report_send(args: argparse.Namespace) -> int:
         return 0
     token, chat_id = _tg_fields(s)
     if not token or not chat_id:
-        print(
-            "Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env"
-        )
+        print("Telegram is not configured: set TELEGRAM__BOT_TOKEN and TELEGRAM__ALERT_CHAT_ID in .env")
         return 1
     hours = int(args.hours)
     limit = int(args.limit) if args.limit is not None else int(s.top_n_report)
@@ -659,16 +621,10 @@ def cmd_report_send(args: argparse.Namespace) -> int:
 def cmd_select_save(args: argparse.Namespace) -> int:
     s = load_settings()
     limit = int(args.limit)
-    threshold = (
-        float(args.threshold) if args.threshold is not None else s.alert_threshold_pct
-    )
+    threshold = float(args.threshold) if args.threshold is not None else s.alert_threshold_pct
     min_vol = float(args.min_vol) if args.min_vol is not None else s.min_vol_24h_usd
     min_price = float(args.min_price) if args.min_price is not None else s.min_price
-    cooldown_sec = (
-        int(args.cooldown_sec)
-        if args.cooldown_sec is not None
-        else s.alert_cooldown_sec
-    )
+    cooldown_sec = int(args.cooldown_sec) if args.cooldown_sec is not None else s.alert_cooldown_sec
 
     from .core.selector import run_selection
 
@@ -703,8 +659,8 @@ def cmd_price_pair(args: argparse.Namespace) -> int:
         spot_rows = client.get_tickers("spot") or []
         lin_rows = client.get_tickers("linear") or []
 
-        def _map_from_tickers(rows: List[Dict[str, Any]]):
-            m: Dict[str, Dict[str, float]] = {}
+        def _map_from_tickers(rows: list[dict[str, Any]]):
+            m: dict[str, dict[str, float]] = {}
             for r in rows:
                 sym = r.get("symbol")
                 if not sym:
@@ -773,15 +729,13 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         return 1
 
     ws = _nested_bybit(s)
-    url_linear: Optional[str] = ws["url_linear"]
-    url_spot: Optional[str] = ws["url_spot"]
-    topics_linear: List[str] = ws["topics_linear"]
-    topics_spot: List[str] = ws["topics_spot"]
+    url_linear: str | None = ws["url_linear"]
+    url_spot: str | None = ws["url_spot"]
+    topics_linear: list[str] = ws["topics_linear"]
+    topics_spot: list[str] = ws["topics_spot"]
 
     cache = QuoteCache()
-    ws_linear = (
-        BybitWS(url_linear, topics_linear or ["tickers"]) if url_linear else None
-    )
+    ws_linear = BybitWS(url_linear, topics_linear or ["tickers"]) if url_linear else None
     ws_spot = BybitWS(url_spot, topics_spot or ["tickers"]) if url_spot else None
 
     if not ws_linear and not ws_spot:
@@ -799,7 +753,7 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
     debug_channels = set(_csv_list(_channels_env)) if _channels_env else set()
     debug_symbols = set(_csv_list(os.getenv("WS_DEBUG_FILTER_SYMBOLS", "")))
     debug_sample_ms = _env_int("WS_DEBUG_SAMPLE_MS", 1000)
-    _last_log: Dict[Tuple[str, str, str], float] = {}
+    _last_log: dict[tuple[str, str, str], float] = {}
 
     if debug_norm:
         logger.bind(tag="WS").info(
@@ -824,20 +778,14 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         if debug_symbols and symbol not in debug_symbols:
             return
         data = evt_norm.get("data")
-        items = (
-            1
-            if isinstance(data, dict)
-            else (len(data) if isinstance(data, list) else 0)
-        )
+        items = 1 if isinstance(data, dict) else (len(data) if isinstance(data, list) else 0)
         key = (source, channel, symbol)
         now = time.monotonic()
         last = _last_log.get(key, 0.0)
         if (now - last) * 1000.0 < max(0, debug_sample_ms):
             return
         _last_log[key] = now
-        logger.bind(tag="WS").debug(
-            f"{source} normalized: channel={channel} symbol={symbol} items={items}"
-        )
+        logger.bind(tag="WS").debug(f"{source} normalized: channel={channel} symbol={symbol} items={items}")
 
     async def refresh_meta_task():
         client = BybitRest()
@@ -846,8 +794,8 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
                 spot_rows = client.get_tickers("spot") or []
                 lin_rows = client.get_tickers("linear") or []
 
-                def _vol_map(rows: List[Dict[str, Any]]) -> Dict[str, float]:
-                    m: Dict[str, float] = {}
+                def _vol_map(rows: list[dict[str, Any]]) -> dict[str, float]:
+                    m: dict[str, float] = {}
                     for r in rows:
                         sym = r.get("symbol")
                         if not sym:
@@ -862,14 +810,9 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
                 spot_vol = _vol_map(spot_rows)
                 lin_vol = _vol_map(lin_rows)
 
-                combined = {
-                    sym: min(spot_vol[sym], lin_vol[sym])
-                    for sym in (set(spot_vol) & set(lin_vol))
-                }
+                combined = {sym: min(spot_vol[sym], lin_vol[sym]) for sym in (set(spot_vol) & set(lin_vol))}
                 await cache.update_vol24h_bulk(combined)
-                logger.bind(tag="RTMETA").info(
-                    f"Refreshed vol24h for {len(combined)} symbols"
-                )
+                logger.bind(tag="RTMETA").info(f"Refreshed vol24h for {len(combined)} symbols")
             except Exception as e:
                 logger.bind(tag="RTMETA").warning(f"Meta refresh failed: {e!r}")
             await asyncio.sleep(max(30, int(getattr(s, "rt_meta_refresh_sec", 30))))
@@ -958,9 +901,7 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
 def cmd_basis_scan(args: argparse.Namespace) -> int:
     s = load_settings()
     min_vol = float(args.min_vol if args.min_vol is not None else s.min_vol_24h_usd)
-    threshold = float(
-        args.threshold if args.threshold is not None else s.alert_threshold_pct
-    )
+    threshold = float(args.threshold if args.threshold is not None else s.alert_threshold_pct)
     limit = int(args.limit)
 
     rows_pass, _ = _basis_rows(min_vol=min_vol, threshold=threshold)
@@ -998,9 +939,7 @@ def main() -> None:
     sub.add_parser("bybit:ping").set_defaults(func=cmd_bybit_ping)
 
     p_top = sub.add_parser("bybit:top")
-    p_top.add_argument(
-        "--category", default="spot", choices=["spot", "linear", "inverse", "option"]
-    )
+    p_top.add_argument("--category", default="spot", choices=["spot", "linear", "inverse", "option"])
     p_top.add_argument("--limit", type=int, default=5)
     p_top.set_defaults(func=cmd_bybit_top)
 
@@ -1074,9 +1013,7 @@ def main() -> None:
 
     # WS health metrics
     p_wh = sub.add_parser("ws:health")
-    p_wh.add_argument(
-        "--reset", action="store_true", help="Reset counters before print"
-    )
+    p_wh.add_argument("--reset", action="store_true", help="Reset counters before print")
     p_wh.set_defaults(func=cmd_ws_health)
 
     # NEW: friendly alias for ws:health
@@ -1104,9 +1041,7 @@ def try_setup_telegram_sender(alerter: Any) -> None:
     try:
         from .core.alerts import RealtimeAlerter  # type: ignore
 
-        if not isinstance(alerter, RealtimeAlerter) or not hasattr(
-            alerter, "set_sender"
-        ):
+        if not isinstance(alerter, RealtimeAlerter) or not hasattr(alerter, "set_sender"):
             return
         from .core.alerts import telegram_sender  # type: ignore
 

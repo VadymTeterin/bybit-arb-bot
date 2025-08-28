@@ -1,5 +1,4 @@
 # src/storage/persistence.py
-# -*- coding: utf-8 -*-
 """SQLite persistence layer for signals & quotes.
 
 Notes:
@@ -14,7 +13,7 @@ import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 # Keep import path consistent with current repo layout
 from src.infra.config import load_settings
@@ -63,7 +62,7 @@ META_SCHEMA_KEY = "schema_version"
 # Connection utils
 # -----------------------------
 @contextmanager
-def conn_ctx(db_path: Optional[str] = None):
+def conn_ctx(db_path: str | None = None):
     """Yield a SQLite connection. The path is resolved as:
     1) explicit arg
     2) env var DB_PATH (for tests)
@@ -92,7 +91,7 @@ def conn_ctx(db_path: Optional[str] = None):
         con.close()
 
 
-def _ts_to_db_value(ts: Optional[datetime] = None) -> str:
+def _ts_to_db_value(ts: datetime | None = None) -> str:
     """Return ISO timestamp string (microseconds, UTC) for SQLite."""
     if ts is None:
         ts = datetime.now(timezone.utc)
@@ -102,7 +101,7 @@ def _ts_to_db_value(ts: Optional[datetime] = None) -> str:
     return ts.isoformat(timespec="microseconds")
 
 
-def _parse_ts(val: Any) -> Optional[datetime]:
+def _parse_ts(val: Any) -> datetime | None:
     """Safe timestamp parse from DB (str -> datetime | None)."""
     if val is None:
         return None
@@ -160,14 +159,14 @@ def save_signal(
         con.commit()
 
 
-def get_signals(last_hours: int = 24, limit: int | None = None) -> List[Dict[str, Any]]:
+def get_signals(last_hours: int = 24, limit: int | None = None) -> list[dict[str, Any]]:
     """Return recent signals for the last N hours, ordered by basis_pct desc."""
     since = datetime.now(timezone.utc) - timedelta(hours=int(last_hours))
     q = (
         "SELECT symbol, spot_price, futures_price, basis_pct, volume_24h_usd, timestamp "
         "FROM signals WHERE timestamp >= ? ORDER BY basis_pct DESC"
     )
-    params: List[Any] = [_ts_to_db_value(since)]
+    params: list[Any] = [_ts_to_db_value(since)]
     if limit:
         q += f" LIMIT {int(limit)}"
     with conn_ctx() as con:
@@ -177,7 +176,7 @@ def get_signals(last_hours: int = 24, limit: int | None = None) -> List[Dict[str
         return rows
 
 
-def get_last_signal_ts(symbol: str) -> Optional[datetime]:
+def get_last_signal_ts(symbol: str) -> datetime | None:
     """Return timestamp of the last signal for a symbol or None."""
     with conn_ctx() as con:
         cur = con.execute(
@@ -204,10 +203,10 @@ def recent_signal_exists(symbol: str, cooldown_sec: int) -> bool:
 # -----------------------------
 def save_quote(
     symbol: str,
-    spot: Optional[float],
-    fut: Optional[float],
-    basis_pct: Optional[float],
-    vol_usd: Optional[float],
+    spot: float | None,
+    fut: float | None,
+    basis_pct: float | None,
+    vol_usd: float | None,
     ts: datetime | None = None,
 ) -> None:
     """Upsert a quote snapshot for (symbol, ts)."""
@@ -237,7 +236,7 @@ def save_quote(
 # -----------------------------
 # Retention API
 # -----------------------------
-def retention_sweep(days: int = 30) -> Tuple[int, int]:
+def retention_sweep(days: int = 30) -> tuple[int, int]:
     """Delete old rows from signals/quotes older than `days`. Return (signals_deleted, quotes_deleted)."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=int(days))
     cutoff_iso = _ts_to_db_value(cutoff)

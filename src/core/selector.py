@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Mapping, Optional
+from typing import Any
 
 from src.core.filters.liquidity import enough_liquidity
 from src.infra.config import load_settings
@@ -53,7 +54,7 @@ def _mget(obj: Any, key: str, default: Any = None) -> Any:
     return default
 
 
-def _parse_symbols_value(v: Any) -> List[str]:
+def _parse_symbols_value(v: Any) -> list[str]:
     """
     Приймає None / list / рядок з JSON-масивом або CSV.
     Повертає список аперкейс-символів без порожніх елементів.
@@ -84,8 +85,8 @@ def _build_pairs(
     # Використовуємо Any, бо клієнт може повертати TypedDict/звичні dict-и з різними наборами ключів
     spot_map: Mapping[str, Any],
     linear_map: Mapping[str, Any],
-) -> List[_Pair]:
-    out: List[_Pair] = []
+) -> list[_Pair]:
+    out: list[_Pair] = []
     for sym, srow in spot_map.items():
         if sym not in linear_map:
             continue
@@ -101,7 +102,7 @@ def _build_pairs(
     return out
 
 
-def _allowed(symbol: str, allow: List[str], deny: List[str]) -> bool:
+def _allowed(symbol: str, allow: list[str], deny: list[str]) -> bool:
     u = symbol.upper()
     if u in (x.upper() for x in deny):
         return False
@@ -112,13 +113,13 @@ def _allowed(symbol: str, allow: List[str], deny: List[str]) -> bool:
 
 def run_selection(
     *,
-    min_vol: Optional[float] = None,
-    min_price: Optional[float] = None,
-    threshold: Optional[float] = None,
+    min_vol: float | None = None,
+    min_price: float | None = None,
+    threshold: float | None = None,
     limit: int = 3,
-    cooldown_sec: Optional[int] = None,
+    cooldown_sec: int | None = None,
     client: Any | None = None,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Запускає відбір SPOT vs LINEAR, фільтрує за ціною/ліквідністю/порогом,
     застосовує allow/deny та cooldown, опційно — фільтр глибини, зберігає у БД і повертає реально збережені записи.
@@ -145,22 +146,16 @@ def run_selection(
 
     # підтримуємо ОБИДВА варіанти allow/deny:
     if hasattr(s, "allow_list"):
-        allow: List[str] = getattr(s, "allow_list")  # type: ignore[assignment]
+        allow: list[str] = s.allow_list  # type: ignore[assignment]
     else:
         raw_allow = getattr(s, "allow_symbols", "")
-        allow = (
-            raw_allow
-            if isinstance(raw_allow, list)
-            else _parse_symbols_value(raw_allow)
-        )
+        allow = raw_allow if isinstance(raw_allow, list) else _parse_symbols_value(raw_allow)
 
     if hasattr(s, "deny_list"):
-        deny: List[str] = getattr(s, "deny_list")  # type: ignore[assignment]
+        deny: list[str] = s.deny_list  # type: ignore[assignment]
     else:
         raw_deny = getattr(s, "deny_symbols", "")
-        deny = (
-            raw_deny if isinstance(raw_deny, list) else _parse_symbols_value(raw_deny)
-        )
+        deny = raw_deny if isinstance(raw_deny, list) else _parse_symbols_value(raw_deny)
 
     # відкладений імпорт реального клієнта
     if client is None:
@@ -174,11 +169,9 @@ def run_selection(
     pairs = _build_pairs(spot_map, linear_map)
 
     # чи є у клієнта методи ордербука (для depth-фільтра)?
-    client_has_orderbook = all(
-        hasattr(client, name) for name in ("get_orderbook_spot", "get_orderbook_linear")
-    )
+    client_has_orderbook = all(hasattr(client, name) for name in ("get_orderbook_spot", "get_orderbook_linear"))
 
-    candidates: List[_Pair] = []
+    candidates: list[_Pair] = []
     for p in pairs:
         # базові фільтри (ліквідність/ціна/поріг + allow/deny)
         spot_row = {"price": p.spot, "turnover_usd": p.vol_usd}
@@ -224,7 +217,7 @@ def run_selection(
 
     # збереження у БД (з урахуванням cooldown)
     persistence.init_db()
-    saved: List[Dict[str, Any]] = []
+    saved: list[dict[str, Any]] = []
     now = datetime.now(timezone.utc)
     for p in candidates:
         if persistence.recent_signal_exists(p.symbol, cooldown_sec):
@@ -248,7 +241,7 @@ def run_selection(
 
 def _apply_liquidity_if_enabled(
     rows: Iterable[Mapping[str, Any]],
-) -> List[Mapping[str, Any]]:
+) -> list[Mapping[str, Any]]:
     """
     Застосувати фільтр ліквідності, якщо він увімкнений через env.
     Безпечно: якщо вимкнено або сталася помилка — повертає rows як є.

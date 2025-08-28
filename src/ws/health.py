@@ -6,16 +6,14 @@ import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any
 
 
-def _fmt_utc(ts: Optional[float]) -> Optional[str]:
+def _fmt_utc(ts: float | None) -> str | None:
     if not ts:
         return None
     try:
-        return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime(
-            "%Y-%m-%d %H:%M:%S UTC"
-        )
+        return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     except Exception:
         return None
 
@@ -25,12 +23,12 @@ class WSHealth:
     started_ts: float
     spot_events: int = 0
     linear_events: int = 0
-    last_event_ts: Optional[float] = None
-    last_spot_ts: Optional[float] = None
-    last_linear_ts: Optional[float] = None
+    last_event_ts: float | None = None
+    last_spot_ts: float | None = None
+    last_linear_ts: float | None = None
     reconnects_total: int = 0  # new in 6.2.1
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         now = time.time()
         return {
             "started_ts": self.started_ts,
@@ -43,16 +41,14 @@ class WSHealth:
             "last_spot_at_utc": _fmt_utc(self.last_spot_ts),
             "last_linear_at_utc": _fmt_utc(self.last_linear_ts),
             "reconnects_total": self.reconnects_total,
-            "last_msg_age_ms": (
-                int((now - self.last_event_ts) * 1000) if self.last_event_ts else None
-            ),
+            "last_msg_age_ms": (int((now - self.last_event_ts) * 1000) if self.last_event_ts else None),
         }
 
 
 class MetricsRegistry:
     """Thread-safe singleton registry of WS health metrics."""
 
-    _instance: "MetricsRegistry|None" = None
+    _instance: MetricsRegistry | None = None
     _lock = threading.Lock()
 
     def __init__(self) -> None:
@@ -60,7 +56,7 @@ class MetricsRegistry:
         self._state = WSHealth(started_ts=time.time())
 
     @classmethod
-    def get(cls) -> "MetricsRegistry":
+    def get(cls) -> MetricsRegistry:
         with cls._lock:
             if cls._instance is None:
                 cls._instance = MetricsRegistry()
@@ -90,7 +86,7 @@ class MetricsRegistry:
             self._state = WSHealth(started_ts=time.time())
 
     # --- views
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         with self._lock_local:
             s = WSHealth(
                 started_ts=self._state.started_ts,

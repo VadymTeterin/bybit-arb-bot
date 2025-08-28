@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, List
 
 import httpx
 
@@ -23,7 +22,7 @@ def build_async_client() -> httpx.AsyncClient:
     debug_http = _flag("BYBIT_DEBUG_HTTP")
     debug_body = _flag("BYBIT_DEBUG_BODY")
 
-    event_hooks: Dict[str, List] = {}
+    event_hooks: dict[str, list] = {}
     if debug_http:
         event_hooks = make_event_hooks(include_body=debug_body)
 

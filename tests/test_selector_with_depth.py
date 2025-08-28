@@ -65,12 +65,8 @@ def test_selector_filters_by_depth(monkeypatch):
     # Відключаємо реальну БД
     saved = []
     monkeypatch.setattr(selector.persistence, "init_db", lambda: None)
-    monkeypatch.setattr(
-        selector.persistence, "recent_signal_exists", lambda symbol, cooldown_sec: False
-    )
-    monkeypatch.setattr(
-        selector.persistence, "save_signal", lambda *a, **k: saved.append(a)
-    )
+    monkeypatch.setattr(selector.persistence, "recent_signal_exists", lambda symbol, cooldown_sec: False)
+    monkeypatch.setattr(selector.persistence, "save_signal", lambda *a, **k: saved.append(a))
 
     # Мокаємо has_enough_depth так, щоб:
     #  - для AAAUSDT → True (mid_price ~100)
@@ -78,9 +74,7 @@ def test_selector_filters_by_depth(monkeypatch):
     def fake_has_enough_depth(orderbook, mid_price, **kwargs):
         return mid_price >= 100.0
 
-    monkeypatch.setattr(
-        selector, "has_enough_depth", fake_has_enough_depth, raising=False
-    )
+    monkeypatch.setattr(selector, "has_enough_depth", fake_has_enough_depth, raising=False)
 
     fake = _FakeBybitRest()
     res = selector.run_selection(limit=5, client=fake)

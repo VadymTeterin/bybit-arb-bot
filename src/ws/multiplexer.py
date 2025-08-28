@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable
 
 
 @dataclass(frozen=True)
@@ -12,7 +12,7 @@ class WsEvent:
     source: str  # e.g. "SPOT" | "LINEAR"
     channel: str  # e.g. "tickers" | "trade"
     symbol: str  # e.g. "BTCUSDT" ("" allowed)
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     ts: float  # seconds since epoch (float)
 
 
@@ -23,9 +23,9 @@ class _Subscription:
         self,
         sid: int,
         handler: Callable[[WsEvent], None],
-        source: Optional[str],
-        channel: Optional[str],
-        symbol: Optional[str],
+        source: str | None,
+        channel: str | None,
+        symbol: str | None,
     ) -> None:
         self.sid = sid
         self.handler = handler
@@ -65,16 +65,16 @@ class WSMultiplexer:
     def __init__(self, name: str = "core") -> None:
         self.name = name
         self._lock = threading.Lock()
-        self._subs: Dict[int, _Subscription] = {}
+        self._subs: dict[int, _Subscription] = {}
         self._next_id = 1
 
     def subscribe(
         self,
         handler: Callable[[WsEvent], None],
         *,
-        source: Optional[str] = None,
-        channel: Optional[str] = None,
-        symbol: Optional[str] = None,
+        source: str | None = None,
+        channel: str | None = None,
+        symbol: str | None = None,
     ) -> Callable[[], None]:
         """Register a handler with optional filters; returns unsubscribe() callable."""
         if not callable(handler):
@@ -115,7 +115,7 @@ class WSMultiplexer:
                 fired += 1
         return fired
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         Return internal counters and state snapshot.
 
@@ -136,7 +136,7 @@ class WSMultiplexer:
         }
 
     # Compatibility alias expected by tests
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """Compatibility alias for tests expecting mux.stats()."""
         return self.get_stats()
 
