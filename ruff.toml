@@ -3,4 +3,3 @@ line-length = 120
 
 [lint]
 extend-select = ["E","F","B","W","UP"]
-
