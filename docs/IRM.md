@@ -76,7 +76,7 @@
 - [ ] 6.1.3 Аналітика дайджестів (тижд./місячні агрегати) — planned.
 <!-- IRM:BEGIN 6.2 -->
 ### Фаза 6.2 — SSOT-lite (автоматизація IRM)
-> Оновлено: 2025-08-24T00:00:00Z
+> Оновлено: 2025-08-27T00:00:00Z
 
 _Статуси_: **todo** — ще не почато, **doing** — в роботі, **done** — завершено, **blocked** — заблоковано
 
@@ -96,6 +96,17 @@ _Статуси_: **todo** — ще не почато, **doing** — в робо
 - [x] **6.2.3 — Ручне оновлення (--write)**  `status: done`
   - [ ] Можливість локально запускати оновлення IRM
   - [ ] Додати ops-ноту в README
+
+- [x] **6.2.4 — QS v1.0 + README + CI + CHANGELOG (Quality Gate)**  `status: done`
+  - [ ] Додано docs/QUALITY.md (QS v1.0, узгоджено з WA v2.0)
+  - [ ] Додано docs/DoD.md (Definition of Done)
+  - [ ] Додано docs/TESTING.md (Testing Guide)
+  - [ ] Додано docs/Plan_bezpechnogo_vprovadzhennya_po_etapakh.md (Safe Rollout Plan)
+  - [ ] Додано .github/PULL_REQUEST_TEMPLATE.md (шаблон PR)
+  - [ ] Додано ruff.toml, isort.cfg, pre-commit-config.yaml, requirements-dev.txt (tooling на корені)
+  - [ ] Оновлено README.md: розділ 'Quality & Delivery Standards' (посилання на QS/DoD/Testing/Plan), PR #40
+  - [ ] Оновлено .github/workflows/ci.yml: PR — pre-commit тільки по змінених файлах; push — --all-files, PR #39
+  - [ ] Оновлено CHANGELOG: секція [Unreleased] у табличному форматі (QS/README/CI)
 
 <!-- IRM:END 6.2 -->
 
