@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import requests
 from loguru import logger
@@ -34,13 +34,13 @@ except Exception:  # noqa: BLE001
 
 
 # Optional/back-compat modules (used if present)
-_core_alerts: Optional[ModuleType]
+_core_alerts: ModuleType | None
 try:
     from .core import alerts as _core_alerts  # type: ignore[assignment]
 except Exception:  # noqa: BLE001
     _core_alerts = None
 
-_tg_formatters: Optional[ModuleType]
+_tg_formatters: ModuleType | None
 try:
     from .telegram import formatters as _tg_formatters  # type: ignore[assignment]
 except Exception:  # noqa: BLE001
@@ -77,7 +77,7 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
-def _env_csv(name: str) -> List[str]:
+def _env_csv(name: str) -> list[str]:
     raw = os.getenv(name, "")
     return [t.strip() for t in raw.split(",") if t.strip()]
 
@@ -180,7 +180,7 @@ def safe_print(text: str) -> None:
         sys.stdout.buffer.write(b"\n")
 
 
-def _csv_list(x: Any) -> List[str]:
+def _csv_list(x: Any) -> list[str]:
     if x is None:
         return []
     if isinstance(x, (list, tuple)):
@@ -194,8 +194,8 @@ def _nested_bybit(s):
     by = getattr(s, "bybit", None)
     url_linear = None
     url_spot = None
-    topics_linear: List[str] = []
-    topics_spot: List[str] = []
+    topics_linear: list[str] = []
+    topics_spot: list[str] = []
     reconnect_max_sec = getattr(s, "ws_reconnect_max_sec", None)
 
     if by is not None:
@@ -318,7 +318,7 @@ def cmd_bybit_ping(_: argparse.Namespace) -> int:
     return 0
 
 
-def _turnover_usd(row: Dict[str, Any]) -> float:
+def _turnover_usd(row: dict[str, Any]) -> float:
     for k in ("turnover24h", "turnoverUsd", "turnover_usd"):
         v = row.get(k)
         if v is not None:
@@ -358,8 +358,8 @@ def _basis_rows(
         spot_rows = client.get_tickers("spot") or []
         lin_rows = client.get_tickers("linear") or []
 
-        def _map_from_tickers(rows: List[Dict[str, Any]]):
-            m: Dict[str, Dict[str, float]] = {}
+        def _map_from_tickers(rows: list[dict[str, Any]]):
+            m: dict[str, dict[str, float]] = {}
             for r in rows:
                 sym = r.get("symbol")
                 if not sym:
@@ -377,8 +377,8 @@ def _basis_rows(
         spot_map = _map_from_tickers(spot_rows)
         lin_map = _map_from_tickers(lin_rows)
 
-    rows_all: List[tuple[str, float, float, float, float]] = []
-    rows_pass: List[tuple[str, float, float, float, float]] = []
+    rows_all: list[tuple[str, float, float, float, float]] = []
+    rows_pass: list[tuple[str, float, float, float, float]] = []
 
     common = set(spot_map.keys()) & set(lin_map.keys())
     for sym in common:
@@ -481,13 +481,11 @@ def cmd_alerts_preview(args: argparse.Namespace) -> int:
     return 0
 
 
-_FUND_CACHE: Dict[str, Tuple[float, Optional[float], Optional[float]]] = {}
+_FUND_CACHE: dict[str, tuple[float, float | None, float | None]] = {}
 _FUND_TTL_SEC = 8 * 60  # 8 hours
 
 
-def _get_funding_with_cache(
-    client: BybitRest, symbol: str
-) -> tuple[Optional[float], Optional[float]]:
+def _get_funding_with_cache(client: BybitRest, symbol: str) -> tuple[float | None, float | None]:
     now = time.time()
     cached = _FUND_CACHE.get(symbol)
     if cached and (now - cached[0] < _FUND_TTL_SEC):
@@ -675,8 +673,8 @@ def cmd_price_pair(args: argparse.Namespace) -> int:
         spot_rows = client.get_tickers("spot") or []
         lin_rows = client.get_tickers("linear") or []
 
-        def _map_from_tickers(rows: List[Dict[str, Any]]):
-            m: Dict[str, Dict[str, float]] = {}
+        def _map_from_tickers(rows: list[dict[str, Any]]):
+            m: dict[str, dict[str, float]] = {}
             for r in rows:
                 sym = r.get("symbol")
                 if not sym:
@@ -745,10 +743,10 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
         return 1
 
     ws = _nested_bybit(s)
-    url_linear: Optional[str] = ws["url_linear"]
-    url_spot: Optional[str] = ws["url_spot"]
-    topics_linear: List[str] = ws["topics_linear"]
-    topics_spot: List[str] = ws["topics_spot"]
+    url_linear: str | None = ws["url_linear"]
+    url_spot: str | None = ws["url_spot"]
+    topics_linear: list[str] = ws["topics_linear"]
+    topics_spot: list[str] = ws["topics_spot"]
 
     cache = QuoteCache()
     ws_linear = BybitWS(url_linear, topics_linear or ["tickers"]) if url_linear else None
@@ -769,7 +767,7 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
     debug_channels = set(_csv_list(_channels_env)) if _channels_env else set()
     debug_symbols = set(_csv_list(os.getenv("WS_DEBUG_FILTER_SYMBOLS", "")))
     debug_sample_ms = _env_int("WS_DEBUG_SAMPLE_MS", 1000)
-    _last_log: Dict[Tuple[str, str, str], float] = {}
+    _last_log: dict[tuple[str, str, str], float] = {}
 
     if debug_norm:
         logger.bind(tag="WS").info(
@@ -812,8 +810,8 @@ def cmd_ws_run(_: argparse.Namespace) -> int:
                 spot_rows = client.get_tickers("spot") or []
                 lin_rows = client.get_tickers("linear") or []
 
-                def _vol_map(rows: List[Dict[str, Any]]) -> Dict[str, float]:
-                    m: Dict[str, float] = {}
+                def _vol_map(rows: list[dict[str, Any]]) -> dict[str, float]:
+                    m: dict[str, float] = {}
                     for r in rows:
                         sym = r.get("symbol")
                         if not sym:

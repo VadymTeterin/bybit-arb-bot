@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 # ---- Unified exception hierarchy (used across all exchange clients)
 
@@ -40,7 +40,7 @@ class ExchangeInsufficientFunds(ExchangeError):
 
 @dataclass(frozen=True)
 class BybitError(ExchangeError):
-    ret_code: Optional[int] = None
+    ret_code: int | None = None
     ret_msg: str = "unknown error"
 
     def __str__(self) -> str:  # noqa: D401

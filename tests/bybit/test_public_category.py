@@ -1,7 +1,7 @@
 # tests/bybit/test_public_category.py
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pytest
 
@@ -11,9 +11,9 @@ from exchanges.bybit.types import BybitConfig
 
 class _FakeHTTP:
     def __init__(self):
-        self.last_params: Dict[str, Any] = {}
+        self.last_params: dict[str, Any] = {}
 
-    async def get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         self.last_params = params or {}
         # Повертаємо валідний payload для парсерів тикера
         return {

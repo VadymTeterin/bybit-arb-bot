@@ -7,7 +7,6 @@ import os
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import List, Tuple
 
 import httpx
 
@@ -57,7 +56,7 @@ def _today_kyiv() -> date:
     return datetime.utcnow().date()
 
 
-def _mock_events(d: date) -> Tuple[List[CommitEvent], List[MergeEvent], List[TagEvent]]:
+def _mock_events(d: date) -> tuple[list[CommitEvent], list[MergeEvent], list[TagEvent]]:
     start_utc, end_utc = kyiv_day_bounds(d)
     mid = start_utc + (end_utc - start_utc) / 2
 
@@ -97,17 +96,17 @@ def _iso(dt: datetime) -> str:
 
 def _collect_real_events(
     d: date, owner: str, repo: str, client: GitHubClient
-) -> Tuple[List[CommitEvent], List[MergeEvent], List[TagEvent]]:
+) -> tuple[list[CommitEvent], list[MergeEvent], list[TagEvent]]:
     start_utc, end_utc = kyiv_day_bounds(d)
     since_iso, until_iso = _iso(start_utc), _iso(end_utc)
 
     # COMMITS
     commits_raw = list(client.list_commits(owner, repo, since_iso=since_iso, until_iso=until_iso))
-    commits: List[CommitEvent] = [parse_commit(item, default_branch="main") for item in commits_raw]
+    commits: list[CommitEvent] = [parse_commit(item, default_branch="main") for item in commits_raw]
 
     # MERGES (PRs)
     pulls_raw = list(client.list_pulls_merged(owner, repo))
-    merges: List[MergeEvent] = []
+    merges: list[MergeEvent] = []
     for pr in pulls_raw:
         merged_at_iso = pr.get("merged_at")
         if not merged_at_iso:
@@ -118,7 +117,7 @@ def _collect_real_events(
 
     # TAGS (require commit date lookup)
     tags_raw = list(client.list_tags(owner, repo))
-    tags: List[TagEvent] = []
+    tags: list[TagEvent] = []
     for t in tags_raw:
         te = parse_tag(t)
         sha = te.sha
@@ -195,7 +194,7 @@ def _send_telegram(text: str) -> None:
             raise RuntimeError(f"Telegram sendMessage failed: {data}")
 
 
-def main(argv: List[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="GitHub Daily Digest")
     parser.add_argument("--date", type=str, help="Kyiv date YYYY-MM-DD (default: today in Kyiv)")
     parser.add_argument(

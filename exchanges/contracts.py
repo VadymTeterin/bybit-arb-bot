@@ -1,18 +1,10 @@
 # exchanges/contracts.py
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import (
-    Any,
-    Dict,
-    Iterable,
-    List,
-    Literal,
-    Optional,
-    Protocol,
-    runtime_checkable,
-)
+from typing import Any, Literal, Protocol, runtime_checkable
 
 MarketType = Literal["spot", "perp", "margin"]
 
@@ -35,8 +27,8 @@ class OrderBookLevel:
 @dataclass(frozen=True)
 class OrderBook:
     symbol: str
-    bids: List[OrderBookLevel]
-    asks: List[OrderBookLevel]
+    bids: list[OrderBookLevel]
+    asks: list[OrderBookLevel]
     ts: datetime
 
 
@@ -57,7 +49,7 @@ class Position:
     symbol: str
     qty: float
     entry_price: float
-    leverage: Optional[float] = None
+    leverage: float | None = None
     side: Literal["long", "short", "flat"] = "flat"
 
 
@@ -76,7 +68,7 @@ class IExchangePublic(Protocol):
     async def get_order_book(self, symbol: str, depth: int = 50) -> OrderBook: ...
     async def get_candles(
         self, symbol: str, interval: Literal["15m", "30m", "1h", "4h"], limit: int = 200
-    ) -> List[Candle]: ...
+    ) -> list[Candle]: ...
 
 
 @runtime_checkable
@@ -89,15 +81,15 @@ class ITradingClient(Protocol):
         side: Literal["buy", "sell"],
         type: Literal["limit", "market"],
         qty: float,
-        price: Optional[float] = None,
+        price: float | None = None,
         reduce_only: bool = False,
         market: MarketType = "spot",
-        extra: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]: ...
+        extra: dict[str, Any] | None = None,
+    ) -> dict[str, Any]: ...
     async def cancel_order(
         self, symbol: str, order_id: str, market: MarketType = "spot"
-    ) -> Dict[str, Any]: ...
-    async def get_positions(self, symbols: Optional[Iterable[str]] = None) -> List[Position]: ...
+    ) -> dict[str, Any]: ...
+    async def get_positions(self, symbols: Iterable[str] | None = None) -> list[Position]: ...
     async def set_leverage(self, symbol: str, leverage: float) -> None: ...
 
 
@@ -105,8 +97,8 @@ class ITradingClient(Protocol):
 class IAccountClient(Protocol):
     """Акаунтинг: баланси, комісії тощо."""
 
-    async def get_balances(self, assets: Optional[Iterable[str]] = None) -> List[Balance]: ...
-    async def get_fees(self) -> Dict[str, Any]: ...
+    async def get_balances(self, assets: Iterable[str] | None = None) -> list[Balance]: ...
+    async def get_fees(self) -> dict[str, Any]: ...
 
 
 @runtime_checkable

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 try:
     from loguru import logger  # type: ignore
@@ -28,7 +28,7 @@ def _load_settings_safe() -> Any | None:
     return None
 
 
-def _env_get(*names: str) -> Optional[str]:
+def _env_get(*names: str) -> str | None:
     for n in names:
         v = os.getenv(n)
         if v:

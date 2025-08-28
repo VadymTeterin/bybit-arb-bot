@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from exchanges.contracts import (
     Candle,
@@ -24,7 +24,7 @@ def _to_dt(ms: int | str) -> datetime:
     return datetime.fromtimestamp(ms_int / 1000.0, tz=timezone.utc)
 
 
-_INTERVAL_MAP: Dict[Interval, str] = {
+_INTERVAL_MAP: dict[Interval, str] = {
     "15m": "15",
     "30m": "30",
     "1h": "60",
@@ -32,7 +32,7 @@ _INTERVAL_MAP: Dict[Interval, str] = {
 }
 
 
-def parse_ticker(payload: Dict[str, Any], symbol_req: str) -> Ticker:
+def parse_ticker(payload: dict[str, Any], symbol_req: str) -> Ticker:
     if int(payload.get("retCode", -1)) != 0:
         raise map_error(payload.get("retCode"), payload.get("retMsg", "unknown error"))
 
@@ -53,7 +53,7 @@ def parse_ticker(payload: Dict[str, Any], symbol_req: str) -> Ticker:
     return Ticker(symbol=normalize_symbol(symbol_req), bid=bid, ask=ask, last=last, ts=ts)
 
 
-def parse_order_book(payload: Dict[str, Any], symbol_req: str) -> OrderBook:
+def parse_order_book(payload: dict[str, Any], symbol_req: str) -> OrderBook:
     if int(payload.get("retCode", -1)) != 0:
         raise map_error(payload.get("retCode"), payload.get("retMsg", "unknown error"))
 
@@ -68,13 +68,13 @@ def parse_order_book(payload: Dict[str, Any], symbol_req: str) -> OrderBook:
     return OrderBook(symbol=normalize_symbol(symbol_req), bids=bids, asks=asks, ts=ts)
 
 
-def parse_candles(payload: Dict[str, Any], symbol_req: str, interval: Interval) -> List[Candle]:
+def parse_candles(payload: dict[str, Any], symbol_req: str, interval: Interval) -> list[Candle]:
     if int(payload.get("retCode", -1)) != 0:
         raise map_error(payload.get("retCode"), payload.get("retMsg", "unknown error"))
 
     result = payload.get("result") or {}
     lst = result.get("list") or []
-    out: List[Candle] = []
+    out: list[Candle] = []
     for row in lst:
         open_time = _to_dt(row[0])
         open_ = float(row[1])
@@ -101,8 +101,8 @@ class BybitPublicClient(IExchangePublic):
     def __init__(
         self,
         cfg: BybitConfig,
-        limiter: Optional[AsyncTokenBucket] = None,
-        http_client: Optional[HTTPClient] = None,  # тестовий інжект
+        limiter: AsyncTokenBucket | None = None,
+        http_client: HTTPClient | None = None,  # тестовий інжект
     ):
         self.cfg = cfg
         self.limiter = limiter or AsyncTokenBucket(rate_per_sec=10, burst=20)
@@ -130,7 +130,7 @@ class BybitPublicClient(IExchangePublic):
         data = await self.http.get("/v5/market/orderbook", params=params)
         return parse_order_book(data, symbol)
 
-    async def get_candles(self, symbol: str, interval: Interval, limit: int = 200) -> List[Candle]:
+    async def get_candles(self, symbol: str, interval: Interval, limit: int = 200) -> list[Candle]:
         bybit_interval = _INTERVAL_MAP[interval]
         params = {
             "category": self._category,

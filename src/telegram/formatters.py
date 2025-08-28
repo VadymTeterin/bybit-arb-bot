@@ -2,10 +2,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
 
 
-def _fmt_usd(x: Optional[float]) -> str:
+def _fmt_usd(x: float | None) -> str:
     if x is None:
         return "n/a"
     try:
@@ -21,7 +20,7 @@ def _fmt_usd(x: Optional[float]) -> str:
     return f"${x:.2f}"
 
 
-def _fmt_price(x: Optional[float]) -> str:
+def _fmt_price(x: float | None) -> str:
     if x is None:
         return "n/a"
     try:
@@ -35,7 +34,7 @@ def _fmt_price(x: Optional[float]) -> str:
     return f"{x:.6f}"
 
 
-def _fmt_pct(x: Optional[float]) -> str:
+def _fmt_pct(x: float | None) -> str:
     if x is None:
         return "n/a"
     try:
@@ -44,7 +43,7 @@ def _fmt_pct(x: Optional[float]) -> str:
         return "n/a"
 
 
-def _fmt_ts(ts_unix: Optional[float]) -> str:
+def _fmt_ts(ts_unix: float | None) -> str:
     if not ts_unix:
         return "n/a"
     try:
@@ -61,10 +60,10 @@ def format_signal(
     spread_pct: float,
     spot_price: float,
     mark_price: float,
-    vol_24h: Optional[float],
+    vol_24h: float | None,
     basis: float,
-    funding_rate: Optional[float] = None,
-    next_funding_time: Optional[float] = None,
+    funding_rate: float | None = None,
+    next_funding_time: float | None = None,
 ) -> str:
     """
     Базовий форматер повідомлення (Markdown) для Telegram/CLI.
@@ -100,10 +99,10 @@ def format_arbitrage_alert(
     spread_pct: float,
     spot_price: float,
     mark_price: float,
-    vol_24h: Optional[float],
+    vol_24h: float | None,
     basis: float,
-    funding_rate: Optional[float] = None,
-    next_funding_time: Optional[float] = None,
+    funding_rate: float | None = None,
+    next_funding_time: float | None = None,
 ) -> str:
     # Делегуємо в наш єдиний форматер, щоб уникати дубляжу логіки
     return format_signal(

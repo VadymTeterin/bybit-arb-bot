@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from src.storage import persistence
 
 
-def get_top_signals(last_hours: int = 24, limit: int = 3) -> List[Dict[str, Any]]:
+def get_top_signals(last_hours: int = 24, limit: int = 3) -> list[dict[str, Any]]:
     """
     Забирає сигнали за останні last_hours годин і повертає top N
     за спаданням basis_pct (це вже робить persistence.get_signals).
@@ -15,7 +15,7 @@ def get_top_signals(last_hours: int = 24, limit: int = 3) -> List[Dict[str, Any]
     return persistence.get_signals(last_hours=last_hours, limit=limit)
 
 
-def format_report(signals: List[Dict[str, Any]], now: Optional[datetime] = None) -> str:
+def format_report(signals: list[dict[str, Any]], now: datetime | None = None) -> str:
     """
     Повертає готовий багаторядковий текст для відправки в Telegram або для CLI.
     """

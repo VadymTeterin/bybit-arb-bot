@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, Callable, Dict, Optional, Protocol
+from typing import Any, Callable, Protocol
 
 try:
     import httpx
@@ -29,7 +29,7 @@ class HTTPClient:
         self,
         base_url: str,
         timeout: float = 10.0,
-        limiter: Optional[_RateLimiterProto] = None,
+        limiter: _RateLimiterProto | None = None,
         max_retries: int = 3,
         backoff_factor: float = 0.5,
         client: Any = None,  # для тестів можна передати фейковий клієнт із методом .request()
@@ -57,16 +57,16 @@ class HTTPClient:
         self,
         method: str,
         path: str,
-        params: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
-        last_exc: Optional[Exception] = None
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        last_exc: Exception | None = None
         for attempt in range(self._max_retries + 1):
             if self._limiter is not None:
                 await self._limiter.acquire(1)
             try:
-                req_kwargs: Dict[str, Any] = {"params": params, "json": json}
+                req_kwargs: dict[str, Any] = {"params": params, "json": json}
                 # 👇 передаємо headers тільки якщо він заданий
                 if headers is not None:
                     req_kwargs["headers"] = headers
@@ -84,7 +84,7 @@ class HTTPClient:
                 if status >= 400 and status != 429:
                     resp.raise_for_status()
 
-                data: Dict[str, Any] = resp.json() if hasattr(resp, "json") else {}
+                data: dict[str, Any] = resp.json() if hasattr(resp, "json") else {}
                 # BYBIT retCode != 0
                 if "retCode" in data and int(data["retCode"]) != 0:
                     if self._is_rate_limit_retcode(data["retCode"]) and attempt < self._max_retries:
@@ -107,17 +107,17 @@ class HTTPClient:
     async def get(
         self,
         path: str,
-        params: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         return await self._request("GET", path, params=params, json=None, headers=headers)
 
     async def post(
         self,
         path: str,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         return await self._request("POST", path, params=None, json=json, headers=headers)
 
     async def close(self) -> None:
@@ -140,11 +140,11 @@ class SignedHTTPClient(HTTPClient):
         api_secret: str,
         recv_window_ms: int = 5000,
         timeout: float = 10.0,
-        limiter: Optional[_RateLimiterProto] = None,
+        limiter: _RateLimiterProto | None = None,
         max_retries: int = 3,
         backoff_factor: float = 0.5,
         client: Any = None,
-        now_ms: Optional[Callable[[], int]] = None,  # для тестів
+        now_ms: Callable[[], int] | None = None,  # для тестів
     ):
         super().__init__(
             base_url,
@@ -161,8 +161,8 @@ class SignedHTTPClient(HTTPClient):
 
     def _common_headers(
         self, timestamp_ms: str, sign: str, content_type_json: bool = False
-    ) -> Dict[str, str]:
-        headers: Dict[str, str] = {
+    ) -> dict[str, str]:
+        headers: dict[str, str] = {
             "X-BAPI-API-KEY": self._api_key,
             "X-BAPI-SIGN": sign,
             "X-BAPI-SIGN-TYPE": "2",
@@ -176,9 +176,9 @@ class SignedHTTPClient(HTTPClient):
     async def get(
         self,
         path: str,
-        params: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         ts = str(self._now_ms())
         body_str = canonical_query(params)
         sign = sign_v5(self._api_key, self._api_secret, self._recv_window, ts, body_str)
@@ -190,9 +190,9 @@ class SignedHTTPClient(HTTPClient):
     async def post(
         self,
         path: str,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         ts = str(self._now_ms())
         body_str = canonical_json(json)
         sign = sign_v5(self._api_key, self._api_secret, self._recv_window, ts, body_str)

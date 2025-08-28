@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 from exchanges.contracts import ITradingClient  # ✅ наслідуємо контракт
 
@@ -11,7 +11,7 @@ from .symbol_mapper import to_bybit_symbol
 from .types import BybitConfig
 
 
-def _ensure_str_num(x: float | int | str | None) -> Optional[str]:
+def _ensure_str_num(x: float | int | str | None) -> str | None:
     if x is None:
         return None
     # Bybit очікує числа як рядки
@@ -61,11 +61,11 @@ class BybitTradingClient(ITradingClient):
     def __init__(
         self,
         cfg: BybitConfig,
-        http_client: Optional[SignedHTTPClient] = None,  # інжект для тестів
+        http_client: SignedHTTPClient | None = None,  # інжект для тестів
     ):
         self.cfg = cfg
         if http_client is not None:
-            self.http: Optional[SignedHTTPClient] = http_client
+            self.http: SignedHTTPClient | None = http_client
         else:
             api_key = os.getenv("BYBIT_API_KEY", "")
             api_secret = os.getenv("BYBIT_API_SECRET", "")
@@ -91,12 +91,12 @@ class BybitTradingClient(ITradingClient):
         side: str,  # "buy" | "sell"
         type: str,  # "limit" | "market"
         qty: float,
-        price: Optional[float] = None,
+        price: float | None = None,
         market: str = "spot",  # "spot" | "perp" (alias "linear")
         time_in_force: str = "GTC",
-        order_link_id: Optional[str] = None,
-        reduce_only: Optional[bool] = None,  # для перпів
-    ) -> Dict[str, Any]:
+        order_link_id: str | None = None,
+        reduce_only: bool | None = None,  # для перпів
+    ) -> dict[str, Any]:
         """
         POST /v5/order/create
         Мінімальний набір полів для spot/linear.
@@ -110,7 +110,7 @@ class BybitTradingClient(ITradingClient):
         if bybit_type == "Limit" and price is None:
             raise ValueError("price is required for limit orders")
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "category": category,
             "symbol": to_bybit_symbol(symbol),
             "side": bybit_side,
@@ -133,10 +133,10 @@ class BybitTradingClient(ITradingClient):
         self,
         *,
         symbol: str,
-        order_id: Optional[str] = None,
-        order_link_id: Optional[str] = None,
+        order_id: str | None = None,
+        order_link_id: str | None = None,
         market: str = "spot",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         POST /v5/order/cancel
         Потрібен або orderId, або orderLinkId.
@@ -148,7 +148,7 @@ class BybitTradingClient(ITradingClient):
 
         category = _market_to_category(market, self.cfg.default_category)
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "category": category,
             "symbol": to_bybit_symbol(symbol),
         }

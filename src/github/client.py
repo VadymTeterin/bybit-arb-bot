@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import random
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -23,13 +23,13 @@ class GitHubClient:
 
     def __init__(
         self,
-        token: Optional[str] = None,
+        token: str | None = None,
         base_url: str = DEFAULT_BASE_URL,
         timeout: float | httpx.Timeout = 10.0,
         max_retries: int = 3,
         backoff_factor: float = 0.5,
         max_sleep_on_reset: int = 60,
-        client: Optional[httpx.Client] = None,
+        client: httpx.Client | None = None,
         user_agent: str = DEFAULT_UA,
     ) -> None:
         self.token = token or os.getenv("GH_TOKEN") or os.getenv("GITHUB_TOKEN")
@@ -100,9 +100,9 @@ class GitHubClient:
         method: str,
         url: str,
         *,
-        params: Optional[Dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
     ) -> httpx.Response:
-        last_exc: Optional[Exception] = None
+        last_exc: Exception | None = None
         full_url = self._absolute(url)
 
         for attempt in range(1, self.max_retries + 1):
@@ -152,15 +152,15 @@ class GitHubClient:
         owner: str,
         repo: str,
         *,
-        since: Optional[str] = None,
-        until: Optional[str] = None,
+        since: str | None = None,
+        until: str | None = None,
         per_page: int = 100,
         max_pages: int = 3,
-        sha: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        sha: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Return recent commits (paginated; limited by max_pages)."""
-        out: List[Dict[str, Any]] = []
-        params: Dict[str, Any] = {"per_page": per_page}
+        out: list[dict[str, Any]] = []
+        params: dict[str, Any] = {"per_page": per_page}
         if since:
             params["since"] = since
         if until:
@@ -189,11 +189,11 @@ class GitHubClient:
         direction: str = "desc",
         per_page: int = 100,
         max_pages: int = 3,
-        base: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        base: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Return pull requests (by default 'closed', sorted by 'updated')."""
-        out: List[Dict[str, Any]] = []
-        params: Dict[str, Any] = {
+        out: list[dict[str, Any]] = []
+        params: dict[str, Any] = {
             "state": state,
             "sort": sort,
             "direction": direction,
@@ -220,10 +220,10 @@ class GitHubClient:
         *,
         per_page: int = 100,
         max_pages: int = 2,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Return tags (lightweight)."""
-        out: List[Dict[str, Any]] = []
-        params: Dict[str, Any] = {"per_page": per_page}
+        out: list[dict[str, Any]] = []
+        params: dict[str, Any] = {"per_page": per_page}
         for page in range(1, max_pages + 1):
             params["page"] = page
             resp = self._request("GET", f"/repos/{owner}/{repo}/tags", params=params)

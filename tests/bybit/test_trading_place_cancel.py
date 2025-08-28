@@ -1,7 +1,7 @@
 # tests/bybit/test_trading_place_cancel.py
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pytest
 
@@ -11,15 +11,15 @@ from exchanges.bybit.types import BybitConfig
 
 class _FakeSignedHTTP:
     def __init__(self) -> None:
-        self.last_path: Optional[str] = None
-        self.last_json: Optional[Dict[str, Any]] = None
+        self.last_path: str | None = None
+        self.last_json: dict[str, Any] | None = None
 
     async def post(
         self,
         path: str,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         self.last_path = path
         self.last_json = dict(json or {})
         # імітуємо успішну відповідь Bybit

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Iterable, List, Tuple
+from collections.abc import Iterable
 
 
 def _to_float(x, default: float = 0.0) -> float:
@@ -11,10 +11,10 @@ def _to_float(x, default: float = 0.0) -> float:
 
 
 def _levels_in_window(
-    levels: Iterable[Tuple[float, float]], lo: float, hi: float
-) -> List[Tuple[float, float]]:
+    levels: Iterable[tuple[float, float]], lo: float, hi: float
+) -> list[tuple[float, float]]:
     """Фільтрує рівні книги за ціновим вікном [lo, hi]."""
-    out: List[Tuple[float, float]] = []
+    out: list[tuple[float, float]] = []
     for p, q in levels:
         fp, fq = _to_float(p), _to_float(q)
         if fp >= lo and fp <= hi:
@@ -22,7 +22,7 @@ def _levels_in_window(
     return out
 
 
-def _sum_notional(levels: Iterable[Tuple[float, float]]) -> float:
+def _sum_notional(levels: Iterable[tuple[float, float]]) -> float:
     """Сума ціна*кількість по рівнях."""
     s = 0.0
     for p, q in levels:
@@ -31,8 +31,8 @@ def _sum_notional(levels: Iterable[Tuple[float, float]]) -> float:
 
 
 def _normalize_ob(
-    orderbook: Dict,
-) -> Tuple[List[Tuple[float, float]], List[Tuple[float, float]]]:
+    orderbook: dict,
+) -> tuple[list[tuple[float, float]], list[tuple[float, float]]]:
     """
     Нормалізує формат книги до двох списків bids/asks у вигляді [(price, qty), ...].
     Підтримує варіанти:
@@ -55,8 +55,8 @@ def _normalize_ob(
 
 
 def calc_window_depth_usd(
-    orderbook: Dict, mid_price: float, window_pct: float
-) -> Tuple[float, float, int]:
+    orderbook: dict, mid_price: float, window_pct: float
+) -> tuple[float, float, int]:
     """
     Розраховує сумарний нотіонал у межах ±window_pct від mid_price.
     Повертає: (bid_usd, ask_usd, levels_in_window_total).
@@ -83,7 +83,7 @@ def calc_window_depth_usd(
 
 
 def has_enough_depth(
-    orderbook: Dict,
+    orderbook: dict,
     mid_price: float,
     *,
     min_depth_usd: float,

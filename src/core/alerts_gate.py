@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Dict, Optional, Tuple
 
 try:
     from loguru import logger  # type: ignore
@@ -47,7 +46,7 @@ class AlertGate:
         cooldown_sec: int = 300,
         suppress_eps_pct: float = 0.2,
         suppress_window_min: int = 15,
-        repo: Optional[object] = None,
+        repo: object | None = None,
     ) -> None:
         """
         :param cooldown_sec: Minimal seconds between alerts for the same symbol.
@@ -60,7 +59,7 @@ class AlertGate:
         self.suppress_eps_pct = float(max(0.0, suppress_eps_pct))
         self.suppress_window_min = int(max(0, suppress_window_min))
         self.repo = repo
-        self._mem: Dict[str, _LastEvent] = {}
+        self._mem: dict[str, _LastEvent] = {}
 
     @classmethod
     def from_settings(cls, settings) -> AlertGate:
@@ -73,7 +72,7 @@ class AlertGate:
 
     # ---------- persistence helpers ----------
 
-    def _load_last(self, symbol: str) -> Optional[_LastEvent]:
+    def _load_last(self, symbol: str) -> _LastEvent | None:
         if symbol in self._mem:
             return self._mem[symbol]
         if self.repo and hasattr(self.repo, "get_last"):
@@ -97,7 +96,7 @@ class AlertGate:
 
     # ---------- public API ----------
 
-    def should_send(self, symbol: str, basis_pct: float, ts: datetime) -> Tuple[bool, str]:
+    def should_send(self, symbol: str, basis_pct: float, ts: datetime) -> tuple[bool, str]:
         """Decide whether an alert should be sent."""
         ts = _to_utc(ts)
         t_epoch = ts.timestamp()

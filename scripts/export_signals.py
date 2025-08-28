@@ -6,7 +6,6 @@ import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 DEFAULT_DB = "data/signals.db"
 
@@ -27,11 +26,11 @@ def _parse_iso(s: str) -> datetime:
 
 def _select_rows(
     con: sqlite3.Connection,
-    last_hours: Optional[int],
-    since: Optional[str],
-    until: Optional[str],
-    limit: Optional[int],
-) -> List[Tuple]:
+    last_hours: int | None,
+    since: str | None,
+    until: str | None,
+    limit: int | None,
+) -> list[tuple]:
     base_sql = """
 
       SELECT symbol, spot_price, futures_price, basis_pct, volume_24h_usd, timestamp
@@ -42,7 +41,7 @@ def _select_rows(
 
     where = []
 
-    params: List[object] = []
+    params: list[object] = []
 
     if since or until:
         if since:
@@ -80,7 +79,7 @@ def _select_rows(
     return cur.fetchall()
 
 
-def _localize_ts(ts: str, tz_name: Optional[str]) -> str:
+def _localize_ts(ts: str, tz_name: str | None) -> str:
     if not tz_name:
         return ts
 
@@ -116,13 +115,13 @@ def _localize_ts(ts: str, tz_name: Optional[str]) -> str:
 
 def export_signals(
     out_path: Path,
-    last_hours: Optional[int] = None,
-    since: Optional[str] = None,
-    until: Optional[str] = None,
-    limit: Optional[int] = None,
-    tz: Optional[str] = None,
-    keep: Optional[int] = None,
-    db_path: Optional[str] = None,
+    last_hours: int | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    limit: int | None = None,
+    tz: str | None = None,
+    keep: int | None = None,
+    db_path: str | None = None,
 ) -> Path:
     if last_hours is not None and (since or until):
         raise ValueError("Use either --last-hours OR (--since/--until), not both.")

@@ -44,7 +44,7 @@ def _dt_from_ms(ms: int | float | None) -> datetime:
 
 
 # ---- Парсер WS-повідомлень tickers ----------------------------------------
-def parse_ws_ticker(payload: dict[str, Any]) -> Optional[Ticker]:
+def parse_ws_ticker(payload: dict[str, Any]) -> Ticker | None:
     """
     Підтримує два формати data:
       1) list[dict] (type: snapshot)
@@ -86,7 +86,7 @@ def parse_ws_ticker(payload: dict[str, Any]) -> Optional[Ticker]:
 # ---- Парсер топу книги (orderbook.1.*) ------------------------------------
 def parse_ws_orderbook_top(
     payload: dict[str, Any],
-) -> Optional[tuple[str, float, float, datetime]]:
+) -> tuple[str, float, float, datetime] | None:
     """
     Витягає best bid/ask з orderbook.1.<SYMBOL>
     Формати:
@@ -144,11 +144,11 @@ class _WsPublic:
         self,
         symbol: str,
         on_ticker: _OnTicker = None,
-        category: Optional[str] = None,
+        category: str | None = None,
         read_timeout_s: float = 30.0,
         retry_backoff_s: float = 5.0,
         ping_interval_s: float = 20.0,
-        use_orderbook_top: Optional[bool] = None,
+        use_orderbook_top: bool | None = None,
     ) -> None:
         self.symbol = symbol
         self.on_ticker = on_ticker
@@ -174,7 +174,7 @@ class _WsPublic:
 
         self._stop_event = asyncio.Event()
         self._ws: Any = None
-        self._ping_task: Optional[asyncio.Task] = None
+        self._ping_task: asyncio.Task | None = None
 
         # останній відомий last (щоб у тікері з ордербука не було 0.0)
         self._last_price: float = 0.0

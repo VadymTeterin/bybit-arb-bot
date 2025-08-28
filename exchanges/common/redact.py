@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 # Ключі/заголовки, які треба маскувати
 _SENSITIVE_KEY_RE = re.compile(

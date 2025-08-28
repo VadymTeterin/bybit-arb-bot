@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import Optional
 
 try:
     # aiogram v3 style imports
@@ -40,7 +39,7 @@ def _get_token() -> str:
     return token
 
 
-def _allowed_chat_id() -> Optional[int]:
+def _allowed_chat_id() -> int | None:
     cid = os.getenv("TELEGRAM__ALERT_CHAT_ID") or os.getenv("TELEGRAM__CHAT_ID") or ""
     cid = cid.strip()
     try:

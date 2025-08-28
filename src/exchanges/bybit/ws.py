@@ -5,16 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 import random
-from typing import (
-    Awaitable,
-    Callable,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Protocol,
-)
+from collections.abc import Awaitable, Iterable, Iterator
+from typing import Callable, Protocol
 
 import aiohttp
 
@@ -52,8 +44,8 @@ def exp_backoff_with_jitter(
     *,
     base: float = 0.5,
     factor: float = 2.0,
-    cap: Optional[float] = None,
-    max_delay: Optional[float] = None,
+    cap: float | None = None,
+    max_delay: float | None = None,
     jitter: float = 0.1,
 ) -> float:
     """
@@ -82,7 +74,7 @@ def exp_backoff_with_jitter(
 
 
 # ---- Parsing helpers -------------------------------------------------
-def _to_float(v: object, default: Optional[float] = None) -> Optional[float]:
+def _to_float(v: object, default: float | None = None) -> float | None:
     """Try to convert arbitrary value to float; return default if impossible."""
     if v is None:
         return default
@@ -95,7 +87,7 @@ def _to_float(v: object, default: Optional[float] = None) -> Optional[float]:
             return default
 
 
-def _from_scaled(v: object, scale: int) -> Optional[float]:
+def _from_scaled(v: object, scale: int) -> float | None:
     """
     Convert scaled integers (E4/E8 etc.) to float.
     Example: 345678901 with scale=4 => 34567.8901
@@ -104,7 +96,7 @@ def _from_scaled(v: object, scale: int) -> Optional[float]:
     return None if f is None else f / (10**scale)
 
 
-def _infer_symbol_from_topic(topic: str) -> Optional[str]:
+def _infer_symbol_from_topic(topic: str) -> str | None:
     # Bybit v5 topics look like "tickers.BTCUSDT" or just "tickers"
     if not topic:
         return None
@@ -114,7 +106,7 @@ def _infer_symbol_from_topic(topic: str) -> Optional[str]:
 
 
 # ---- Public parser API ----------------------------------------------
-def iter_ticker_entries(message: Dict) -> Iterator[Dict]:
+def iter_ticker_entries(message: dict) -> Iterator[dict]:
     """
     Normalize Bybit v5 'tickers' WS message into rows:
       { 'symbol': str, 'last': float|None, 'mark': float|None, 'index': float|None }
@@ -131,13 +123,13 @@ def iter_ticker_entries(message: Dict) -> Iterator[Dict]:
         return iter(())  # empty iterator
 
     if isinstance(data, dict):
-        arr: List[Dict] = [data]
+        arr: list[dict] = [data]
     elif isinstance(data, list):
         arr = [x for x in data if isinstance(x, dict)]
     else:
         return iter(())
 
-    out_rows: List[Dict] = []
+    out_rows: list[dict] = []
     for item in arr:
         symbol = item.get("symbol") or _infer_symbol_from_topic(topic) or ""
         symbol = str(symbol).upper()
@@ -187,12 +179,12 @@ class BybitPublicWS:
         url: str,
         topics: Iterable[str],
         *,
-        metrics_source: Optional[str] = None,  # "SPOT" | "LINEAR" | None
+        metrics_source: str | None = None,  # "SPOT" | "LINEAR" | None
     ) -> None:
         self.url = url
         self.topics = list(topics)
         self._stop = asyncio.Event()
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
         self._metrics_source = (metrics_source or "").upper() or None
 
     async def _subscribe(self, ws: aiohttp.ClientWebSocketResponse) -> None:

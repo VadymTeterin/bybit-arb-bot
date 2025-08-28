@@ -2,9 +2,10 @@
 # (c) Bybit Arb Bot — GitHub Daily Digest report & aggregation
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any
 
 try:
     # Python 3.9+: zoneinfo
@@ -18,7 +19,7 @@ except Exception:  # pragma: no cover
 KYIV_TZ_NAME = "Europe/Kyiv"
 
 
-def kyiv_day_bounds(d: date) -> Tuple[datetime, datetime]:
+def kyiv_day_bounds(d: date) -> tuple[datetime, datetime]:
     """
     For a given calendar date in Kyiv, return (start_utc, end_utc)
     where start is 00:00:00 and end is 23:59:59.999... of that Kyiv day,
@@ -71,13 +72,13 @@ class TagEvent:
 @dataclass
 class Digest:
     date_kyiv: date
-    window_utc: Tuple[datetime, datetime]
-    commits: List[CommitEvent]
-    merges: List[MergeEvent]
-    tags: List[TagEvent]
+    window_utc: tuple[datetime, datetime]
+    commits: list[CommitEvent]
+    merges: list[MergeEvent]
+    tags: list[TagEvent]
 
     @property
-    def stats(self) -> Dict[str, int]:
+    def stats(self) -> dict[str, int]:
         return {
             "commits": len(self.commits),
             "merges": len(self.merges),
@@ -88,7 +89,7 @@ class Digest:
 # ---------- Parsing helpers from raw GitHub payloads (dicts) ----------
 
 
-def parse_commit(item: Dict[str, Any], default_branch: str = "main") -> CommitEvent:
+def parse_commit(item: dict[str, Any], default_branch: str = "main") -> CommitEvent:
     commit = item.get("commit", {})
     author = (commit.get("author") or {}).get("name") or "unknown"
     message = commit.get("message") or ""
@@ -114,7 +115,7 @@ def parse_commit(item: Dict[str, Any], default_branch: str = "main") -> CommitEv
     )
 
 
-def parse_merge_pr(item: Dict[str, Any], base_fallback: str = "main") -> MergeEvent:
+def parse_merge_pr(item: dict[str, Any], base_fallback: str = "main") -> MergeEvent:
     number = item.get("number") or 0
     title = item.get("title") or ""
     merged_by = ((item.get("merged_by") or {}) or {}).get("login") or "bot"
@@ -134,7 +135,7 @@ def parse_merge_pr(item: Dict[str, Any], base_fallback: str = "main") -> MergeEv
     )
 
 
-def parse_tag(item: Dict[str, Any]) -> TagEvent:
+def parse_tag(item: dict[str, Any]) -> TagEvent:
     name = item.get("name") or ""
     sha = (item.get("commit") or {}).get("sha") or ""
     # No tag date in tags API; caller should enrich with commit date if needed.
@@ -145,7 +146,7 @@ def parse_tag(item: Dict[str, Any]) -> TagEvent:
 # ---------- Aggregation ----------
 
 
-def in_window(ts: datetime, window_utc: Tuple[datetime, datetime]) -> bool:
+def in_window(ts: datetime, window_utc: tuple[datetime, datetime]) -> bool:
     start, end = window_utc
     return (ts >= start) and (ts < end)
 
@@ -169,7 +170,7 @@ def build_digest(
 
 def render_text_report(d: Digest) -> str:
     start, end = d.window_utc
-    lines: List[str] = []
+    lines: list[str] = []
     lines.append("🗞️ GitHub Daily Digest")
     lines.append(f"Date (Kyiv): {d.date_kyiv.isoformat()}")
     lines.append(f"UTC window: {start.isoformat()} → {end.isoformat()}")

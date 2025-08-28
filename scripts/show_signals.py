@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import os
 import sqlite3
-from typing import Optional
 
 
-def show_signals(limit: int = 10, last_hours: Optional[int] = None) -> None:
+def show_signals(limit: int = 10, last_hours: int | None = None) -> None:
     db = os.getenv("DB_PATH", "data/signals.db")
     con = sqlite3.connect(db)
     cur = con.cursor()

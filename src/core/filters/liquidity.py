@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Mapping, Optional
+from collections.abc import Mapping
+from typing import Any
 
 
 def _to_float(x: Any, default: float = 0.0) -> float:
@@ -18,9 +19,7 @@ def _norm_key(k: str) -> str:
     return re.sub(r"[^a-z0-9]", "", str(k).lower())
 
 
-def _pick_first(
-    m: Mapping[str, Any], *keys: str, default: Optional[float] = None
-) -> Optional[float]:
+def _pick_first(m: Mapping[str, Any], *keys: str, default: float | None = None) -> float | None:
     # 1) спроба точних збігів (щоб не втратити вже існуючі ключі)
     for k in keys:
         if k in m and m[k] is not None:

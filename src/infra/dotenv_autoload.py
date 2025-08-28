@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Optional
 
 __all__ = ["autoload_env", "find_env_file"]
 
@@ -80,7 +79,7 @@ def _expand_vars(value: str, env: dict[str, str]) -> str:
     return current
 
 
-def find_env_file() -> Optional[str]:
+def find_env_file() -> str | None:
     path = os.getenv("ENV_FILE")
     if path and os.path.isfile(path):
         return path
@@ -101,7 +100,7 @@ def find_env_file() -> Optional[str]:
     return None
 
 
-def autoload_env(override: bool = False) -> Optional[str]:
+def autoload_env(override: bool = False) -> str | None:
     """Load .env into os.environ without external packages.
 
     - override=False keeps existing os.environ values (safe for CI/secrets)

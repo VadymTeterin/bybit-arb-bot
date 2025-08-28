@@ -6,10 +6,10 @@ import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any
 
 
-def _fmt_utc(ts: Optional[float]) -> Optional[str]:
+def _fmt_utc(ts: float | None) -> str | None:
     if not ts:
         return None
     try:
@@ -23,12 +23,12 @@ class WSHealth:
     started_ts: float
     spot_events: int = 0
     linear_events: int = 0
-    last_event_ts: Optional[float] = None
-    last_spot_ts: Optional[float] = None
-    last_linear_ts: Optional[float] = None
+    last_event_ts: float | None = None
+    last_spot_ts: float | None = None
+    last_linear_ts: float | None = None
     reconnects_total: int = 0  # new in 6.2.1
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         now = time.time()
         return {
             "started_ts": self.started_ts,
@@ -88,7 +88,7 @@ class MetricsRegistry:
             self._state = WSHealth(started_ts=time.time())
 
     # --- views
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         with self._lock_local:
             s = WSHealth(
                 started_ts=self._state.started_ts,

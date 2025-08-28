@@ -1,7 +1,6 @@
 # tests/test_ws_alerts_subscriber.py
 import asyncio
 import re
-from typing import List
 
 from src.infra.config import AppSettings
 from src.ws.multiplexer import WsEvent, WSMultiplexer
@@ -16,7 +15,7 @@ def test_alerts_subscriber_basic_send(monkeypatch):
     mux = WSMultiplexer()
 
     # capture sink
-    out: List[str] = []
+    out: list[str] = []
 
     async def fake_send(text: str) -> None:
         out.append(text)
@@ -61,7 +60,7 @@ def test_alerts_subscriber_basic_send(monkeypatch):
 def test_alerts_subscriber_cooldown(monkeypatch):
     mux = WSMultiplexer()
 
-    out: List[str] = []
+    out: list[str] = []
 
     async def fake_send(text: str) -> None:
         out.append(text)

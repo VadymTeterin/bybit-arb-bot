@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Dict
+from typing import Any
 
 from src.ws.multiplexer import WsEvent, WSMultiplexer
 
@@ -10,7 +10,7 @@ from src.ws.multiplexer import WsEvent, WSMultiplexer
 def publish_bybit_ticker(
     mux: WSMultiplexer,
     source: str,
-    item: Dict[str, Any],
+    item: dict[str, Any],
     *,
     channel: str = "tickers",
     ts: float | None = None,

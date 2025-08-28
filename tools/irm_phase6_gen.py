@@ -18,7 +18,6 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
 
 
 # --- Ensure UTF-8 stdio on Windows runners (cp1252 would fail on Cyrillic) ---
@@ -70,7 +69,7 @@ class Section:
     id: str
     name: str
     status: str
-    tasks: List[str]
+    tasks: list[str]
 
 
 def load_yaml() -> dict:
@@ -85,7 +84,7 @@ def render_markdown(data: dict) -> str:
     title = data.get("title", "").strip()
     updated = data.get("updated_utc", "").strip()
     sections = [Section(**s) for s in data.get("sections", [])]
-    out: List[str] = []
+    out: list[str] = []
     out.append(f"### Фаза 6.2 — {title}")
     if updated:
         out.append(f"> Оновлено: {updated}")

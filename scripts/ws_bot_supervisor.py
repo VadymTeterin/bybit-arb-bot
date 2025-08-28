@@ -13,7 +13,7 @@ import asyncio
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from dotenv import load_dotenv  # NEW
 from loguru import logger
@@ -27,7 +27,7 @@ from src.ws.health import MetricsRegistry
 load_dotenv(override=False)
 
 
-def _csv_list(x: Any) -> List[str]:
+def _csv_list(x: Any) -> list[str]:
     if x is None:
         return []
     if isinstance(x, (list, tuple)):
@@ -51,7 +51,7 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
-def _allowed_chat_id() -> Optional[int]:
+def _allowed_chat_id() -> int | None:
     cid = os.getenv("TELEGRAM__ALERT_CHAT_ID") or os.getenv("TELEGRAM__CHAT_ID") or ""
     cid = cid.strip()
     try:
@@ -60,7 +60,7 @@ def _allowed_chat_id() -> Optional[int]:
         return None
 
 
-def _get_token() -> Optional[str]:
+def _get_token() -> str | None:
     tok = os.getenv("TELEGRAM__BOT_TOKEN") or os.getenv("TELEGRAM__TOKEN") or ""
     tok = tok.strip()
     return tok or None
@@ -70,8 +70,8 @@ def _nested_bybit(s):
     by = getattr(s, "bybit", None)
     url_linear = None
     url_spot = None
-    topics_linear: List[str] = []
-    topics_spot: List[str] = []
+    topics_linear: list[str] = []
+    topics_spot: list[str] = []
     if by is not None:
         url_linear = getattr(by, "ws_public_url_linear", None)
         url_spot = getattr(by, "ws_public_url_spot", None)
@@ -89,7 +89,7 @@ def _nested_bybit(s):
     }
 
 
-async def ws_spot_loop(ws_url: str, topics: List[str], shared, metrics, debug):
+async def ws_spot_loop(ws_url: str, topics: list[str], shared, metrics, debug):
     bo = ExponentialBackoff(base=1.0, factor=2.0, cap=30.0)
     while True:
         try:
@@ -155,7 +155,7 @@ async def ws_spot_loop(ws_url: str, topics: List[str], shared, metrics, debug):
             await asyncio.sleep(delay)
 
 
-async def ws_linear_loop(ws_url: str, topics: List[str], shared, metrics, debug):
+async def ws_linear_loop(ws_url: str, topics: list[str], shared, metrics, debug):
     bo = ExponentialBackoff(base=1.0, factor=2.0, cap=30.0)
     while True:
         try:
@@ -233,8 +233,8 @@ async def meta_refresh_loop(shared, refresh_sec: int):
                     spot_rows = client.get_tickers("spot") or []
                     lin_rows = client.get_tickers("linear") or []
 
-                    def _vol_map(rows: List[Dict[str, Any]]) -> Dict[str, float]:
-                        m: Dict[str, float] = {}
+                    def _vol_map(rows: list[dict[str, Any]]) -> dict[str, float]:
+                        m: dict[str, float] = {}
                         for r in rows:
                             sym = r.get("symbol")
                             if not sym:
@@ -263,7 +263,7 @@ async def meta_refresh_loop(shared, refresh_sec: int):
             await asyncio.sleep(delay)
 
 
-async def bot_polling_loop(metrics, allow_chat: Optional[int]):
+async def bot_polling_loop(metrics, allow_chat: int | None):
     bo = ExponentialBackoff(base=1.0, factor=2.0, cap=30.0)
     token = _get_token()
     if not token:
@@ -357,7 +357,7 @@ async def main() -> None:
         "iter_ticker_entries": iter_ticker_entries,
     }
 
-    tasks: List[asyncio.Task] = []
+    tasks: list[asyncio.Task] = []
 
     if ws_enabled:
         if ws_cfg["url_spot"]:

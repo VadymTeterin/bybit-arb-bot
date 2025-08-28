@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any
 
 try:
     from loguru import logger  # type: ignore
@@ -102,7 +102,7 @@ def send_arbitrage_alert(signal: Any, enabled: bool = True) -> bool:
         return False
 
     # Build final text and send
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "symbol_spot": _to_str(symbol_spot),
         "symbol_linear": _to_str(symbol_linear),
         "spread_pct": spread_pct,

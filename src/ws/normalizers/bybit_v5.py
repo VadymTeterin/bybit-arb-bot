@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 BYBIT = "BYBIT"
 
@@ -30,9 +30,9 @@ class NormalizedEvent:
     symbol: str
     event: str
     ts_ms: int
-    data: Dict[str, Any]
+    data: dict[str, Any]
 
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> dict[str, Any]:
         return {
             "exchange": self.exchange,
             "channel": self.channel,
@@ -47,7 +47,7 @@ def _now_ms() -> int:
     return int(time.time() * 1000)
 
 
-def _parse_topic(topic: str) -> Tuple[str, str]:
+def _parse_topic(topic: str) -> tuple[str, str]:
     """Parse Bybit v5 topic into (channel, symbol).
 
     Examples:
@@ -74,7 +74,7 @@ def _parse_topic(topic: str) -> Tuple[str, str]:
     return (channel, symbol)
 
 
-def _event_type(raw: Dict[str, Any]) -> str:
+def _event_type(raw: dict[str, Any]) -> str:
     # Prefer explicit type field if present
     evt = str(raw.get("type", "")).lower()
     if evt in {"snapshot", "delta"}:
@@ -89,7 +89,7 @@ def _event_type(raw: Dict[str, Any]) -> str:
     return "unknown"
 
 
-def _ts_ms(raw: Dict[str, Any]) -> int:
+def _ts_ms(raw: dict[str, Any]) -> int:
     # Bybit often provides 'ts' or 'T' fields in ms; fall back to now.
     for key in ("ts", "T", "time", "sent_ts"):
         val = raw.get(key)
@@ -98,7 +98,7 @@ def _ts_ms(raw: Dict[str, Any]) -> int:
     return _now_ms()
 
 
-def normalize(raw: Dict[str, Any]) -> Dict[str, Any]:
+def normalize(raw: dict[str, Any]) -> dict[str, Any]:
     """Normalize a single Bybit WS message.
 
     The function is resilient to minor schema differences between channels.
@@ -118,7 +118,7 @@ def normalize(raw: Dict[str, Any]) -> Dict[str, Any]:
         # 'data' may be list with a single dict or a dict
         if isinstance(payload, list) and payload:
             payload = payload[0]
-        out: Dict[str, Any] = {
+        out: dict[str, Any] = {
             "last_price": _safe_float(_get_first(payload, "lastPrice", "last_price")),
             "index_price": _safe_float(_get_first(payload, "indexPrice", "index_price")),
             "mark_price": _safe_float(_get_first(payload, "markPrice", "mark_price")),
@@ -176,7 +176,7 @@ def _get_first(d: Any, *keys: str) -> Any:
     return None
 
 
-def _safe_float(x: Any) -> Optional[float]:
+def _safe_float(x: Any) -> float | None:
     try:
         if x is None:
             return None
@@ -185,7 +185,7 @@ def _safe_float(x: Any) -> Optional[float]:
         return None
 
 
-def _ab_row(row: Any) -> Dict[str, Optional[float]]:
+def _ab_row(row: Any) -> dict[str, float | None]:
     """Normalize an orderbook row.
 
     Accepts:

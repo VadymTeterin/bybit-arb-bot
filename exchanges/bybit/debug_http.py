@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable
 
 import httpx
 
@@ -10,9 +10,9 @@ from exchanges.common.redact import redact_headers, redact_json, redact_text
 
 
 def make_event_hooks(
-    logger: Optional[Callable[[str], None]] = None,
+    logger: Callable[[str], None] | None = None,
     include_body: bool = True,
-) -> Dict[str, List]:
+) -> dict[str, list]:
     """
     Повертає event_hooks для httpx.AsyncClient з редагуванням секретів.
     Використання:

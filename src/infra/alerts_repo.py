@@ -11,7 +11,6 @@ import os
 import sqlite3
 import threading
 import time
-from typing import Optional, Tuple
 
 try:
     from loguru import logger  # type: ignore
@@ -68,7 +67,7 @@ class SqliteAlertGateRepo:
             conn.commit()
 
     # ---- Public API ----
-    def get_last(self, symbol: str) -> Optional[Tuple[float, float]]:
+    def get_last(self, symbol: str) -> tuple[float, float] | None:
         sym = (symbol or "").upper().strip()
         if not sym:
             return None

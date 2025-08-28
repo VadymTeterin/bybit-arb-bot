@@ -13,7 +13,6 @@ import subprocess
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List
 from zoneinfo import ZoneInfo
 
 
@@ -25,19 +24,19 @@ class CommitItem:
     subject: str
 
 
-def run(cmd: List[str]) -> str:
+def run(cmd: list[str]) -> str:
     """Run a shell command and return stdout (stripped)."""
     res = subprocess.run(cmd, capture_output=True, text=True, check=True)
     return res.stdout.strip()
 
 
-def recent_commits(limit: int) -> List[CommitItem]:
+def recent_commits(limit: int) -> list[CommitItem]:
     """
     Collect recent commits using git. ISO date for easy parsing.
     """
     fmt = "%h|%ad|%an|%s"
     out = run(["git", "log", f"-n{limit}", f"--pretty=format:{fmt}", "--date=iso-strict"])
-    items: List[CommitItem] = []
+    items: list[CommitItem] = []
     for line in out.splitlines():
         parts = line.split("|", 3)
         if len(parts) != 4:
@@ -48,7 +47,7 @@ def recent_commits(limit: int) -> List[CommitItem]:
     return items
 
 
-def build_markdown(repo: str, branch: str, sha: str, commits: List[CommitItem]) -> str:
+def build_markdown(repo: str, branch: str, sha: str, commits: list[CommitItem]) -> str:
     """Render markdown digest."""
     now = datetime.now(ZoneInfo("Europe/Kyiv"))
     header = (
