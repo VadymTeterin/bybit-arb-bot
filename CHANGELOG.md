@@ -1,11 +1,13 @@
 ﻿## [6.2.5] - 2025-08-29
 
 ### Changed
-- IRM Phase 6.2.5 synced from SSOT (docs/irm.phase6.yaml  docs/IRM.md).
+- IRM Phase 6.2.5 synced from SSOT (docs/irm.phase6.yaml → docs/IRM.md).
 
 ### Tooling / Lint / CI
 - .gitattributes/.gitignore normalization; pre-commit/ruff/isort alignment; repo hygiene.
 - No runtime logic changes.
+
+
 # Changelog
 
 РЈСЃС– СЃСѓС‚С‚С”РІС– Р·РјС–РЅРё С†СЊРѕРіРѕ РїСЂРѕС”РєС‚Сѓ РґРѕРєСѓРјРµРЅС‚СѓСЋС‚СЊСЃСЏ С‚СѓС‚. Р¤РѕСЂРјР°С‚ вЂ” Р·Р° РїСЂРёРЅС†РёРїР°РјРё
