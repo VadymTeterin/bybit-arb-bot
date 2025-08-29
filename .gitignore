@@ -156,3 +156,9 @@ docs/IRM.view.md
 !.vscode/
 .vscode/*
 !.vscode/tasks.json
+*.egg-info/
+dist/
+build/
+.coverage*
+.audit_*
+.env*
