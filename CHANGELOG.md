@@ -1,16 +1,3 @@
-<<<<<<< HEAD
-﻿## [6.2.5] - 2025-08-29
-
-### Changed
-- IRM Phase 6.2.5 synced from SSOT (docs/irm.phase6.yaml → docs/IRM.md).
-
-### Tooling / Lint / CI
-- .gitattributes/.gitignore normalization; pre-commit/ruff/isort alignment; repo hygiene.
-- No runtime logic changes.
-
-
-=======
->>>>>>> parent of 379cc6d (docs(IRM): sync Phase 6.2.5 from SSOT; update CHANGELOG)
 # Changelog
 
 Усі суттєві зміни цього проєкту документуються тут. Формат — за принципами
