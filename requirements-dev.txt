@@ -1,6 +1,5 @@
-# Dev-only tools (pinned)
-ruff==0.5.7
-isort==5.13.2
-pytest==8.3.2
+﻿ruff==0.12.8
+pytest==8.4.1
 pytest-cov==5.0.0
 coverage==7.6.1
+types-requests==2.32.0.20250301
