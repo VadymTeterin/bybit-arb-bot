@@ -1,54 +1,66 @@
-
-# src/infra/alerts_repo.py
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Optional, Protocol, Tuple
+from dataclasses import dataclass, field
+from typing import Optional, Tuple
 
 from loguru import logger
 
 
-class AlertGateRepo(Protocol):
-    def get_last(self, symbol: str) -> Optional[Tuple[float, float]]: ...
-    def set_last(self, symbol: str, *, ts_epoch: float, basis_pct: float) -> None: ...
+class AlertGateRepo:
+    """Protocol-like base for alert persistence."""
+
+    def get_last(self, symbol: str) -> Optional[Tuple[float, float]]:  # (ts_epoch, basis_pct)
+        raise NotImplementedError
+
+    def set_last(self, symbol: str, *, ts_epoch: float, basis_pct: float) -> None:
+        raise NotImplementedError
 
 
 @dataclass
 class SqliteAlertGateRepo(AlertGateRepo):
-    db_path: str
+    """
+    Lightweight SQLite-backed storage for last alert per symbol.
+    Schema: alerts(symbol TEXT PRIMARY KEY, ts REAL, basis REAL)
+    """
+    path: str
+    _conn: sqlite3.Connection | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
-        # Ensure directory exists
-        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-        logger.debug("SqliteAlertGateRepo initialized: {}", self.db_path)
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                "CREATE TABLE IF NOT EXISTS alerts_last ("
-                "symbol TEXT PRIMARY KEY,"
-                "ts_epoch REAL NOT NULL,"
-                "basis_pct REAL NOT NULL"
-                ")"
+        self._conn = sqlite3.connect(self.path)
+        with self._conn:
+            self._conn.execute(
+                "CREATE TABLE IF NOT EXISTS alerts ("
+                "symbol TEXT PRIMARY KEY, "
+                "ts REAL NOT NULL, "
+                "basis REAL NOT NULL)"
             )
+        logger.debug(f"SqliteAlertGateRepo initialized: {self.path}")
+
+    @classmethod
+    def from_settings(cls, db_path: Optional[str] = None) -> "SqliteAlertGateRepo":
+        """
+        Convenience factory used by higher-level wiring.
+        If db_path is None, uses in-memory database (good for tests / defaults).
+        """
+        return cls(db_path or ":memory:")
+
+    # --- AlertGateRepo API -------------------------------------------------
 
     def get_last(self, symbol: str) -> Optional[Tuple[float, float]]:
-        with sqlite3.connect(self.db_path) as conn:
-            cur = conn.execute(
-                "SELECT ts_epoch, basis_pct FROM alerts_last WHERE symbol = ?",
-                (symbol,),
-            )
-            row = cur.fetchone()
-            if not row:
-                return None
-            ts_epoch, basis_pct = float(row[0]), float(row[1])
-            return ts_epoch, basis_pct
+        assert self._conn is not None
+        cur = self._conn.execute("SELECT ts, basis FROM alerts WHERE symbol = ?", (symbol,))
+        row = cur.fetchone()
+        if row is None:
+            return None
+        ts, basis = row
+        return float(ts), float(basis)
 
     def set_last(self, symbol: str, *, ts_epoch: float, basis_pct: float) -> None:
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute(
-                "INSERT INTO alerts_last(symbol, ts_epoch, basis_pct) VALUES(?, ?, ?) "
-                "ON CONFLICT(symbol) DO UPDATE SET ts_epoch = excluded.ts_epoch, basis_pct = excluded.basis_pct",
+        assert self._conn is not None
+        with self._conn:
+            self._conn.execute(
+                "INSERT INTO alerts(symbol, ts, basis) VALUES (?, ?, ?) "
+                "ON CONFLICT(symbol) DO UPDATE SET ts = excluded.ts, basis = excluded.basis",
                 (symbol, float(ts_epoch), float(basis_pct)),
             )
-            conn.commit()
