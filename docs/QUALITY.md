@@ -39,3 +39,118 @@
 - `docs/DoD.md` — визначення “готово” з анкорами для IRM.
 - `.github/PULL_REQUEST_TEMPLATE.md` — чекліст PR.
 - `.pre-commit-config.yaml`, `.ruff.toml`, `.isort.cfg`, `requirements-dev.txt` — конфіги якості.
+
+## КОРИСНІ КОМАНДИ
+
+> **Мітка:** ✅ Цей чат закрито: **2025-08-30 09:13**. Наступна перевірка QS: **2025-09-13**.
+
+## 1) Репозиторій та файлові політики
+- **.gitattributes**: LF для `*.py, *.md, *.yml, *.yaml, *.json, *.toml, *.sh`; CRLF для `*.ps1, *.cmd, *.bat`.
+- **.gitignore**: `__pycache__/`, `*.py[cod]`, `*.egg-info/`, `dist/`, `build/`, `.venv/`, `.pytest_cache/`, `htmlcov/`, `.coverage*`, `.mypy_cache/`, `logs/`, `*.log`, `.audit_*`, `.env*` (окрім `!.env.example`), `/IRM.md` (захист від кореневого дубля).
+- **Repo hygiene**: у репозиторії відсутні логи/бекапи/тимчасові/артефакти.
+
+
+```powershell
+git add --renormalize .
+pre-commit run --hook-stage manual -a
+# швидкий аудит найбільших файлів (tracked)
+git ls-files | % { gi $_ } | sort Length -desc | select -f 20 FullName,Length
+```
+
+---
+
+## 2) Лінт та форматування
+- **Ruff** (`ruff.toml`):
+  - `line-length = 120`
+  - `[lint].extend-select = ["E","F","B","W","UP"]`  (правило `I` вимкнено — сортування робить isort)
+- **isort** (`isort.cfg`):
+  - `profile = black`, `line_length = 120`
+  - `combine_as_imports = true`, `ensure_newline_before_comments = true`
+- **Форматування**: `ruff format`
+
+**Команди**
+```powershell
+pre-commit install
+ruff check --fix .
+ruff format .
+isort .
+```
+
+---
+
+## 3) IRM: SSOT та Генератор
+- **SSOT**: `docs/irm.phase6.yaml` (UTF‑8 **без BOM**, єдиний канонічний файл).
+- **Генератор**: `tools/irm_phase6_gen.py` → оновлює блок у `docs/IRM.md` між сентинелами
+  `<!-- IRM:BEGIN 6.2 --> … ` + "<!-- IRM:END 6.2 -->" + `.`
+- **CI/PR**: у PR запускається `--check` і блокує злиття, якщо `IRM.md` не синхронізований.
+
+**Команди**
+```powershell
+# одноразово залежність
+python -m pip install pyyaml
+
+# перевірити: чи IRM актуальний
+python .	ools\irm_phase6_gen.py --check
+
+# згенерувати/перезаписати
+python .	ools\irm_phase6_gen.py --write
+```
+
+---
+
+## 4) CHANGELOG
+- Ведеться вручну, **без автогенерації**. Кодування — UTF‑8 (LF). Не вносити кирилицю через несумісні редактори.
+
+---
+
+## 5) Кодування та рядки
+- Усі `*.md` / `*.yaml` — **UTF‑8 без BOM**.
+- VS Code: `".vscode/settings.json" → "files.encoding": "utf8"`.
+- Перевірка «кракозябри»:
+```powershell
+$moji = 'Ð|Ñ|Â|РРІС'
+Select-String -Path .\docs\IRM.md, .\docs\irm.phase6.yaml -Pattern $moji || Write-Host "OK"
+```
+
+---
+
+## 6) pre-commit (локально)
+Хуки: `trim trailing whitespace`, `end-of-file-fixer`, `mixed-line-ending`, `ruff`, `ruff-format`, `isort`.
+
+**Команди**
+```powershell
+python -m pip install pre-commit
+pre-commit install
+pre-commit run --hook-stage manual -a
+```
+
+---
+
+## 7) DoD для QS (перед PR)
+- [x] Відсутні логи/бекапи/тимчасові файли у репо.
+- [x] `.gitattributes`/`.gitignore` — коректні; `git add --renormalize .` — без дифу.
+- [x] `pre-commit run --hook-stage manual -a` — **Passed**.
+- [x] `python tools/irm_phase6_gen.py --check` — **IRM up-to-date**.
+- [x] Жодних збігів по «кракозябрі» у `IRM.md`/`irm.phase6.yaml`.
+- [x] Якщо були зміни в IRM — згенеровано `--write`, закомічено та запущені хуки.
+
+---
+
+## 8) Швидкий сценарій релізу IRM
+```powershell
+# генерація
+python .	ools\irm_phase6_gen.py --write
+
+# коміт
+git add .\docs\IRM.md .\docs\irm.phase6.yaml
+git commit -m "docs(IRM): regenerate from SSOT"
+
+# пуш і PR
+git push -u origin HEAD
+Start-Process "https://github.com/<owner>/<repo>/pull/new/$(git rev-parse --abbrev-ref HEAD)"
+```
+
+---
+
+### Примітка
+Цей документ — стабільна версія **QS v1.0** для проєкту *bybit-arb-bot*. Якщо з’являться нові вимоги — оновлюємо цей файл і комунікуємо в PR.
