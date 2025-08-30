@@ -120,6 +120,16 @@ _Статуси_: **todo** — ще не почато, **doing** — в робо
   - [ ] Repo hygiene: прибрано зайві файли/логи/бекапи; додано правила до .gitignore; перенесено dev/ → docs/dev/; додано ігнор для root IRM.md.
   - [ ] pre-commit manual stage: усі хуки проходять без змін.
 
+- [x] **6.2.6 — QS/mypy: alerts & telegram label; generator hygiene**  `status: done`
+  - [ ] fix(telegram): LABEL prefix: LABEL  у сповіщеннях; експорт send_telegram() для прямого виклику; сумісність з тестом tests/test_notify_telegram_label.py.
+  - [ ] fix(alerts): уніфіковано API AlertGate/SqliteAlertGateRepo: commit(), should_send(), normalized reasons (cooldown, suppressed-by-eps, Δbasis_…).
+  - [ ] chore(dev): додано types-requests для mypy; приведено дотичні модулі до mypy clean.
+  - [ ] refactor: легкий mypy/ruff clean у змінених файлах (без зміни бізнес-логіки).
+  - [ ] mypy clean: src/core/alerts_gate.py, src/infra/alerts_repo.py, src/infra/notify_telegram.py, src/core/alerts_hook.py.
+  - [ ] pytest -q: тестові набори alerts/tg/ws — 10/10 passed; повний прогін: 144 passed, 1 skipped.
+  - [ ] pre-commit OK (ruff, ruff-format, isort, whitespace hooks).
+  - [ ] WA: виконано на тимчасовій гілці; один-крок-за-раз; мінімальний ризик — лише формат повідомлень TG.
+
 <!-- IRM:END 6.2 -->
 
 ### Фаза 6.3 — Історія (SQLite) та фільтри ліквідності
