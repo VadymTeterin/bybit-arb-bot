@@ -127,3 +127,5 @@ class AlertGate:
     def commit(self, symbol: str, basis_pct: float, ts: datetime) -> None:
         ts = _to_utc(ts)
         self._store_last(symbol, _LastEvent(ts_epoch=ts.timestamp(), basis_pct=float(basis_pct)))
+# Back-compat alias for older imports
+AlertsGate = AlertGate
