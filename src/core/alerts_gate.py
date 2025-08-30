@@ -1,129 +1,107 @@
-"""
-AlertGate (Step 6.3.4) — cooldown + suppression
-
-Semantics (v2):
-  - Cooldown blocks ANY repeat alert for the same symbol within `cooldown_sec`.
-  - Suppression of near-duplicate basis is applied **only while cooldown is active**.
-    Rationale: after cooldown expires we allow a new alert, even for a small Δbasis,
-    to keep the channel updated at a human pace.
-
-Persistence adapter (optional):
-  repo.get_last(symbol) -> tuple[float, float] | None        # (ts_epoch, basis_pct)
-  repo.set_last(symbol, ts_epoch: float, basis_pct: float) -> None
-"""
-
+# src/core/alerts_gate.py
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional, Tuple
 
-try:
-    from loguru import logger  # type: ignore
-except Exception:  # pragma: no cover
-    import logging
+import logging
 
-    logger = logging.getLogger(__name__)
+log: logging.Logger = logging.getLogger(__name__)
 
 
-def _to_utc(ts: datetime) -> datetime:
-    """Ensure datetime is timezone-aware (UTC)."""
-    if ts.tzinfo is None:
-        return ts.replace(tzinfo=timezone.utc)
-    return ts.astimezone(timezone.utc)
-
-
-@dataclass
-class _LastEvent:
-    ts_epoch: float
-    basis_pct: float
-
-
+@dataclass(slots=True)
 class AlertGate:
-    """Cooldown + suppression gate per trading symbol."""
+    """
+    Рішальник, чи надсилати алерт по символу.
+    Правила (узгоджено з тестами):
+    - Перший алерт по символу дозволено завжди.
+    - Якщо активний cooldown (ts_now - ts_last < cooldown_sec), повторні алерти блокуються.
+    - Додатково, поки триває cooldown і час з останнього алерта всередині suppress_window_min,
+      дрібні зміни (Δbasis < suppress_eps_pct, у відсоткових пунктах) теж придушуються.
+      У цьому випадку reason повинен містити підрядок 'Δbasis'.
+    - Поза cooldown або поза suppress_window_min — правило придушення за епсилоном не діє.
+    """
 
-    def __init__(
-        self,
-        cooldown_sec: int = 300,
-        suppress_eps_pct: float = 0.2,
-        suppress_window_min: int = 15,
-        repo: object | None = None,
-    ) -> None:
-        """
-        :param cooldown_sec: Minimal seconds between alerts for the same symbol.
-        :param suppress_eps_pct: Suppress if |Δbasis| < this (percentage points).
-        :param suppress_window_min: Compare with last alert within this window (minutes) —
-                                    but ONLY while cooldown is active.
-        :param repo: Optional persistence adapter with (get_last, set_last) API.
-        """
-        self.cooldown_sec = int(max(0, cooldown_sec))
-        self.suppress_eps_pct = float(max(0.0, suppress_eps_pct))
-        self.suppress_window_min = int(max(0, suppress_window_min))
-        self.repo = repo
-        self._mem: dict[str, _LastEvent] = {}
+    cooldown_sec: int
+    suppress_eps_pct: float
+    suppress_window_min: int
+    repo: Optional["AlertGateRepo"] = None
 
-    @classmethod
-    def from_settings(cls, settings) -> AlertGate:
-        a = settings.alerts
-        return cls(
-            cooldown_sec=int(getattr(a, "cooldown_sec", 300)),
-            suppress_eps_pct=float(getattr(a, "suppress_eps_pct", 0.2)),
-            suppress_window_min=int(getattr(a, "suppress_window_min", 15)),
-        )
+    _mem: Dict[str, Tuple[float, float]] = field(default_factory=dict, init=False, repr=False)
 
-    # ---------- persistence helpers ----------
+    # --------- API ---------
 
-    def _load_last(self, symbol: str) -> _LastEvent | None:
-        if symbol in self._mem:
-            return self._mem[symbol]
-        if self.repo and hasattr(self.repo, "get_last"):
-            try:
-                rec = self.repo.get_last(symbol)
-                if rec:
-                    ev = _LastEvent(ts_epoch=float(rec[0]), basis_pct=float(rec[1]))
-                    self._mem[symbol] = ev
-                    return ev
-            except Exception as e:  # pragma: no cover
-                logger.warning("AlertGate repo.get_last failed for %s: %s", symbol, e)
-        return None
+    def should_send(self, symbol: str, *, basis_pct: float, ts: datetime) -> Tuple[bool, str]:
+        last = self._get_last(symbol)
+        if not last:
+            return True, "first"
 
-    def _store_last(self, symbol: str, ev: _LastEvent) -> None:
-        self._mem[symbol] = ev
-        if self.repo and hasattr(self.repo, "set_last"):
-            try:
-                self.repo.set_last(symbol, ev.ts_epoch, ev.basis_pct)
-            except Exception as e:  # pragma: no cover
-                logger.warning("AlertGate repo.set_last failed for %s: %s", symbol, e)
+        last_ts, last_basis = last
+        now_epoch = _to_epoch(ts)
+        elapsed = max(0.0, now_epoch - last_ts)
 
-    # ---------- public API ----------
+        reasons: list[str] = []
+        in_cooldown = self.cooldown_sec > 0 and elapsed < self.cooldown_sec
+        if in_cooldown:
+            reasons.append("cooldown")
+            in_window = elapsed <= self.suppress_window_min * 60
+            if in_window and self.suppress_eps_pct > 0.0:
+                delta = abs(float(basis_pct) - float(last_basis))
+                if delta < self.suppress_eps_pct:
+                    # ключове — включити маркер 'Δbasis' у reason
+                    reasons.append(f"Δbasis={delta:.2f}pp<thr={self.suppress_eps_pct:.2f}pp")
 
-    def should_send(self, symbol: str, basis_pct: float, ts: datetime) -> tuple[bool, str]:
-        """Decide whether an alert should be sent."""
-        ts = _to_utc(ts)
-        t_epoch = ts.timestamp()
+        if reasons:
+            return False, ";".join(reasons)
 
-        last = self._load_last(symbol)
-        if last is None:
-            return True, ""
-
-        dt = t_epoch - last.ts_epoch
-        # 1) Cooldown check
-        if self.cooldown_sec > 0 and dt < self.cooldown_sec:
-            # 2) Suppression only while cooldown is active
-            if self.suppress_window_min > 0 and dt <= self.suppress_window_min * 60:
-                delta_pp = abs(float(basis_pct) - last.basis_pct)
-                if delta_pp < self.suppress_eps_pct:
-                    return False, (
-                        f"suppress: |Δbasis|={delta_pp:.4f}pp < eps={self.suppress_eps_pct:.4f}pp "
-                        f"within cooldown ({self.suppress_window_min}min window)"
-                    )
-            return (
-                False,
-                f"cooldown({self.cooldown_sec}s) active; last at {last.ts_epoch:.0f}",
-            )
-
-        # after cooldown -> allowed (regardless of small delta)
-        return True, ""
+        return True, "ok"
 
     def commit(self, symbol: str, basis_pct: float, ts: datetime) -> None:
-        ts = _to_utc(ts)
-        self._store_last(symbol, _LastEvent(ts_epoch=ts.timestamp(), basis_pct=float(basis_pct)))
+        ts_epoch = _to_epoch(ts)
+        if self.repo is not None:
+            self.repo.set_last(symbol, ts_epoch=ts_epoch, basis_pct=basis_pct)
+        else:
+            self._mem[symbol] = (ts_epoch, float(basis_pct))
+        log.debug("AlertGate: commit %r at %s", symbol, datetime.fromtimestamp(ts_epoch, tz=timezone.utc).isoformat())
+
+    # --------- helpers ---------
+
+    def _get_last(self, symbol: str) -> Optional[Tuple[float, float]]:
+        if self.repo is not None:
+            return self.repo.get_last(symbol)
+        return self._mem.get(symbol)
+
+    # --------- factories ---------
+
+    @classmethod
+    def from_settings(cls, settings: Any, *, repo: Optional["AlertGateRepo"] = None) -> "AlertGate":
+        """
+        Безпечна фабрика: читає поля з налаштувань, але не вимагає їх обов'язкової наявності.
+        """
+        cooldown = int(getattr(settings, "alerts_cooldown_sec", getattr(settings, "cooldown_sec", 0)) or 0)
+        eps = float(getattr(settings, "alerts_suppress_eps_pct", getattr(settings, "suppress_eps_pct", 0.0)) or 0.0)
+        window_min = int(getattr(settings, "alerts_suppress_window_min", getattr(settings, "suppress_window_min", 0)) or 0)
+        if repo is None:
+            try:
+                from src.infra.alerts_repo import SqliteAlertGateRepo  # local import to avoid heavy deps at type-time
+                repo = SqliteAlertGateRepo.from_settings(settings)
+            except Exception:
+                repo = None
+        return cls(cooldown_sec=cooldown, suppress_eps_pct=eps, suppress_window_min=window_min, repo=repo)
+
+
+# Protocol is only needed for typing; we import it lazily above as well
+try:
+    from typing import Protocol
+    class AlertGateRepo(Protocol):
+        def get_last(self, symbol: str) -> Optional[Tuple[float, float]]: ...
+        def set_last(self, symbol: str, *, ts_epoch: float, basis_pct: float) -> None: ...
+except Exception:  # pragma: no cover - mypy/typing fallback
+    AlertGateRepo = object  # type: ignore[misc]
+
+
+def _to_epoch(ts: datetime) -> float:
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return ts.timestamp()
