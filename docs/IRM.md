@@ -75,44 +75,50 @@
 - [ ] 6.1.2 DOCX-експорт для дайджесту — planned.
 - [ ] 6.1.3 Аналітика дайджестів (тижд./місячні агрегати) — planned.
 <!-- IRM:BEGIN 6.2 -->
-### Фаза 6.2 — SSOT-lite (Р°РІС‚РѕРјР°С‚РёР·Р°С†С–СЏ IRM)
-> Оновлено: 2025-08-29T11:39:14Z
+### Фаза 6.2 — SSOT-lite (автоматизація IRM)
+> Оновлено: 2025-08-27T00:00:00Z
 
-_Статуси_: **todo** — С‰Рµ РЅРµ РїРѕС‡Р°С‚Рѕ, **doing** — РІ СЂРѕР±РѕС‚С–, **done** — Р·Р°РІРµСЂС€РµРЅРѕ, **blocked** — Р·Р°Р±Р»РѕРєРѕРІР°РЅРѕ
+_Статуси_: **todo** — ще не почато, **doing** — в роботі, **done** — завершено, **blocked** — заблоковано
 
-- [x] **6.2.0 — РљР°СЂРєР°СЃ SSOT-lite (YAML + РіРµРЅРµСЂР°С‚РѕСЂ + CI)**  `status: done`
-  - [ ] РЎС‚РІРѕСЂРµРЅРѕ docs/irm.phase6.yaml
-  - [ ] Р”РѕРґР°РЅРѕ tools/irm_phase6_gen.py
-  - [ ] РќР°Р»Р°С€С‚РѕРІР°РЅРѕ .github/workflows/irm_phase6_sync.yml
+- [x] **6.2.0 — Каркас SSOT-lite (YAML + генератор + CI)**  `status: done`
+  - [ ] Створено docs/irm.phase6.yaml
+  - [ ] Додано tools/irm_phase6_gen.py
+  - [ ] Налаштовано .github/workflows/irm_phase6_sync.yml
 
-- [x] **6.2.1 — Р†РЅС‚РµРіСЂР°С†С–СЏ Р· docs/IRM.md (СЃРµРЅС‚РёРЅРµР»Рё)**  `status: done`
-  - [ ] Р”РѕРґР°С‚Рё/РїРµСЂРµРІС–СЂРёС‚Рё Р±Р»РѕРє <!-- IRM:BEGIN 6.2 --> вЂ¦ <!-- IRM:END 6.2 -->
-  - [ ] Р“РµРЅРµСЂСѓРІР°С‚Рё СЃРµРєС†С–СЋ Р· YAML
+- [x] **6.2.1 — Інтеграція з docs/IRM.md (сентинели)**  `status: done`
+  - [ ] Додати/перевірити блок <!-- IRM:BEGIN 6.2 --> … <!-- IRM:END 6.2 -->
+  - [ ] Генерувати секцію з YAML
 
-- [x] **6.2.2 — РџРµСЂРµРІС–СЂРєРё Сѓ PR (--check)**  `status: done`
-  - [ ] GitHub Actions Р·Р°РїСѓСЃРєР°С” РіРµРЅРµСЂР°С‚РѕСЂ Сѓ СЂРµР¶РёРјС– --check
-  - [ ] PR С„РµР№Р»РёС‚СЊСЃСЏ, СЏРєС‰Рѕ IRM РЅРµ СЃРёРЅС…СЂРѕРЅС–Р·РѕРІР°РЅРёР№
+- [x] **6.2.2 — Перевірки у PR (--check)**  `status: done`
+  - [ ] GitHub Actions запускає генератор у режимі --check
+  - [ ] PR фейлиться, якщо IRM не синхронізований
 
-- [x] **6.2.3 — Р СѓС‡РЅРµ РѕРЅРѕРІР»РµРЅРЅСЏ (--write)**  `status: done`
-  - [ ] РњРѕР¶Р»РёРІС–СЃС‚СЊ Р»РѕРєР°Р»СЊРЅРѕ Р·Р°РїСѓСЃРєР°С‚Рё РѕРЅРѕРІР»РµРЅРЅСЏ IRM
-  - [ ] Р”РѕРґР°С‚Рё ops-РЅРѕС‚Сѓ РІ README
+- [x] **6.2.3 — Ручне оновлення (--write)**  `status: done`
+  - [ ] Можливість локально запускати оновлення IRM
+  - [ ] Додати ops-ноту в README
 
 - [x] **6.2.4 — QS v1.0 + README + CI + CHANGELOG (Quality Gate)**  `status: done`
-  - [ ] Р”РѕРґР°РЅРѕ docs/QUALITY.md (QS v1.0, СѓР·РіРѕРґР¶РµРЅРѕ Р· WA v2.0)
-  - [ ] Р”РѕРґР°РЅРѕ docs/DoD.md (Definition of Done)
-  - [ ] Р”РѕРґР°РЅРѕ docs/TESTING.md (Testing Guide)
-  - [ ] Р”РѕРґР°РЅРѕ docs/Plan_bezpechnogo_vprovadzhennya_po_etapakh.md (Safe Rollout Plan)
-  - [ ] Р”РѕРґР°РЅРѕ .github/PULL_REQUEST_TEMPLATE.md (С€Р°Р±Р»РѕРЅ PR)
-  - [ ] Р”РѕРґР°РЅРѕ ruff.toml, isort.cfg, pre-commit-config.yaml, requirements-dev.txt (tooling РЅР° РєРѕСЂРµРЅС–)
-  - [ ] РћРЅРѕРІР»РµРЅРѕ README.md: СЂРѕР·РґС–Р» 'Quality & Delivery Standards' (РїРѕСЃРёР»Р°РЅРЅСЏ РЅР° QS/DoD/Testing/Plan), PR #40
-  - [ ] РћРЅРѕРІР»РµРЅРѕ .github/workflows/ci.yml: PR вЂ” pre-commit С‚С–Р»СЊРєРё РїРѕ Р·РјС–РЅРµРЅРёС… С„Р°Р№Р»Р°С…; push вЂ” --all-files, PR #39
-  - [ ] РћРЅРѕРІР»РµРЅРѕ CHANGELOG: СЃРµРєС†С–СЏ [Unreleased] Сѓ С‚Р°Р±Р»РёС‡РЅРѕРјСѓ С„РѕСЂРјР°С‚С– (QS/README/CI)
+  - [ ] Додано docs/QUALITY.md (QS v1.0, узгоджено з WA v2.0)
+  - [ ] Додано docs/DoD.md (Definition of Done)
+  - [ ] Додано docs/TESTING.md (Testing Guide)
+  - [ ] Додано docs/Plan_bezpechnogo_vprovadzhennya_po_etapakh.md (Safe Rollout Plan)
+  - [ ] Додано .github/PULL_REQUEST_TEMPLATE.md (шаблон PR)
+  - [ ] Додано ruff.toml, isort.cfg, pre-commit-config.yaml, requirements-dev.txt (tooling на корені)
+  - [ ] Оновлено README.md: розділ 'Quality & Delivery Standards' (посилання на QS/DoD/Testing/Plan), PR #40
+  - [ ] Оновлено .github/workflows/ci.yml: PR — pre-commit тільки по змінених файлах; push — --all-files, PR #39
+  - [ ] Оновлено CHANGELOG: секція [Unreleased] у табличному форматі (QS/README/CI)
 
 - [x] **6.2.5 — Реліз 6.2.5 — IRM sync + repo hygiene**  `status: done`
   - [ ] Синхронізовано IRM 6.2.5 з SSOT (docs/irm.phase6.yaml  docs/IRM.md)
   - [ ] CHANGELOG: секція 6.2.5 (без змін у runtime-логіці)
   - [ ] Нормалізовано .gitattributes/.gitignore; узгоджено pre-commit/Ruff/isort
   - [ ] Жодних змін у виконуваній логіці
+  - [ ] Нормалізовано line-endings через .gitattributes (LF для коду; CRLF для Windows-скриптів); виконано git add --renormalize.
+  - [ ] Уніфіковано pre-commit конфіг: лишено .pre-commit-config.yaml; hook isort оновлено до 6.0.1.
+  - [ ] Налаштовано isort (black profile, line_length=120); Ruff: перенесено extend-select у [lint], line-length=120, вимкнено I (import sorting).
+  - [ ] Масовий autofix код-стилю (ruff-format, pyupgrade до PEP 604, isort); без зміни логіки.
+  - [ ] Repo hygiene: прибрано зайві файли/логи/бекапи; додано правила до .gitignore; перенесено dev/ → docs/dev/; додано ігнор для root IRM.md.
+  - [ ] pre-commit manual stage: усі хуки проходять без змін.
 
 <!-- IRM:END 6.2 -->
 
