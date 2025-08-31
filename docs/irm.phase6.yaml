@@ -1,78 +1,98 @@
-﻿phase: "6.2"
-title: "SSOT-lite (автоматизація IRM)"
-updated_utc: "2025-08-27T00:00:00Z"
+phase: '6.2'
+title: SSOT-lite (автоматизація IRM)
+updated_utc: '2025-08-27T00:00:00Z'
 status_legend:
-  todo: "ще не почато"
-  doing: "в роботі"
-  done: "завершено"
-  blocked: "заблоковано"
+  todo: ще не почато
+  doing: в роботі
+  done: завершено
+  blocked: заблоковано
 sections:
-  - id: "6.2.0"
-    name: "Каркас SSOT-lite (YAML + генератор + CI)"
-    status: "done"
-    tasks:
-      - "Створено docs/irm.phase6.yaml"
-      - "Додано tools/irm_phase6_gen.py"
-      - "Налаштовано .github/workflows/irm_phase6_sync.yml"
-  - id: "6.2.1"
-    name: "Інтеграція з docs/IRM.md (сентинели)"
-    status: "done"
-    tasks:
-      - "Додати/перевірити блок <!-- IRM:BEGIN 6.2 --> … <!-- IRM:END 6.2 -->"
-      - "Генерувати секцію з YAML"
-  - id: "6.2.2"
-    name: "Перевірки у PR (--check)"
-    status: "done"
-    tasks:
-      - "GitHub Actions запускає генератор у режимі --check"
-      - "PR фейлиться, якщо IRM не синхронізований"
-  - id: "6.2.3"
-    name: "Ручне оновлення (--write)"
-    status: "done"
-    tasks:
-      - "Можливість локально запускати оновлення IRM"
-      - "Додати ops-ноту в README"
-  - id: "6.2.4"
-    name: "QS v1.0 + README + CI + CHANGELOG (Quality Gate)"
-    status: "done"
-    tasks:
-      - "Додано docs/QUALITY.md (QS v1.0, узгоджено з WA v2.0)"
-      - "Додано docs/DoD.md (Definition of Done)"
-      - "Додано docs/TESTING.md (Testing Guide)"
-      - "Додано docs/Plan_bezpechnogo_vprovadzhennya_po_etapakh.md (Safe Rollout Plan)"
-      - "Додано .github/PULL_REQUEST_TEMPLATE.md (шаблон PR)"
-      - "Додано ruff.toml, isort.cfg, pre-commit-config.yaml, requirements-dev.txt (tooling на корені)"
-      - "Оновлено README.md: розділ 'Quality & Delivery Standards' (посилання на QS/DoD/Testing/Plan), PR #40"
-      - "Оновлено .github/workflows/ci.yml: PR — pre-commit тільки по змінених файлах; push — --all-files, PR #39"
-      - "Оновлено CHANGELOG: секція [Unreleased] у табличному форматі (QS/README/CI)"
-  - id: "6.2.5"
-    name: "Реліз 6.2.5 — IRM sync + repo hygiene"
-    status: "done"
-    tasks:
-      - "Синхронізовано IRM 6.2.5 з SSOT (docs/irm.phase6.yaml  docs/IRM.md)"
-      - "CHANGELOG: секція 6.2.5 (без змін у runtime-логіці)"
-      - "Нормалізовано .gitattributes/.gitignore; узгоджено pre-commit/Ruff/isort"
-      - "Жодних змін у виконуваній логіці"
-      - Нормалізовано line-endings через .gitattributes (LF для коду; CRLF для Windows-скриптів);
-        виконано git add --renormalize.
-      - 'Уніфіковано pre-commit конфіг: лишено .pre-commit-config.yaml; hook isort оновлено
-        до 6.0.1.'
-      - 'Налаштовано isort (black profile, line_length=120); Ruff: перенесено extend-select
-        у [lint], line-length=120, вимкнено I (import sorting).'
-      - Масовий autofix код-стилю (ruff-format, pyupgrade до PEP 604, isort); без зміни
-        логіки.
-      - 'Repo hygiene: прибрано зайві файли/логи/бекапи; додано правила до .gitignore;
-        перенесено dev/ → docs/dev/; додано ігнор для root IRM.md.'
-      - 'pre-commit manual stage: усі хуки проходять без змін.'
-  - id: "6.2.6"
-    name: "QS/mypy: alerts & telegram label; generator hygiene"
-    status: "done"
-    tasks:
-      - "fix(telegram): LABEL prefix: LABEL  у сповіщеннях; експорт send_telegram() для прямого виклику; сумісність з тестом tests/test_notify_telegram_label.py."
-      - "fix(alerts): уніфіковано API AlertGate/SqliteAlertGateRepo: commit(), should_send(), normalized reasons (cooldown, suppressed-by-eps, Δbasis_…)."
-      - "chore(dev): додано types-requests для mypy; приведено дотичні модулі до mypy clean."
-      - "refactor: легкий mypy/ruff clean у змінених файлах (без зміни бізнес-логіки)."
-      - "mypy clean: src/core/alerts_gate.py, src/infra/alerts_repo.py, src/infra/notify_telegram.py, src/core/alerts_hook.py."
-      - "pytest -q: тестові набори alerts/tg/ws — 10/10 passed; повний прогін: 144 passed, 1 skipped."
-      - "pre-commit OK (ruff, ruff-format, isort, whitespace hooks)."
-      - "WA: виконано на тимчасовій гілці; один-крок-за-раз; мінімальний ризик — лише формат повідомлень TG."
+- id: 6.2.0
+  name: Каркас SSOT-lite (YAML + генератор + CI)
+  status: done
+  tasks:
+  - Створено docs/irm.phase6.yaml
+  - Додано tools/irm_phase6_gen.py
+  - Налаштовано .github/workflows/irm_phase6_sync.yml
+- id: 6.2.1
+  name: Інтеграція з docs/IRM.md (сентинели)
+  status: done
+  tasks:
+  - Додати/перевірити блок <!-- IRM:BEGIN 6.2 --> … <!-- IRM:END 6.2 -->
+  - Генерувати секцію з YAML
+- id: 6.2.2
+  name: Перевірки у PR (--check)
+  status: done
+  tasks:
+  - GitHub Actions запускає генератор у режимі --check
+  - PR фейлиться, якщо IRM не синхронізований
+- id: 6.2.3
+  name: Ручне оновлення (--write)
+  status: done
+  tasks:
+  - Можливість локально запускати оновлення IRM
+  - Додати ops-ноту в README
+- id: 6.2.4
+  name: QS v1.0 + README + CI + CHANGELOG (Quality Gate)
+  status: done
+  tasks:
+  - Додано docs/QUALITY.md (QS v1.0, узгоджено з WA v2.0)
+  - Додано docs/DoD.md (Definition of Done)
+  - Додано docs/TESTING.md (Testing Guide)
+  - Додано docs/Plan_bezpechnogo_vprovadzhennya_po_etapakh.md (Safe Rollout Plan)
+  - Додано .github/PULL_REQUEST_TEMPLATE.md (шаблон PR)
+  - Додано ruff.toml, isort.cfg, pre-commit-config.yaml, requirements-dev.txt (tooling
+    на корені)
+  - 'Оновлено README.md: розділ ''Quality & Delivery Standards'' (посилання на QS/DoD/Testing/Plan),
+    PR #40'
+  - 'Оновлено .github/workflows/ci.yml: PR — pre-commit тільки по змінених файлах;
+    push — --all-files, PR #39'
+  - 'Оновлено CHANGELOG: секція [Unreleased] у табличному форматі (QS/README/CI)'    
+- id: 6.2.5
+  name: Реліз 6.2.5 — IRM sync + repo hygiene
+  status: done
+  tasks:
+  - Синхронізовано IRM 6.2.5 з SSOT (docs/irm.phase6.yaml  docs/IRM.md)
+  - 'CHANGELOG: секція 6.2.5 (без змін у runtime-логіці)'
+  - Нормалізовано .gitattributes/.gitignore; узгоджено pre-commit/Ruff/isort
+  - Жодних змін у виконуваній логіці
+  - Нормалізовано line-endings через .gitattributes (LF для коду; CRLF для Windows-скриптів);
+    виконано git add --renormalize.
+  - 'Уніфіковано pre-commit конфіг: лишено .pre-commit-config.yaml; hook isort оновлено
+    до 6.0.1.'
+  - 'Налаштовано isort (black profile, line_length=120); Ruff: перенесено extend-select
+    у [lint], line-length=120, вимкнено I (import sorting).'
+  - Масовий autofix код-стилю (ruff-format, pyupgrade до PEP 604, isort); без зміни
+    логіки.
+  - 'Repo hygiene: прибрано зайві файли/логи/бекапи; додано правила до .gitignore;
+    перенесено dev/ → docs/dev/; додано ігнор для root IRM.md.'
+  - 'pre-commit manual stage: усі хуки проходять без змін.'
+- id: 6.2.6
+  name: 'QS/mypy: alerts & telegram label; generator hygiene'
+  status: done
+  tasks:
+  - 'fix(telegram): LABEL prefix: LABEL  у сповіщеннях; експорт send_telegram() для
+    прямого виклику; сумісність з тестом tests/test_notify_telegram_label.py.'
+  - 'fix(alerts): уніфіковано API AlertGate/SqliteAlertGateRepo: commit(), should_send(),
+    normalized reasons (cooldown, suppressed-by-eps, Δbasis_…).'
+  - 'chore(dev): додано types-requests для mypy; приведено дотичні модулі до mypy
+    clean.'
+  - 'refactor: легкий mypy/ruff clean у змінених файлах (без зміни бізнес-логіки).'
+  - 'mypy clean: src/core/alerts_gate.py, src/infra/alerts_repo.py, src/infra/notify_telegram.py,
+    src/core/alerts_hook.py.'
+  - 'pytest -q: тестові набори alerts/tg/ws — 10/10 passed; повний прогін: 144 passed,
+    1 skipped.'
+  - pre-commit OK (ruff, ruff-format, isort, whitespace hooks).
+  - 'WA: виконано на тимчасовій гілці; один-крок-за-раз; мінімальний ризик — лише
+    формат повідомлень TG.'
+- id: 6.2.7
+  name: WS hardening (QS P0)
+  status: done
+  tasks:   
+    - Unified exponential backoff with jitter in WS-layer (shared module).
+    - Bybit WS client now uses shared backoff; removed duplicates.
+    - Typing pass (mypy green) for src/ws/* and exchanges/bybit/ws.py.
+    - Added jitter/backoff tests; WS coverage achieved 88%.
+    - IRM SSOT-lite for 6.2 left unchanged; this entry records WS QS step.
+
+updated_at: '2025-08-31'

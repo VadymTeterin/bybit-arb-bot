@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import json
-import random
 from collections.abc import Awaitable, Iterable, Iterator
-from typing import Callable, Protocol
+from typing import Any, Callable, Protocol
 
 import aiohttp
 
 # Reconnect/backoff helpers (project-wide, exchange-agnostic)
 from src.ws.reconnect import ReconnectPolicy
+
+# Unified backoff (with jitter) from WS package
+from src.ws.backoff import exp_backoff_with_jitter_compat as _exp_backoff_with_jitter_compat
 
 # Health metrics (optional singleton). If unavailable, we no-op.
 try:
@@ -38,7 +40,7 @@ except Exception:  # pragma: no cover
     logger = logging.getLogger("bybit.ws")
 
 
-# ---- Legacy-compatible exponential backoff with jitter --------------
+# ---- Backward-compat alias for legacy imports -----------------------
 def exp_backoff_with_jitter(
     attempt: int,
     *,
@@ -46,48 +48,33 @@ def exp_backoff_with_jitter(
     factor: float = 2.0,
     cap: float | None = None,
     max_delay: float | None = None,
-    jitter: float = 0.1,
+    jitter: float = 0.10,
 ) -> float:
-    """
-    Legacy-compatible exponential backoff with jitter.
-
-    - Tests may call with 'cap=' -> accept as alias for max delay.
-    - attempt is 1-based: attempt=1 -> base, attempt=2 -> base*factor, ...
-    - Never overshoot the unclamped target after jitter (upper clamp).
-    """
-    # Resolve cap/max_delay to a single upper bound
-    if cap is not None and max_delay is not None:
-        max_d = min(cap, max_delay)
-    else:
-        max_d = cap if cap is not None else (max_delay if max_delay is not None else float("inf"))
-
-    k = max(0, int(attempt) - 1)  # 1-based -> 0-based exponent
-    nominal = base * (factor**k)
-    clipped = min(max_d, nominal)
-
-    span = max(0.0, jitter) * clipped
-    jittered = clipped + random.uniform(-span, span)
-
-    # do not exceed unclamped target after jitter
-    delay = min(clipped, jittered)
-    return max(0.0, delay)
+    return _exp_backoff_with_jitter_compat(
+        attempt,
+        base=base,
+        factor=factor,
+        cap=cap,
+        max_delay=max_delay,
+        jitter=jitter,
+    )
 
 
 # ---- Parsing helpers -------------------------------------------------
-def _to_float(v: object, default: float | None = None) -> float | None:
+def _to_float(v: Any, default: float | None = None) -> float | None:
     """Try to convert arbitrary value to float; return default if impossible."""
     if v is None:
         return default
     try:
-        return float(v)  # fast path (floats/ints/str-numeric)
+        if isinstance(v, (int, float)):
+            return float(v)
+        s = str(v).strip()
+        return float(s)
     except Exception:
-        try:
-            return float(str(v).strip())
-        except Exception:
-            return default
+        return default
 
 
-def _from_scaled(v: object, scale: int) -> float | None:
+def _from_scaled(v: Any, scale: int) -> float | None:
     """
     Convert scaled integers (E4/E8 etc.) to float.
     Example: 345678901 with scale=4 => 34567.8901
@@ -240,16 +227,15 @@ class BybitPublicWS:
                                 ):
                                     continue
 
-                                # Health metrics (optional)
+                                # Health metrics (optional, must never break loop)
                                 try:
-                                    if MetricsRegistry and self._metrics_source:
+                                    if MetricsRegistry is not None and self._metrics_source is not None:
                                         reg = MetricsRegistry.get()
                                         if self._metrics_source == "SPOT":
                                             reg.inc_spot(1)
                                         elif self._metrics_source == "LINEAR":
                                             reg.inc_linear(1)
                                 except Exception:
-                                    # metrics must never break the WS loop
                                     pass
 
                                 await on_message(payload)
