@@ -11,6 +11,24 @@
 
 ## [Unreleased]
 
+## [6.2.7] — 2025-08-31
+**Phase 6 — Step-6.2.7 · WS hardening (QS P0)**
+
+### Added
+- Unified exponential backoff with jitter in WS-layer (`src/ws/backoff.py`).
+
+### Changed
+- Removed duplicated backoff code from Bybit WS client — now uses shared WS backoff module (`src/exchanges/bybit/ws.py`).
+- Typing pass (**mypy green**) for `src/ws/*` та `src/exchanges/bybit/ws.py`.
+- Added jitter/backoff tests (`tests/test_ws_backoff_jitter.py`).
+
+### Coverage
+- WS package coverage **≥ 85%** (current ≈ 88%).
+
+### IRM / CI
+- IRM (SSOT-lite for 6.2) залишено без змін; крок 6.2.7 зафіксовано окремо в SSOT (див. `docs/irm.phase6.yaml`).
+- `pre-commit` green.
+
 ---
 
 ## [6.2.5] — 2025-08-30

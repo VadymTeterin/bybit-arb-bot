@@ -130,6 +130,13 @@ _Статуси_: **todo** — ще не почато, **doing** — в робо
   - [ ] pre-commit OK (ruff, ruff-format, isort, whitespace hooks).
   - [ ] WA: виконано на тимчасовій гілці; один-крок-за-раз; мінімальний ризик — лише формат повідомлень TG.
 
+- [x] **6.2.7 — WS hardening (QS P0)**  `status: done`
+  - [ ] Unified exponential backoff with jitter in WS-layer (shared module).
+  - [ ] Bybit WS client now uses shared backoff; removed duplicates.
+  - [ ] Typing pass (mypy green) for src/ws/* and exchanges/bybit/ws.py.
+  - [ ] Added jitter/backoff tests; WS coverage achieved 88%.
+  - [ ] IRM SSOT-lite for 6.2 left unchanged; this entry records WS QS step.
+
 <!-- IRM:END 6.2 -->
 
 ### Фаза 6.3 — Історія (SQLite) та фільтри ліквідності
