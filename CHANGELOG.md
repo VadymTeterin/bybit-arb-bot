@@ -28,6 +28,7 @@
 ### IRM / CI
 - IRM (SSOT-lite for 6.2) залишено без змін; крок 6.2.7 зафіксовано окремо в SSOT (див. `docs/irm.phase6.yaml`).
 - `pre-commit` green.
+[6.2.7]: https://github.com/VadymTeterin/bybit-arb-bot/compare/v6.2.5...v6.2.7
 
 ---
 
@@ -70,6 +71,7 @@
 3. `pre-commit run -a` — всі хуки мають пройти.
 4. Відкрити `README.md` в `main` і перевірити, що лінки на QS/DoD/Testing/Plan працюють.
 
+[6.2.5]: https://github.com/VadymTeterin/bybit-arb-bot/compare/v6.2.0...v6.2.5
 ---
 ---
 
@@ -262,3 +264,6 @@
 - До `6.1.0` використовувались pre-1.0 теги (`0.6.x`). Починаючи з `6.1.0`, мажор **6**
   синхронізовано з **Phase 6** IRM — це не ламає API; це узгодження з етапами розвитку.
 - Використовуйте **Conventional Commits** та оновлюйте цей файл на кожен реліз.
+
+
+
