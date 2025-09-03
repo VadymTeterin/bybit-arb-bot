@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import math
 import time
+from datetime import datetime, timezone  # ← додано
 from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import Any, Callable, cast
@@ -113,6 +114,23 @@ class RealtimeAlerter:
 
             try:
                 await self._sender(text)
+
+                # --- журналювання історії успішної відправки ---
+                try:
+                    from src.core import alerts_hook as _alerts_hook  # локальний імпорт, щоб уникнути циклів
+                    dt_utc = datetime.fromtimestamp(now, tz=timezone.utc)
+                    _alerts_hook.log_history(
+                        symbol=symbol,
+                        basis_pct=basis_pct,
+                        ts=dt_utc,
+                        reason="sent",
+                        tg_msg_id=None,  # якщо у відправника буде message_id — прокинемо пізніше
+                    )
+                except Exception:
+                    # fail-silent: історія не повинна ламати відправку
+                    pass
+                # -------------------------------------------------
+
             except Exception:
                 # Навмисно не пробиваємось нагору — щоб WS-потік не падав.
                 return False
