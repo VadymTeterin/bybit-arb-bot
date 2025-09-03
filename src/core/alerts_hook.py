@@ -28,3 +28,14 @@ def should_send(symbol: str, basis_pct: float, ts: datetime) -> tuple[bool, str]
 def commit(symbol: str, basis_pct: float, ts: datetime) -> None:
     """Expose commit to persist last alert state for external callers."""
     _gate.commit(symbol=symbol, basis_pct=basis_pct, ts=ts)
+
+
+def log_history(symbol: str, basis_pct: float, ts: datetime, *, reason: str, tg_msg_id: str | None = None) -> None:
+    """Persist history row after a successful send."""
+    _repo.log_event(
+        symbol,
+        ts_epoch=ts.timestamp(),
+        basis_pct=basis_pct,
+        reason=reason,
+        tg_msg_id=tg_msg_id,
+    )
