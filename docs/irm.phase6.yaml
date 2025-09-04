@@ -47,7 +47,7 @@ sections:
     PR #40'
   - 'Оновлено .github/workflows/ci.yml: PR — pre-commit тільки по змінених файлах;
     push — --all-files, PR #39'
-  - 'Оновлено CHANGELOG: секція [Unreleased] у табличному форматі (QS/README/CI)'    
+  - 'Оновлено CHANGELOG: секція [Unreleased] у табличному форматі (QS/README/CI)'
 - id: 6.2.5
   name: Реліз 6.2.5 — IRM sync + repo hygiene
   status: done
@@ -88,11 +88,73 @@ sections:
 - id: 6.2.7
   name: WS hardening (QS P0)
   status: done
-  tasks:   
-    - Unified exponential backoff with jitter in WS-layer (shared module).
-    - Bybit WS client now uses shared backoff; removed duplicates.
-    - Typing pass (mypy green) for src/ws/* and exchanges/bybit/ws.py.
-    - Added jitter/backoff tests; WS coverage achieved 88%.
-    - IRM SSOT-lite for 6.2 left unchanged; this entry records WS QS step.
-
+  tasks:
+  - Unified exponential backoff with jitter in WS-layer (shared module).
+  - Bybit WS client now uses shared backoff; removed duplicates.
+  - Typing pass (mypy green) for src/ws/* and exchanges/bybit/ws.py.
+  - Added jitter/backoff tests; WS coverage achieved 88%.
+  - IRM SSOT-lite for 6.2 left unchanged; this entry records WS QS step.
+- id: '6.3'
+  name: SQLite persistence for alerts & signals
+  status: done
+  tasks:
+  - 'alerts_repo: add alerts_log (history), keep alerts (last)'
+  - 'alerts_hook: persistent repo + log_history wrapper'
+  - 'alerts.py: log history after successful send'
+  - 'tests: repo history + integration'
+  - 'docs: README/CHANGELOG/.env.example'
 updated_at: '2025-08-31'
+phases:
+  '6.3':
+    title: Історія (SQLite) та фільтри ліквідності
+    updated_utc: '2025-09-04T12:00:00Z'
+    status_legend:
+      todo: заплановано
+      wip: в роботі
+      done: завершено
+    sections:
+    - id: 6.3.0
+      name: SQLite persistence for alerts & signals
+      status: done
+      tasks:
+      - 'alerts_repo: add alerts_log (history), keep alerts (last)'
+      - 'alerts_hook: persistent repo + log_history wrapper'
+      - 'alerts.py: log history after successful send'
+      - 'tests: repo history + integration'
+      - 'docs: README/CHANGELOG/.env.example'
+    - id: 6.3.1
+      name: Схема SQLite (signals/quotes/meta)
+      status: done
+      tasks: []
+    - id: 6.3.2
+      name: DAO + retention + тести
+      status: done
+      tasks: []
+    - id: 6.3.3
+      name: Фільтр ліквідності
+      status: done
+      tasks: []
+    - id: 6.3.4
+      name: Мітка чату & приглушення алертів
+      status: done
+      tasks: []
+    - id: 6.3.5
+      name: Персист стану Gate у SQLite
+      status: done
+      tasks: []
+    - id: 6.3.6
+      name: Maintenance SQLite (retention/VACUUM)
+      status: todo
+      tasks: []
+    - id: 6.3.7
+      name: 'Документи: docs/HISTORY_AND_FILTERS.md, README, CHANGELOG'
+      status: todo
+      tasks: []
+    - id: 6.3.8
+      name: 'CI: покриття, бейдж'
+      status: todo
+      tasks: []
+    - id: 6.3.9
+      name: Генерувати секцію з YAML
+      status: todo
+      tasks: []
