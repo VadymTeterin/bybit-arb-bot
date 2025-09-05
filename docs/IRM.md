@@ -137,19 +137,40 @@ _Статуси_: **todo** — ще не почато, **doing** — в робо
   - [ ] Added jitter/backoff tests; WS coverage achieved 88%.
   - [ ] IRM SSOT-lite for 6.2 left unchanged; this entry records WS QS step.
 
-<!-- IRM:END 6.2 -->
 
+<!-- IRM:END 6.2 -->
+<!-- IRM:BEGIN 6.3 -->
 ### Фаза 6.3 — Історія (SQLite) та фільтри ліквідності
-- [x] 6.3.0 Крок Kickoff — мітка часу зафіксована (2025-08-24).
-- [x] 6.3.1 Крок Схема SQLite (signals/quotes/meta) — done.
-- [x] 6.3.2 Крок DAO + retention + тести — done.
-- [x] 6.3.3 Крок Фільтр ліквідності — done.
-- [x] 6.3.4 Крок мітка чату & приглушення алертів
-- [x] 6.3.5 Крок персист стану Gate у SQLite
-- [ ] 6.3.6 Крок maintenance SQLite (retention/VACUUM)
-- [ ] 6.3.7 Крок Документи: `docs/HISTORY_AND_FILTERS.md`, README, CHANGELOG.
-- [ ] 6.3.8 Крок CI: покриття, бейдж.
-- [ ] Генерувати секцію з YAML
+> Оновлено: 2025-09-04T12:00:00Z
+
+_Статуси_: **todo** — заплановано, **wip** — в роботі, **done** — завершено
+
+- [x] **6.3.0 — SQLite persistence for alerts & signals**  `status: done`
+  - [ ] alerts_repo: add alerts_log (history), keep alerts (last)
+  - [ ] alerts_hook: persistent repo + log_history wrapper
+  - [ ] alerts.py: log history after successful send
+  - [ ] tests: repo history + integration
+  - [ ] docs: README/CHANGELOG/.env.example
+
+- [x] **6.3.1 — Схема SQLite (signals/quotes/meta)**  `status: done`
+
+- [x] **6.3.2 — DAO + retention + тести**  `status: done`
+
+- [x] **6.3.3 — Фільтр ліквідності**  `status: done`
+
+- [x] **6.3.4 — Мітка чату & приглушення алертів**  `status: done`
+
+- [x] **6.3.5 — Персист стану Gate у SQLite**  `status: done`
+
+- [ ] **6.3.6 — Maintenance SQLite (retention/VACUUM)**  `status: todo`
+
+- [ ] **6.3.7 — Документи: docs/HISTORY_AND_FILTERS.md, README, CHANGELOG**  `status: todo`
+
+- [ ] **6.3.8 — CI: покриття, бейдж**  `status: todo`
+
+- [ ] **6.3.9 — Генерувати секцію з YAML**  `status: todo`
+
+<!-- IRM:END 6.3 -->
 
 ### Подальші фази (укрупнено)
 - [ ] 7 — Risk & Money Management (quality-gates, ліміти, dry-run).
