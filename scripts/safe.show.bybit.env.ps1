@@ -1,53 +1,48 @@
-<#
-  Безпечний вивід змінних BYBIT_* з маскуванням ключів.
-  Використання:
-    .\scripts\safe.show.bybit.env.ps1
-    # Показати повністю (НЕ радиться на скрині/стрімі):
-    # .\scripts\safe.show.bybit.env.ps1 -All
-#>
-param(
-  [switch]$All
-)
+﻿[CmdletBinding()]
+param()
 
-function Get-EnvSafe([string]$name) {
-  $v = [System.Environment]::GetEnvironmentVariable($name, "Process")
-  if ([string]::IsNullOrEmpty($v)) {
-    # спробуємо зчитати з User/Machine на всякий випадок
-    $v = [System.Environment]::GetEnvironmentVariable($name, "User")
-    if ([string]::IsNullOrEmpty($v)) {
-      $v = [System.Environment]::GetEnvironmentVariable($name, "Machine")
-    }
-  }
-  return $v
+function Get-EnvSafe { param([string]$Name)
+  $v = [Environment]::GetEnvironmentVariable($Name)
+  if ($null -eq $v) { '' } else { $v }
+}
+function Mask { param([string]$v, [int]$Head=4, [int]$Tail=2)
+  if ([string]::IsNullOrEmpty($v)) { return '<empty>' }
+  if ($v.Length -le ($Head + $Tail)) { return ('*' * $v.Length) }
+  return $v.Substring(0,$Head) + ('*' * ($v.Length - ($Head + $Tail))) + $v.Substring($v.Length-$Tail)
+}
+function ToDisplay { param([string]$s)
+  if ([string]::IsNullOrEmpty($s)) { '<empty>' } else { $s }
 }
 
-function Mask([string]$s) {
-  if ([string]::IsNullOrEmpty($s)) { return "" }
-  if ($s.Length -le 8) { return "****" }
-  return $s.Substring(0,4) + "…" + $s.Substring($s.Length-4,4)
-}
+# ---- Bybit core ----
+$IS_TESTNET = Get-EnvSafe 'BYBIT_IS_TESTNET'
+$PUB_URL    = Get-EnvSafe 'BYBIT_PUBLIC_URL'
+$PRV_URL    = Get-EnvSafe 'BYBIT_PRIVATE_URL'
+$API_KEY    = Get-EnvSafe 'BYBIT_API_KEY'
+$API_SECRET = Get-EnvSafe 'BYBIT_API_SECRET'
 
-$vars = @(
-  "BYBIT_PUBLIC_URL",
-  "BYBIT_PRIVATE_URL",
-  "BYBIT_DEFAULT_CATEGORY",
-  "BYBIT_API_KEY",
-  "BYBIT_API_SECRET"
-)
+Write-Host "BYBIT_IS_TESTNET : $IS_TESTNET"
+if ($PUB_URL) { Write-Host "BYBIT_PUBLIC_URL : $PUB_URL" }
+if ($PRV_URL) { Write-Host "BYBIT_PRIVATE_URL: $PRV_URL" }
 
-foreach ($k in $vars) {
-  $v = Get-EnvSafe $k
-  if ($k -match "KEY|SECRET" -and -not $All) {
-    "{0} = {1}" -f $k, (Mask $v)
-  } else {
-    "{0} = {1}" -f $k, $v
-  }
-}
+if ($PUB_URL -and $PUB_URL -notmatch 'bybit\.com') { Write-Warning 'BYBIT_PUBLIC_URL looks non-standard.' }
+if ($PRV_URL -and $PRV_URL -notmatch 'bybit\.com') { Write-Warning 'BYBIT_PRIVATE_URL looks non-standard.' }
 
-# Додаткові підказки
-if ((Get-EnvSafe "BYBIT_PUBLIC_URL") -notmatch "bybit\.com") {
-  Write-Warning "BYBIT_PUBLIC_URL виглядає нетипово."
-}
-if ((Get-EnvSafe "BYBIT_PRIVATE_URL") -notmatch "bybit\.com") {
-  Write-Warning "BYBIT_PRIVATE_URL виглядає нетипово."
-}
+Write-Host ("BYBIT_API_KEY    : {0}" -f (Mask $API_KEY))
+Write-Host ("BYBIT_API_SECRET : {0}" -f (Mask $API_SECRET))
+
+# ---- Telegram (supports TELEGRAM__* and TG_* ) ----
+$TG_TOKEN = Get-EnvSafe 'TELEGRAM__BOT_TOKEN'
+if (-not $TG_TOKEN) { $TG_TOKEN = Get-EnvSafe 'TG_BOT_TOKEN' }
+
+$TG_CHAT  = Get-EnvSafe 'TELEGRAM__ALERT_CHAT_ID'
+if (-not $TG_CHAT) { $TG_CHAT = Get-EnvSafe 'TG_CHAT_ID' }
+
+Write-Host ("TELEGRAM__BOT_TOKEN     : {0}" -f (Mask $TG_TOKEN))
+Write-Host ("TELEGRAM__ALERT_CHAT_ID : {0}" -f (ToDisplay $TG_CHAT))
+
+# ---- SQLite paths (optional) ----
+$ALERTS_DB  = Get-EnvSafe 'ALERTS__DB_PATH'
+$RUNTIME_DB = Get-EnvSafe 'RUNTIME__DB_PATH'
+if ($ALERTS_DB)  { Write-Host "ALERTS__DB_PATH  : $ALERTS_DB" }
+if ($RUNTIME_DB) { Write-Host "RUNTIME__DB_PATH : $RUNTIME_DB" }
