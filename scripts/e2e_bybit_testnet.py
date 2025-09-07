@@ -9,6 +9,20 @@ from exchanges.bybit.trading_client import BybitTradingClient
 from exchanges.bybit.types import BybitConfig
 
 
+def _classify_host(*urls: str) -> str:
+    """
+    Return a short label for the environment based on Bybit base URLs.
+    Priority: demo > testnet > mainnet > custom.
+    """
+    joined = " ".join([u or "" for u in urls]).lower()
+    if "api-demo.bybit.com" in joined or "stream-demo.bybit.com" in joined:
+        return "demo"
+    if "testnet" in joined:
+        return "testnet"
+    if "api.bybit.com" in joined or "stream.bybit.com" in joined:
+        return "mainnet"
+    return "custom"
+
 async def main() -> None:
     cfg = BybitConfig(
         enabled=True,
@@ -17,7 +31,9 @@ async def main() -> None:
         default_category=os.getenv("BYBIT_DEFAULT_CATEGORY", "spot"),
     )
 
-    print("== E2E Testnet: balances ==")
+    env_label = _classify_host(cfg.base_url_public, cfg.base_url_private)
+
+    print(f"== E2E ({env_label}) : balances ==")
     acc = BybitAccountClient(cfg)
     try:
         bals = await acc.get_balances()
@@ -40,7 +56,7 @@ async def main() -> None:
     price_env = os.getenv("BYBIT_ORDER_PRICE")
     price = float(price_env) if price_env else None
 
-    print("== E2E Testnet: create/cancel order ==")
+    print(f"== E2E ({env_label}) : create/cancel order ==")
     tr = BybitTradingClient(cfg)
     try:
         created = await tr.create_order(
