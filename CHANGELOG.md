@@ -9,6 +9,28 @@
 > що відповідають нашому внутрішньому Implementation Roadmap (IRM).
 
 `------------------------------------------------------------------------------------------------------------------------------`
+## [6.3.6] — 2025-09-07
+**Phase 6 — Step-6.3.6 · DEMO env (api-demo) + WS host=demo + env loader hardening**
+
+### Added
+- **DEMO середовище (`api-demo.bybit.com`)** під ключами з `.env` і змінними оточення.
+  - `scripts/load.bybit.env.ps1` — коректно підтягує DEMO URL-и для **REST** і маскує ключі.
+  - `scripts/safe.show.bybit.env.ps1` — безпечно показує замасковані ключі та **api-demo** в host.
+  - **WS-ендпоїнти можна перевизначити** через `WS_PUBLIC_URL_SPOT` і `WS_PUBLIC_URL_LINEAR`.
+  - `scripts/smoke_bybit_ws.py` — читає ці змінні та логікує **host=demo** в заголовку.
+  - `scripts/e2e_bybit.py` — банер середовища (REST/WS) і делегація до легасі-раннера для e2e.
+
+### Changed
+- `scripts/e2e_bybit_testnet.py` — узгоджено повідомлення для DEMO‑рунів; шлях створення/скасування ордера
+  лишився попереднім і активується прапором `BYBIT_PLACE_ORDER=1`.
+
+### Notes
+- Тестовий прогін: REST підпис/баланси (`retCode: 0`), WS тікери з **host=demo**, e2e створення/скасування ордера — ок.
+- Релізний тег: **v6.3.6**.
+
+[6.3.6]: https://github.com/VadymTeterin/bybit-arb-bot/compare/v6.3.5...v6.3.6
+
+`------------------------------------------------------------------------------------------------------------------------------`
 ## [6.3.5] — 2025-08-27
 **Phase 6 — Step-6.3.4 / 6.3.5 · Alerts cooldown + suppression + persistence**
 
