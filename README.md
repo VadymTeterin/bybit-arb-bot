@@ -96,32 +96,62 @@ This project follows **QS v1.0** aligned with **Working Agreements v2.0**.
 ---
 
 ## Швидкий старт (PowerShell)
-
+### 1) Активація venv (Windows)
 ```powershell
-# 1) Клон репозиторію
-git clone https://github.com/VadymTeterin/bybit-arb-bot.git
-cd bybit-arb-bot
-
-# 2) Віртуальне середовище
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-# 3) Залежності
-pip install -r requirements.txt
-
-# 4) Конфіг
-Copy-Item .\.env.example .\.env
-# заповніть TELEGRAM__TOKEN, TELEGRAM__CHAT_ID, (опц.) BYBIT__API_KEY/SECRET
-
-# 5) Перевірка
-pytest -q
-pre-commit run -a
+& .\.venv\Scripts\Activate.ps1
 ```
 
-> **Безпека:** ніколи не комітьте `.env`. Файл уже у `.gitignore`.
+### 2) Установити залежності
+```powershell
+pip install -r requirements.txt
+```
 
----
+### 3) Конфігурація ENV (.env або змінні середовища)
 
+**DEMO (рекомендовано для тестів):**
+```powershell
+$env:BYBIT_PUBLIC_URL  = 'https://api-demo.bybit.com'
+$env:BYBIT_PRIVATE_URL = 'https://api-demo.bybit.com'
+# (опційно) явні DEMO WS-ендпоїнти
+$env:WS_PUBLIC_URL_SPOT   = 'wss://stream-demo.bybit.com/v5/public/spot'
+$env:WS_PUBLIC_URL_LINEAR = 'wss://stream-demo.bybit.com/v5/public/linear'
+```
+`.env` приклад (ключі з **Demo Trading** в кабінеті Bybit):
+```dotenv
+BYBIT_API_KEY=...
+BYBIT_API_SECRET=...
+BYBIT_USE_SERVER_TIME=1
+BYBIT_RECV_WINDOW_MS=20000
+```
+Завантаження `.env` і швидка перевірка масок:
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\scripts\load.bybit.env.ps1
+.\scripts\safe.show.bybit.env.ps1
+```
+
+### 4) Smoke‑тести
+Підпис і баланси:
+```powershell
+python -m scripts.diag_bybit_keys
+python -m scripts.smoke_bybit
+```
+WS тікери:
+```powershell
+python -m scripts.smoke_bybit_ws
+```
+
+### 5) E2E (без ордерів)
+```powershell
+python -m scripts.e2e_bybit
+```
+
+### 6) (опційно) тест create/cancel
+```powershell
+$env:BYBIT_ORDER_SIDE='buy'; $env:BYBIT_ORDER_QTY='0.001'; $env:BYBIT_ORDER_PRICE='100000'; $env:BYBIT_PLACE_ORDER='1'
+python -m scripts.e2e_bybit_testnet
+Remove-Item Env:BYBIT_PLACE_ORDER -ErrorAction SilentlyContinue
+```
 ## Конфігурація
 
 Лоадер: `src/infra/config.py` (**pydantic-settings v2**, роздільник **`__`**).
@@ -307,6 +337,23 @@ docs/
 - **Digest не шле у Telegram** — перевірте `TELEGRAM__TOKEN/CHAT_ID` (секрети не логуються).
 
 ---
+
+- **Bybit: `API key is invalid`**
+  - Перевір, що **тип акаунта відповідає ендпоїнту**:
+    - Demo Trading → `https://api-demo.bybit.com` (+ WS `wss://stream-demo.bybit.com/...`)
+    - Testnet → `https://api-testnet.bybit.com`
+    - Mainnet → `https://api.bybit.com`
+  - Ключі з Demo/Testnet **не працюють** на іншому ендпоїнті.
+  - Перевір таймінг підпису: додай `BYBIT_USE_SERVER_TIME=1` і `BYBIT_RECV_WINDOW_MS=20000`.
+  - Швидка перевірка: `python -m scripts.diag_bybit_keys` (очікуємо `retCode: 0`).
+
+- **WS показує host=mainnet, коли очікується DEMO**
+  - Вкажи явні WS‑ендпоїнти:
+    ```powershell
+    $env:WS_PUBLIC_URL_SPOT   = 'wss://stream-demo.bybit.com/v5/public/spot'
+    $env:WS_PUBLIC_URL_LINEAR = 'wss://stream-demo.bybit.com/v5/public/linear'
+    ```
+  - Перевір: `python -m scripts.smoke_bybit_ws` (у банері має бути `host=demo`).
 
 ## Ліцензія
 
