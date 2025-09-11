@@ -140,8 +140,7 @@ _Статуси_: **todo** — ще не почато, **doing** — в робо
 
 <!-- IRM:END 6.2 -->
 <!-- IRM:BEGIN 6.3 -->
-### Фаза 6.3 — Історія (SQLite) та фільтри ліквідності
-> Оновлено: 2025-09-04T12:00:00Z
+### Фаза 6.3 — 
 
 _Статуси_: **todo** — заплановано, **wip** — в роботі, **done** — завершено
 
@@ -163,6 +162,16 @@ _Статуси_: **todo** — заплановано, **wip** — в робот
 - [x] **6.3.5 — Персист стану Gate у SQLite**  `status: done`
 
 - [ ] **6.3.6 — Maintenance SQLite (retention/VACUUM)**  `status: todo`
+  - [ ] Design/plan SQLite maintenance (schema & retention)
+  - [ ] Implement VACUUM/compaction job + retention policy
+  - [ ] Smoke tests for maintenance tasks
+
+- [x] **6.3.6a — DEMO env support (linked release v6.3.6)**  `status: done`
+  - [ ] REST: support api-demo endpoints in env loader + diag
+  - [ ] WS: WS_PUBLIC_URL_SPOT/LINEAR overrides; host=demo in logs
+  - [ ] Diag: /v5/user/query-api retCode=0; wallet-balance retCode=0
+  - [ ] E2E: create/cancel order on demo env
+  - [ ] Docs: README/CHANGELOG updated; tag v6.3.6
 
 - [ ] **6.3.7 — Документи: docs/HISTORY_AND_FILTERS.md, README, CHANGELOG**  `status: todo`
 
