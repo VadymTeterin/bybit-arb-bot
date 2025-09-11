@@ -56,6 +56,7 @@ This project follows **QS v1.0** aligned with **Working Agreements v2.0**.
 - 🔧 Windows-орієнтований DX: інструкції лише для **PowerShell / VS Code “Термінал”**
 
 ---
+- 🧪 **DEMO env**: підтримка `api-demo` для REST та явні WS override (`WS_PUBLIC_URL_SPOT/LINEAR`), banner host=demo, безпечні E2E скрипти.
 
 ## WS Resilience (6.2.0)
 
@@ -84,6 +85,13 @@ This project follows **QS v1.0** aligned with **Working Agreements v2.0**.
 Якщо задано `TELEGRAM__LABEL`, у повідомленнях Telegram додається префікс `"LABEL | ..."`. Зручно для `DEV`/`STAGE`.
 
 ---
+
+**6.3.6a — DEMO env support (release v6.3.6):**
+- REST: лоадер ENV і `scripts/diag_bybit_keys` підтримують `https://api-demo.bybit.com` (перевірка `retCode: 0` і балансів).
+- WS: параметри `WS_PUBLIC_URL_SPOT`/`WS_PUBLIC_URL_LINEAR` дозволяють явно вказати DEMO-стріми, лог у `smoke_bybit_ws` показує `host=demo`.
+- E2E: `scripts/e2e_bybit.py` друкує банер із активними DEMO-ендпоїнтами; `scripts/e2e_bybit_testnet` у DEMO-режимі вміє **create/cancel** ордер.
+- Безпека: створення ордерів тільки якщо встановлено `BYBIT_PLACE_ORDER=1` (і ціна далеко від ринку для smoke).
+- Документи оновлено: README/CHANGELOG, тег **v6.3.6**.
 
 ## Вимоги
 
