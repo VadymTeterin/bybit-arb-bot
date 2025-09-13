@@ -165,3 +165,6 @@ build/
 _runlogs/
 tools/tmp/
 docs/*.bak
+
+# SQLite maintenance logs
+logs/sqlite_maint.log

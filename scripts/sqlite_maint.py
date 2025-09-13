@@ -1,6 +1,7 @@
+
 # scripts/sqlite_maint.py
 # Purpose: SQLite maintenance CLI (retention & compaction)
-# Comments: English only (per WA). Windows-friendly. No secrets printed.
+# Comments: ASCII-only console output for Windows cp1251 consoles.
 
 from __future__ import annotations
 
@@ -21,9 +22,7 @@ RET_SIGNALS_DAYS = int(os.getenv("SQLITE_RETENTION_SIGNALS_DAYS", "14"))
 RET_QUOTES_DAYS = int(os.getenv("SQLITE_RETENTION_QUOTES_DAYS", "7"))
 RET_ALERTS_DAYS = int(os.getenv("SQLITE_RETENTION_ALERTS_DAYS", "30"))
 MAINT_ENABLE = os.getenv("SQLITE_MAINT_ENABLE", "0") == "1"
-VACUUM_STRATEGY = os.getenv(
-    "SQLITE_MAINT_VACUUM_STRATEGY", "incremental"
-)  # full|incremental|none
+VACUUM_STRATEGY = os.getenv("SQLITE_MAINT_VACUUM_STRATEGY", "incremental")  # full|incremental|none
 MAX_DURATION_SEC = int(os.getenv("SQLITE_MAINT_MAX_DURATION_SEC", "60"))
 
 BUSY_TIMEOUT_MS = 4000
@@ -61,16 +60,13 @@ def utc_now_seconds() -> int:
 
 
 def ensure_indexes(conn: sqlite3.Connection) -> None:
-    """
-    Idempotent index creation for timestamp-based retention.
+    """Idempotent index creation for timestamp-based retention.
     Creates indexes only if the table exists.
     """
     cur = conn.cursor()
 
     def table_exists(name: str) -> bool:
-        cur.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
-        )
+        cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,))
         return cur.fetchone() is not None
 
     # signals(ts)
@@ -79,9 +75,7 @@ def ensure_indexes(conn: sqlite3.Connection) -> None:
 
     # alerts_log(created_at)
     if table_exists("alerts_log"):
-        cur.execute(
-            "CREATE INDEX IF NOT EXISTS idx_alerts_log_created_at ON alerts_log(created_at)"
-        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_alerts_log_created_at ON alerts_log(created_at)")
 
     # quotes(ts)
     if table_exists("quotes"):
@@ -99,19 +93,13 @@ def count_table(conn: sqlite3.Connection, table: str) -> int:
     return 0
 
 
-def retention_delete(
-    conn: sqlite3.Connection, table: str, ts_col: str, days: int, dry_run: bool
-) -> int:
-    """
-    Delete rows older than now - X days. Assumes ts_col is epoch seconds or comparable.
-    """
+def retention_delete(conn: sqlite3.Connection, table: str, ts_col: str, days: int, dry_run: bool) -> int:
+    """Delete rows older than now - X days. Assumes ts_col is epoch seconds or comparable."""
     cutoff = utc_now_seconds() - days * 86400
     cur = conn.cursor()
 
     # Fast path: check if table exists
-    cur.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
-    )
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,))
     if not cur.fetchone():
         return 0
 
@@ -133,9 +121,7 @@ def retention_delete(
 
 
 def compact_db(conn: sqlite3.Connection, strategy: str, dry_run: bool) -> None:
-    """
-    Compact database per strategy.
-    """
+    """Compact database per strategy."""
     cur = conn.cursor()
     if strategy == "none":
         return
@@ -159,9 +145,7 @@ def compact_db(conn: sqlite3.Connection, strategy: str, dry_run: bool) -> None:
 
 
 def busy_connection(db_path: str) -> sqlite3.Connection:
-    conn = sqlite3.connect(
-        db_path, timeout=BUSY_TIMEOUT_MS / 1000, isolation_level=None
-    )
+    conn = sqlite3.connect(db_path, timeout=BUSY_TIMEOUT_MS / 1000, isolation_level=None)
     # WAL mode is controlled by the app; we do not force it here.
     # Short-lived transactions:
     conn.execute("PRAGMA journal_mode")
@@ -169,9 +153,7 @@ def busy_connection(db_path: str) -> sqlite3.Connection:
     return conn
 
 
-def run_maintenance(
-    db_path: str, do_retention: bool, do_compact: bool, dry_run: bool
-) -> Metrics:
+def run_maintenance(db_path: str, do_retention: bool, do_compact: bool, dry_run: bool) -> Metrics:
     metrics = Metrics(strategy=VACUUM_STRATEGY)
     p = Path(db_path)
     metrics.size_before = file_size(p)
@@ -205,10 +187,7 @@ def run_maintenance(
 
 def guard_enable() -> None:
     if not MAINT_ENABLE:
-        print(
-            "Maintenance is disabled: set SQLITE_MAINT_ENABLE=1 to enable.",
-            file=sys.stderr,
-        )
+        print("Maintenance is disabled: set SQLITE_MAINT_ENABLE=1 to enable.", file=sys.stderr)
         sys.exit(2)
 
 
@@ -216,7 +195,7 @@ def install_time_guard(seconds: int) -> None:
     if seconds <= 0:
         return
 
-    def _handler(signum, frame):  # noqa: ARG001
+    def _handler(signum, frame):  # noqa: ARG001 (frame unused)
         print(f"Time limit exceeded ({seconds}s). Aborting.", file=sys.stderr)
         sys.exit(3)
 
@@ -226,22 +205,12 @@ def install_time_guard(seconds: int) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="SQLite maintenance CLI (retention & compaction)"
-    )
-    parser.add_argument(
-        "--db", default=DEF_DB_PATH, help=f"Path to SQLite DB (default: {DEF_DB_PATH})"
-    )
-    parser.add_argument(
-        "--dry-run", action="store_true", help="Print what would be done, no changes"
-    )
+    parser = argparse.ArgumentParser(description="SQLite maintenance CLI (retention & compaction)")
+    parser.add_argument("--db", default=DEF_DB_PATH, help=f"Path to SQLite DB (default: {DEF_DB_PATH})")
+    parser.add_argument("--dry-run", action="store_true", help="Print what would be done, no changes")
     parser.add_argument("--execute", action="store_true", help="Apply changes")
-    parser.add_argument(
-        "--retention-only", action="store_true", help="Run only retention"
-    )
-    parser.add_argument(
-        "--compact-only", action="store_true", help="Run only compaction"
-    )
+    parser.add_argument("--retention-only", action="store_true", help="Run only retention")
+    parser.add_argument("--compact-only", action="store_true", help="Run only compaction")
     args = parser.parse_args(argv)
 
     if not (args.dry_run or args.execute):
@@ -263,17 +232,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"OperationalError: {e}", file=sys.stderr)
         return 1
 
-    # Human summary
+    # Human summary (ASCII only)
     mode = "DRY-RUN" if args.dry_run else "EXECUTE"
     print(f"[{mode}] DB: {args.db}")
     print(f"  Strategy: {VACUUM_STRATEGY}")
-    print(f"  Size: {metrics.size_before} → {metrics.size_after} bytes")
+    print(f"  Size: {metrics.size_before} -> {metrics.size_after} bytes")
     print(f"  Elapsed: {metrics.elapsed_ms} ms")
     print("  Deleted per table:")
     for tbl, n in metrics.deleted.items():
         print(f"    - {tbl}: {n}")
 
-    # JSON line (for logs/automation)
+    # JSON line (ASCII-safe)
     payload = {
         "mode": mode,
         "db": args.db,
@@ -286,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
         "elapsed_ms": metrics.elapsed_ms,
         "ts": utc_now_seconds(),
     }
-    print(json.dumps(payload, ensure_ascii=False))
+    print(json.dumps(payload, ensure_ascii=True))
 
     return 0
 
