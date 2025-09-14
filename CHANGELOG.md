@@ -9,6 +9,31 @@
 > що відповідають нашому внутрішньому Implementation Roadmap (IRM).
 
 `------------------------------------------------------------------------------------------------`
+## [6.3.7] — 2025-09-14
+**Phase 6 — Step-6.3.7 · Documentation update (README/CHANGELOG/HISTORY_AND_FILTERS)**
+
+### Added
+- **Docs**: `README.md` section on SQLite Maintenance expanded (CLI usage, daily scheduler, logs, troubleshooting).
+- **Docs**: `docs/HISTORY_AND_FILTERS.md` appendix on retention policy (signals 14d, alerts_log 30d, quotes 7d).
+- **CHANGELOG**: this entry.
+
+### Changed
+- IRM 6.3.6 marked as **done**; synced documentation.
+- Updated examples to use `python .\scripts\sqlite_maint.py` instead of `-m`.
+
+### Ops
+- Daily scheduler task: `BybitBot_SQLiteMaint_Daily` @ 03:15 (local), runner `scripts/sqlite.maint.daily.ps1`.
+- Re-registration helper: `scripts/schedule_sqlite_maint.ps1`.
+- Manual trigger & log validation documented in README.
+
+### Notes
+- Safe usage: run `--dry-run` first, take DB backup before `--execute`.
+- Logs: `logs/sqlite_maint.log`.
+
+[6.3.7]: https://github.com/VadymTeterin/bybit-arb-bot/compare/v6.3.6b...v6.3.7
+
+
+`------------------------------------------------------------------------------------------------`
 
 ## [6.3.6b] — 2025-09-12
 **Phase 6 — Step-6.3.6 · SQLite Maintenance (retention & compaction)**
