@@ -10,6 +10,33 @@
 
 `------------------------------------------------------------------------------------------------`
 
+## [6.3.6b] — 2025-09-12
+**Phase 6 — Step-6.3.6 · SQLite Maintenance (retention & compaction)**
+
+### Added
+- **SQLite maintenance CLI** (`scripts/sqlite_maint.py`):
+  - Modes: `--dry-run`, `--execute`, `--retention-only`, `--compact-only`.
+  - Safe guard: requires `SQLITE_MAINT_ENABLE=1` for `--execute`.
+  - Index creation only if table exists.
+  - JSON metrics output (size_before/after, counts, deleted, elapsed_ms).
+- **PowerShell wrapper** `scripts/sqlite.maint.ps1` for Windows Task Scheduler integration.
+- **ENV variables** (`.env.example`): `SQLITE_DB_PATH`, `SQLITE_MAINT_ENABLE`, `SQLITE_RETENTION_*_DAYS`,
+  `SQLITE_MAINT_VACUUM_STRATEGY`, `SQLITE_MAINT_MAX_DURATION_SEC`.
+- **README.md** updated: section "6.3.6 — SQLite Maintenance".
+
+### Changed
+- Guarded index creation in `sqlite_maint.py` to avoid errors on missing tables.
+
+### Notes
+- Incremental vacuum requires DB created with `auto_vacuum=INCREMENTAL`. If DB was created with `NONE`, run a one-time FULL VACUUM off-hours.
+- Recommended schedule: daily at 03:15, retention first, then compact.
+- IRM: this release closes Step-6.3.6 as **done**.
+- Release tag: **v6.3.6b**.
+
+[6.3.6b]: https://github.com/VadymTeterin/bybit-arb-bot/compare/v6.3.6...v6.3.6b
+
+`------------------------------------------------------------------------------------------------`
+
 ## [6.3.6] — 2025-09-07
 **Phase 6 — Step-6.3.6a · DEMO env (api-demo) + WS host=demo + env loader hardening**
 

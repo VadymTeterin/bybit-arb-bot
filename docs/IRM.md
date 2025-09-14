@@ -161,10 +161,10 @@ _Статуси_: **todo** — заплановано, **wip** — в робот
 
 - [x] **6.3.5 — Персист стану Gate у SQLite**  `status: done`
 
-- [ ] **6.3.6 — Maintenance SQLite (retention/VACUUM)**  `status: todo`
-  - [ ] Design/plan SQLite maintenance (schema & retention)
-  - [ ] Implement VACUUM/compaction job + retention policy
-  - [ ] Smoke tests for maintenance tasks
+- [x] **6.3.6 — Maintenance SQLite (retention/VACUUM)**  `status: done`
+  - [ ] {'text': 'Design/plan SQLite maintenance (schema & retention)', 'checked': True}
+  - [ ] {'text': 'Implement VACUUM/compaction job + retention policy', 'checked': True}
+  - [ ] {'text': 'Smoke tests for maintenance tasks', 'checked': True}
 
 - [x] **6.3.6a — DEMO env support (linked release v6.3.6)**  `status: done`
   - [ ] REST: support api-demo endpoints in env loader + diag

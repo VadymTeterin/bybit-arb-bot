@@ -1,81 +1,67 @@
-# IRM SSOT for Phase 6.3 — DON'T EDIT docs/IRM.md BY HAND
-phase: "6.3"
-updated_at: "2025-09-11T10:45:00Z"
-
-# Legend for statuses (rendered in IRM.md)
+phase: '6.3'
+updated_at: '2025-09-14T15:01:31Z'
 status_legend:
-  todo: "заплановано"
-  wip: "в роботі"
-  done: "завершено"
-
-# Sections for Phase 6.3 (order preserved)
+  todo: заплановано
+  wip: в роботі
+  done: завершено
 sections:
-  - id: "6.3.0"
-    name: "SQLite persistence for alerts & signals"
-    status: "done"
-    tasks:
-      - "alerts_repo: add alerts_log (history), keep alerts (last)"
-      - "alerts_hook: persistent repo + log_history wrapper"
-      - "alerts.py: log history after successful send"
-      - "tests: repo history + integration"
-      - "docs: README/CHANGELOG/.env.example"
-
-  - id: "6.3.1"
-    name: "Схема SQLite (signals/quotes/meta)"
-    status: "done"
-    tasks: []
-
-  - id: "6.3.2"
-    name: "DAO + retention + тести"
-    status: "done"
-    tasks: []
-
-  - id: "6.3.3"
-    name: "Фільтр ліквідності"
-    status: "done"
-    tasks: []
-
-  - id: "6.3.4"
-    name: "Мітка чату & приглушення алертів"
-    status: "done"
-    tasks: []
-
-  - id: "6.3.5"
-    name: "Персист стану Gate у SQLite"
-    status: "done"
-    tasks: []
-
-  # Keep 6.3.6 (SQLite maintenance) as TODO for future work
-  - id: "6.3.6"
-    name: "Maintenance SQLite (retention/VACUUM)"
-    status: "todo"
-    tasks:
-      - "Design/plan SQLite maintenance (schema & retention)"
-      - "Implement VACUUM/compaction job + retention policy"
-      - "Smoke tests for maintenance tasks"
-
-  # New step completed as part of release v6.3.6
-  - id: "6.3.6a"
-    name: "DEMO env support (linked release v6.3.6)"
-    status: "done"
-    tasks:
-      - "REST: support api-demo endpoints in env loader + diag"
-      - "WS: WS_PUBLIC_URL_SPOT/LINEAR overrides; host=demo in logs"
-      - "Diag: /v5/user/query-api retCode=0; wallet-balance retCode=0"
-      - "E2E: create/cancel order on demo env"
-      - "Docs: README/CHANGELOG updated; tag v6.3.6"
-
-  - id: "6.3.7"
-    name: "Документи: docs/HISTORY_AND_FILTERS.md, README, CHANGELOG"
-    status: "todo"
-    tasks: []
-
-  - id: "6.3.8"
-    name: "CI: покриття, бейдж"
-    status: "todo"
-    tasks: []
-
-  - id: "6.3.9"
-    name: "Генерувати секцію з YAML"
-    status: "todo"
-    tasks: []
+- id: 6.3.0
+  name: SQLite persistence for alerts & signals
+  status: done
+  tasks:
+  - 'alerts_repo: add alerts_log (history), keep alerts (last)'
+  - 'alerts_hook: persistent repo + log_history wrapper'
+  - 'alerts.py: log history after successful send'
+  - 'tests: repo history + integration'
+  - 'docs: README/CHANGELOG/.env.example'
+- id: 6.3.1
+  name: Схема SQLite (signals/quotes/meta)
+  status: done
+  tasks: []
+- id: 6.3.2
+  name: DAO + retention + тести
+  status: done
+  tasks: []
+- id: 6.3.3
+  name: Фільтр ліквідності
+  status: done
+  tasks: []
+- id: 6.3.4
+  name: Мітка чату & приглушення алертів
+  status: done
+  tasks: []
+- id: 6.3.5
+  name: Персист стану Gate у SQLite
+  status: done
+  tasks: []
+- id: 6.3.6
+  name: Maintenance SQLite (retention/VACUUM)
+  status: done
+  tasks:
+  - text: Design/plan SQLite maintenance (schema & retention)
+    checked: true
+  - text: Implement VACUUM/compaction job + retention policy
+    checked: true
+  - text: Smoke tests for maintenance tasks
+    checked: true
+- id: 6.3.6a
+  name: DEMO env support (linked release v6.3.6)
+  status: done
+  tasks:
+  - 'REST: support api-demo endpoints in env loader + diag'
+  - 'WS: WS_PUBLIC_URL_SPOT/LINEAR overrides; host=demo in logs'
+  - 'Diag: /v5/user/query-api retCode=0; wallet-balance retCode=0'
+  - 'E2E: create/cancel order on demo env'
+  - 'Docs: README/CHANGELOG updated; tag v6.3.6'
+- id: 6.3.7
+  name: 'Документи: docs/HISTORY_AND_FILTERS.md, README, CHANGELOG'
+  status: todo
+  tasks: []
+- id: 6.3.8
+  name: 'CI: покриття, бейдж'
+  status: todo
+  tasks: []
+- id: 6.3.9
+  name: Генерувати секцію з YAML
+  status: todo
+  tasks: []

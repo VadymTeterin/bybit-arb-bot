@@ -84,6 +84,48 @@ This project follows **QS v1.0** aligned with **Working Agreements v2.0**.
 **Telegram Chat Label (ENV-префікс):**
 Якщо задано `TELEGRAM__LABEL`, у повідомленнях Telegram додається префікс `"LABEL | ..."`. Зручно для `DEV`/`STAGE`.
 
+
+---
+
+## 6.3.6 — SQLite Maintenance (retention & compaction)
+
+This repository includes a maintenance CLI to keep the SQLite DB lean and healthy.
+
+**Files**
+- `scripts/sqlite_maint.py` — Python CLI (`--dry-run`, `--execute`, `--retention-only`, `--compact-only`)
+- `scripts/sqlite.maint.ps1` — Windows wrapper
+
+**Environment (.env / ENV)**
+- `SQLITE_DB_PATH` — path to SQLite DB (default: `data/signals.db`)
+- `SQLITE_MAINT_ENABLE` — must be `1` to allow `--execute` (safety guard)
+- `SQLITE_RETENTION_SIGNALS_DAYS` / `SQLITE_RETENTION_ALERTS_DAYS` / `SQLITE_RETENTION_QUOTES_DAYS` — retention windows (days)
+- `SQLITE_MAINT_VACUUM_STRATEGY` — `incremental | full | none` (default: `incremental`)
+- `SQLITE_MAINT_MAX_DURATION_SEC` — safety time cap for one run (seconds, default: `60`)
+
+**Dry run (no changes)**
+```powershell
+$env:SQLITE_DB_PATH='data\signals.db'
+$env:SQLITE_MAINT_ENABLE='0'
+python -m scripts.sqlite_maint --db $env:SQLITE_DB_PATH --dry-run
+```
+
+**Execute (recommended off-hours; retention first, then compact)**
+```powershell
+$env:SQLITE_DB_PATH='data\signals.db'
+$env:SQLITE_MAINT_ENABLE='1'
+
+# 1) retention only
+python -m scripts.sqlite_maint --db $env:SQLITE_DB_PATH --execute --retention-only
+
+# 2) compact only (incremental vacuum)
+python -m scripts.sqlite_maint --db $env:SQLITE_DB_PATH --execute --compact-only
+```
+
+**Sanity test on a copy (optional)**
+- Make a copy of the DB (e.g., `dev\tmp\signals.backup.db`).
+- Temporarily set `SQLITE_RETENTION_SIGNALS_DAYS=0` and run `--execute --retention-only` on the copy.
+- Verify that the JSON line shows `"deleted".signals > 0`, then restore the original settings.
+
 ---
 
 **6.3.6a — DEMO env support (release v6.3.6):**
@@ -92,6 +134,8 @@ This project follows **QS v1.0** aligned with **Working Agreements v2.0**.
 - E2E: `scripts/e2e_bybit.py` друкує банер із активними DEMO-ендпоїнтами; `scripts/e2e_bybit_testnet` у DEMO-режимі вміє **create/cancel** ордер.
 - Безпека: створення ордерів тільки якщо встановлено `BYBIT_PLACE_ORDER=1` (і ціна далеко від ринку для smoke).
 - Документи оновлено: README/CHANGELOG, тег **v6.3.6**.
+
+
 
 ## Вимоги
 
@@ -366,3 +410,6 @@ docs/
 ## Ліцензія
 
 MIT © 2025
+
+
+
