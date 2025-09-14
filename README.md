@@ -106,7 +106,7 @@ This repository includes a maintenance CLI to keep the SQLite DB lean and health
 ```powershell
 $env:SQLITE_DB_PATH='data\signals.db'
 $env:SQLITE_MAINT_ENABLE='0'
-python -m scripts.sqlite_maint --db $env:SQLITE_DB_PATH --dry-run
+python .\scripts\sqlite_maint.py --db $env:SQLITE_DB_PATH --dry-run
 ```
 
 **Execute (recommended off-hours; retention first, then compact)**
@@ -115,16 +115,43 @@ $env:SQLITE_DB_PATH='data\signals.db'
 $env:SQLITE_MAINT_ENABLE='1'
 
 # 1) retention only
-python -m scripts.sqlite_maint --db $env:SQLITE_DB_PATH --execute --retention-only
+python .\scripts\sqlite_maint.py --db $env:SQLITE_DB_PATH --execute --retention-only
 
 # 2) compact only (incremental vacuum)
-python -m scripts.sqlite_maint --db $env:SQLITE_DB_PATH --execute --compact-only
+python .\scripts\sqlite_maint.py --db $env:SQLITE_DB_PATH --execute --compact-only
+```
+
+
+**Daily scheduler (Windows Task Scheduler)**
+- Recommended task name: `BybitBot_SQLiteMaint_Daily`
+- Runner script: `scripts\sqlite.maint.daily.ps1`
+- Registration helper: `scripts\schedule_sqlite_maint.ps1`
+
+_Register / re-register the task:_
+```powershell
+# From repo root; runs as current user, Start In = repo root
+powershell -File .\scripts\schedule_sqlite_maint.ps1
+```
+
+_Manual trigger for validation:_
+```powershell
+schtasks /Run /TN "BybitBot_SQLiteMaint_Daily"
+Get-Content .\logs\sqlite_maint.log -Tail 100
 ```
 
 **Sanity test on a copy (optional)**
 - Make a copy of the DB (e.g., `dev\tmp\signals.backup.db`).
 - Temporarily set `SQLITE_RETENTION_SIGNALS_DAYS=0` and run `--execute --retention-only` on the copy.
 - Verify that the JSON line shows `"deleted".signals > 0`, then restore the original settings.
+
+
+**Troubleshooting (SQLite maintenance)**
+- **Logs**: `logs/sqlite_maint.log` — check after scheduled or manual runs.
+- **Console/Unicode**: prefer ASCII arrows; set `chcp 65001` if output looks garbled.
+- **Permissions**: register the task from a PowerShell started *as the target user*.
+- **Start In**: ensure task's *Start in* points to the repo root to resolve relative paths.
+- **venv path**: the scheduled action should use `.venv\Scripts\python.exe`.
+
 
 ---
 
@@ -413,3 +440,5 @@ MIT © 2025
 
 
 
+- `scripts/sqlite.maint.daily.ps1` — daily runner (retention + incremental compaction)
+- `scripts/schedule_sqlite_maint.ps1` — (re)register Windows Task Scheduler job
