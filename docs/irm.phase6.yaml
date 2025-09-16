@@ -1,5 +1,5 @@
 phase: '6.3'
-updated_at: '2025-09-14T15:01:31Z'
+updated_at: '2025-09-16T10:50:04Z'
 status_legend:
   todo: заплановано
   wip: в роботі
@@ -55,8 +55,17 @@ sections:
   - 'Docs: README/CHANGELOG updated; tag v6.3.6'
 - id: 6.3.7
   name: 'Документи: docs/HISTORY_AND_FILTERS.md, README, CHANGELOG'
-  status: todo
+  status: done
   tasks: []
+- id: 6.3.7a
+  name: "Ops: Windows scheduler runner hardened (UTF-8, abs DB path, Set-Location; schtasks flags, full PowerShell path)"
+  status: done
+  tasks:
+  - 'scripts/sqlite.maint.daily.ps1: Set-Location to repo root; absolute DB path; PYTHONIOENCODING=utf-8; direct .py'
+  - 'scripts/schedule_sqlite_maint.ps1: full path to powershell.exe; correct flags for /SC DAILY'
+  - 'README: add scheduler note (Start In not required; absolute DB path)'
+  - 'CHANGELOG: add Unreleased ops entry'
+  - 'Release: tag v6.3.7a'
 - id: 6.3.8
   name: 'CI: покриття, бейдж'
   status: todo
