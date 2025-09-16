@@ -1,53 +1,86 @@
 # scripts/sqlite.maint.daily.ps1
-# Purpose: Daily maintenance runner: retention then incremental compact, with logging.
-param(
-    [string]$DbPath = "data\signals.db",
-    [string]$Strategy = "incremental",
-    [int]$MaxDurationSec = 60
-)
+# Purpose: Run SQLite maintenance in two phases: retention-only then compact-only.
+# Changes in this patch:
+#  - Set-Location to the repo root (so relative paths resolve)
+#  - Build absolute DB path from env var or default
+#  - Use direct script path (no `-m`) to avoid ModuleNotFoundError
+#  - Force UTF-8 for Python I/O to avoid UnicodeEncodeError
+#  - Log to logs/sqlite_maint.log
 
-# Resolve repo root & logs dir
+param()
+
+$ErrorActionPreference = 'Stop'
+
+# Resolve repo root and key paths
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$RepoRoot  = Resolve-Path (Join-Path $ScriptDir "..")
-$LogsDir   = Join-Path $RepoRoot "logs"
-if (-not (Test-Path $LogsDir)) { New-Item -ItemType Directory -Force -Path $LogsDir | Out-Null }
-$LogFile   = Join-Path $LogsDir "sqlite_maint.log"
+$RepoRoot  = Split-Path $ScriptDir -Parent
+Set-Location -Path $RepoRoot
 
-# Pick python (venv if exists)
-$python = Join-Path $RepoRoot ".venv\Scripts\python.exe"
-if (-not (Test-Path $python)) { $python = "python" }
+$PythonExe = Join-Path $RepoRoot ".venv\Scripts\python.exe"
+$CliScript = Join-Path $RepoRoot "scripts\sqlite_maint.py"
+$LogDir    = Join-Path $RepoRoot "logs"
+$LogFile   = Join-Path $LogDir  "sqlite_maint.log"
 
-# Sensible ENV defaults
-if (-not $env:SQLITE_MAINT_ENABLE)           { $env:SQLITE_MAINT_ENABLE = "1" }
-if (-not $env:SQLITE_DB_PATH)                { $env:SQLITE_DB_PATH = $DbPath }
-if (-not $env:SQLITE_MAINT_VACUUM_STRATEGY)  { $env:SQLITE_MAINT_VACUUM_STRATEGY = $Strategy }
-if (-not $env:SQLITE_MAINT_MAX_DURATION_SEC) { $env:SQLITE_MAINT_MAX_DURATION_SEC = "$MaxDurationSec" }
+if (-not (Test-Path $LogDir)) { New-Item -ItemType Directory -Path $LogDir -Force | Out-Null }
 
-function Write-Log($msg) {
-    $line = "[{0}] {1}" -f (Get-Date -Format s), $msg
+function Write-Log([string]$msg) {
+    $ts = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ss")
+    $line = "[{0}] {1}" -f $ts, $msg
     $line | Tee-Object -FilePath $LogFile -Append
 }
 
-Write-Log "SQLiteMaint START db=$($env:SQLITE_DB_PATH) strategy=$($env:SQLITE_MAINT_VACUUM_STRATEGY)"
+# Defaults
+if (-not $env:SQLITE_DB_PATH) { $env:SQLITE_DB_PATH = "data\signals.db" }
 
-# Phase 1: retention-only
-$cmd1 = "& `"$python`" -m scripts.sqlite_maint --db `"$($env:SQLITE_DB_PATH)`" --execute --retention-only"
-Write-Log "RUN: $cmd1"
-$ret1 = & $python -m scripts.sqlite_maint --db $env:SQLITE_DB_PATH --execute --retention-only 2>&1
-$ret1 | Tee-Object -FilePath $LogFile -Append | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    Write-Log "ERROR: retention-only failed with code $LASTEXITCODE"
-    exit $LASTEXITCODE
+# Build absolute DB path even if env var is relative
+$DBPath = $env:SQLITE_DB_PATH
+if (-not [System.IO.Path]::IsPathRooted($DBPath)) {
+    $DBPath = Join-Path $RepoRoot $DBPath
 }
 
-# Phase 2: compact-only (incremental)
-$cmd2 = "& `"$python`" -m scripts.sqlite_maint --db `"$($env:SQLITE_DB_PATH)`" --execute --compact-only"
-Write-Log "RUN: $cmd2"
-$ret2 = & $python -m scripts.sqlite_maint --db $env:SQLITE_DB_PATH --execute --compact-only 2>&1
-$ret2 | Tee-Object -FilePath $LogFile -Append | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    Write-Log "ERROR: compact-only failed with code $LASTEXITCODE"
-    exit $LASTEXITCODE
+if (-not $env:SQLITE_MAINT_ENABLE) { $env:SQLITE_MAINT_ENABLE = "1" } # Allow execute in scheduled runs
+
+# Force UTF-8 for Python I/O and PowerShell console/file sink
+$env:PYTHONIOENCODING = "utf-8"
+try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch {}
+
+Write-Log ("SQLiteMaint START db={0} strategy=incremental" -f $DBPath)
+
+# Phase 1: Retention-only
+$cmd1 = @(
+    "`"$PythonExe`"",
+    "`"$CliScript`"",
+    "--db", "`"$DBPath`"",
+    "--execute",
+    "--retention-only"
+) -join ' '
+
+Write-Log ("RUN: & {0}" -f $cmd1)
+$LASTEXITCODE = 0
+& $PythonExe $CliScript --db $DBPath --execute --retention-only 2>&1 | Tee-Object -FilePath $LogFile -Append
+$ret1 = $LASTEXITCODE
+if ($ret1 -ne 0) {
+    Write-Log ("ERROR: retention-only failed with code {0}" -f $ret1)
+    exit $ret1
+}
+
+# Phase 2: Compact-only
+$cmd2 = @(
+    "`"$PythonExe`"",
+    "`"$CliScript`"",
+    "--db", "`"$DBPath`"",
+    "--execute",
+    "--compact-only"
+) -join ' '
+
+Write-Log ("RUN: & {0}" -f $cmd2)
+$LASTEXITCODE = 0
+& $PythonExe $CliScript --db $DBPath --execute --compact-only 2>&1 | Tee-Object -FilePath $LogFile -Append
+$ret2 = $LASTEXITCODE
+if ($ret2 -ne 0) {
+    Write-Log ("ERROR: compact-only failed with code {0}" -f $ret2)
+    exit $ret2
 }
 
 Write-Log "SQLiteMaint DONE"
+exit 0
