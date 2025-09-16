@@ -173,7 +173,14 @@ _Статуси_: **todo** — заплановано, **wip** — в робот
   - [ ] E2E: create/cancel order on demo env
   - [ ] Docs: README/CHANGELOG updated; tag v6.3.6
 
-- [ ] **6.3.7 — Документи: docs/HISTORY_AND_FILTERS.md, README, CHANGELOG**  `status: todo`
+- [x] **6.3.7 — Документи: docs/HISTORY_AND_FILTERS.md, README, CHANGELOG**  `status: done`
+
+- [x] **6.3.7a — Ops: Windows scheduler runner hardened (UTF-8, abs DB path, Set-Location; schtasks flags, full PowerShell path)**  `status: done`
+  - [ ] scripts/sqlite.maint.daily.ps1: Set-Location to repo root; absolute DB path; PYTHONIOENCODING=utf-8; direct .py
+  - [ ] scripts/schedule_sqlite_maint.ps1: full path to powershell.exe; correct flags for /SC DAILY
+  - [ ] README: add scheduler note (Start In not required; absolute DB path)
+  - [ ] CHANGELOG: add Unreleased ops entry
+  - [ ] Release: tag v6.3.7a
 
 - [ ] **6.3.8 — CI: покриття, бейдж**  `status: todo`
 
