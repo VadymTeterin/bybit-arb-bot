@@ -9,6 +9,13 @@
 > що відповідають нашому внутрішньому Implementation Roadmap (IRM).
 
 `------------------------------------------------------------------------------------------------`
+
+## [Unreleased]
+### Ops
+- Windows Task Scheduler: hardened runner — sets working directory to repo root, resolves absolute DB path, forces UTF-8 I/O, uses direct `.py` call; fixed `schtasks` flags and full path to `powershell.exe`.
+
+
+`------------------------------------------------------------------------------------------------`
 ## [6.3.7] — 2025-09-14
 **Phase 6 — Step-6.3.7 · Documentation update (README/CHANGELOG/HISTORY_AND_FILTERS)**
 
