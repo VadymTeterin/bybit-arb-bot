@@ -94,6 +94,9 @@ This repository includes a maintenance CLI to keep the SQLite DB lean and health
 **Files**
 - `scripts/sqlite_maint.py` — Python CLI (`--dry-run`, `--execute`, `--retention-only`, `--compact-only`)
 - `scripts/sqlite.maint.ps1` — Windows wrapper
+- `scripts/sqlite.maint.daily.ps1` — daily runner (retention + incremental compaction)
+- `scripts/schedule_sqlite_maint.ps1` — (re)register Windows Task Scheduler job
+
 
 **Environment (.env / ENV)**
 - `SQLITE_DB_PATH` — path to SQLite DB (default: `data/signals.db`)
