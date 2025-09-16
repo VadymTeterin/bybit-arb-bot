@@ -23,3 +23,12 @@
     hooks:
       - id: isort
         stages: [manual]
+
+repos:
+  - repo: local
+    hooks:
+      - id: irm-phase6-check
+        name: IRM Phase 6 sync check
+        entry: python tools/irm_phase6_gen.py --check --phase 6.3
+        language: system
+        pass_filenames: false
