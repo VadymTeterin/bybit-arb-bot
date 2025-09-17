@@ -410,6 +410,26 @@ docs/
 
 ---
 
+### IRM workflow (Phase 6)
+
+> Не редагуйте `docs/IRM.md` вручну — файл генерується з YAML.
+
+Правильний процес:
+1. Зміни внесіть у `docs/irm.phase6.yaml`.
+2. Згенеруйте IRM для Phase 6:
+   ```powershell
+   python tools/irm_phase6_gen.py --write --phase 6.3
+   ```
+3. Закомітьте **разом**: `docs/irm.phase6.yaml` і `docs/IRM.md`.
+4. Локальний pre-commit guard заблокує коміт, якщо `IRM.md` без YAML.
+5. У CI (GitHub Actions) є додаткова перевірка синхронності.
+
+Швидка перевірка перед комітом:
+```powershell
+python tools/irm_phase6_gen.py --check --phase 6.3
+pre-commit run -a
+```
+
 ## Траблшутінг
 
 - **`pip install -r requirements.txt` падає через \x00** — не використовуйте `-Encoding Unicode` для `requirements.txt`; зберігайте файл у **UTF-8**.
