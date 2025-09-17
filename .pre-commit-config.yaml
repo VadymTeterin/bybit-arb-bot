@@ -34,3 +34,11 @@ repos:
         pass_filenames: false
 
 
+
+  - repo: local
+    hooks:
+      - id: irm-no-manual-md
+        name: Forbid manual commits of docs/IRM.md without YAML
+        entry: python tools/hooks/guard_irm_no_manual.py
+        language: system
+        pass_filenames: false
