@@ -182,6 +182,11 @@ _Статуси_: **todo** — заплановано, **wip** — в робот
   - [ ] CHANGELOG: add Unreleased ops entry
   - [ ] Release: tag v6.3.7a
 
+- [x] **6.3.7b — CI/Pre-commit: IRM guards (strict local + GH Actions)**  `status: done`
+  - [ ] pre-commit: forbid manual IRM.md without YAML
+  - [ ] CI (GitHub Actions): irm-check.yml runs generator check on PR/push
+  - [ ] README: contributor note about IRM workflow
+
 - [ ] **6.3.8 — CI: покриття, бейдж**  `status: todo`
 
 - [ ] **6.3.9 — Генерувати секцію з YAML**  `status: todo`

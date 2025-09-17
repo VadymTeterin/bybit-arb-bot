@@ -66,6 +66,13 @@ sections:
   - 'README: add scheduler note (Start In not required; absolute DB path)'
   - 'CHANGELOG: add Unreleased ops entry'
   - 'Release: tag v6.3.7a'
+- id: 6.3.7b
+  name: "CI/Pre-commit: IRM guards (strict local + GH Actions)"
+  status: done
+  tasks:
+  - "pre-commit: forbid manual IRM.md without YAML"
+  - "CI (GitHub Actions): irm-check.yml runs generator check on PR/push"
+  - "README: contributor note about IRM workflow"
 - id: 6.3.8
   name: 'CI: покриття, бейдж'
   status: todo
