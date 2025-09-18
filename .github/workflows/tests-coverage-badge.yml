@@ -63,3 +63,4 @@ jobs:
           commit_message: "chore(coverage): update docs/coverage.svg [skip ci]"
           file_pattern: docs/coverage.svg
           branch: main
+
