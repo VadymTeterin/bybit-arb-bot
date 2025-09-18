@@ -4,9 +4,14 @@ on:
   pull_request:
   push:
     branches: ["main", "ci/**", "feat/**", "fix/**"]
+    paths-ignore:
+      - "docs/coverage.svg"
 
 jobs:
   tests:
+    # allow committing coverage.svg back to the repo
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -49,3 +54,12 @@ jobs:
           name: coverage-badge
           path: docs/coverage.svg
           if-no-files-found: error
+
+      # Commit updated badge back to the repo on pushes to main
+      - name: Commit updated coverage badge to repo (main only)
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(coverage): update docs/coverage.svg [skip ci]"
+          file_pattern: docs/coverage.svg
+          branch: main
