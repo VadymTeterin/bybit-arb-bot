@@ -11,6 +11,27 @@
 
 `------------------------------------------------------------------------------------------------`
 
+## [6.3.8] — 2025-09-18
+**Phase 6 — Step-6.3.8 · CI: покриття, бейдж**
+
+### Added
+- **CI workflow** `tests-coverage-badge.yml`: запуск на `pull_request` і `push` до `main` (+ ручний `workflow_dispatch`).
+- **Покриття**: `pytest` + `pytest-cov` → `coverage.xml`; локальний бейдж `docs/coverage.svg` через `coverage-badge`.
+- **Артефакти**: збереження `coverage-xml` і `coverage-badge` у GitHub Actions.
+- **Авто-коміт бейджа на main** (`stefanzweifel/git-auto-commit-action@v5`) — автор і комітер **github-actions[bot]**;
+  повідомлення: `chore(coverage): update docs/coverage.svg [skip ci]`.
+- **README**: додано бейдж покриття у шапку.
+
+### Changed
+- `paths-ignore: ["docs/coverage.svg"]` щоб уникнути CI-циклів.
+- Додано швидкий тест `tests/test_infra_notify_import.py` для стабілізації порогу ≥67%.
+
+### Notes
+- IRM: секція **6.3.8** відмічена як `done`; далі — крок **6.3.9** (генерація IRM з YAML).
+
+
+`------------------------------------------------------------------------------------------------`
+
 ## [6.3.7b] - 2025-09-17
 ### Added
 - README: розділ “IRM workflow (Phase 6)” (правильний процес редагування IRM)
@@ -447,7 +468,6 @@
 - Старт проєкту: структура `src/`, `tests/`, конфіг і логування; вхідна точка `python -m src.main <command>`.
 
 `------------------------------------------------------------------------------------------------`
-
 
 
 

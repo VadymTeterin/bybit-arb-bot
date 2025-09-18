@@ -168,6 +168,30 @@ Get-Content .\logs\sqlite_maint.log -Tail 100
 - Документи оновлено: README/CHANGELOG, тег **v6.3.6**.
 
 
+### Coverage badge (6.3.8)
+
+У репозиторії налаштовано workflow **Tests + Coverage Badge** (`.github/workflows/tests-coverage-badge.yml`), який:
+
+- запускається на **pull_request**, на **push** у `main`, `ci/**`, `feat/**`, `fix/**`, а також має **workflow_dispatch** (ручний запуск);
+- виконує `pytest` із збиранням покриття та генерує локальний бейдж **`docs/coverage.svg`**;
+- завантажує артефакти: `coverage-xml.zip` (із `coverage.xml`) і `coverage-badge.zip` (із `docs/coverage.svg`);
+- на **push у `main`** комітить оновлений бейдж назад у репозиторій за допомогою **stefanzweifel/git-auto-commit-action@v5** з параметрами:
+  - `commit_user_name: github-actions[bot]`
+  - `commit_user_email: 41898282+github-actions[bot]@users.noreply.github.com`
+  - `commit_author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>`
+  - `commit_message: "chore(coverage): update docs/coverage.svg [skip ci]"`
+  - `branch: main`
+- щоб уникнути CI‑циклу, у тригерах додано `paths-ignore: docs/coverage.svg`.
+
+**Ручний запуск (на `main`):**
+```powershell
+gh workflow run tests-coverage-badge.yml --ref main
+# останній workflow_dispatch-ран:
+$rid = gh run list --workflow tests-coverage-badge.yml -e workflow_dispatch --limit 1 --json databaseId --jq '.[0].databaseId'
+# переглянути параметри авто-коміту в логах:
+gh run view $rid --log | Select-String -Pattern 'git-auto-commit-action@v5|commit_user_name|commit_user_email|commit_author'
+```
+
 
 ## Вимоги
 
