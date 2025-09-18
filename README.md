@@ -14,6 +14,8 @@ This project follows **QS v1.0** aligned with **Working Agreements v2.0**.
 
 [![Digest E2E Smoke](https://github.com/VadymTeterin/bybit-arb-bot/actions/workflows/digest-e2e-smoke.yml/badge.svg?branch=main)](https://github.com/VadymTeterin/bybit-arb-bot/actions/workflows/digest-e2e-smoke.yml)
 
+[![Coverage](docs/coverage.svg)](docs/coverage.svg)
+
 > Windows 11 · Python 3.11+ · aiogram 3 · Bybit REST & WebSocket v5 · pydantic-settings v2
 
 **Мета:** Telegram-бот, що в реальному часі аналізує базис між **Spot** та **USDT-перпетуалами** на Bybit, відбирає **топ-3** монети за порогом (за замовчуванням **1%**), застосовує фільтри ліквідності, зберігає історію та надсилає алерти у Telegram з троттлінгом.
