@@ -58,7 +58,7 @@ jobs:
 
       # Commit updated badge back to the repo on pushes to main
       - name: Commit updated coverage badge to repo (main only)
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        if: ${{ github.ref == 'refs/heads/main' }}
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_user_name: github-actions[bot]
