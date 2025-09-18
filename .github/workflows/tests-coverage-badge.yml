@@ -1,0 +1,65 @@
+﻿name: Tests + Coverage Badge
+
+on:
+  pull_request:
+  push:
+    branches: ["main", "ci/**", "feat/**", "fix/**"]
+    paths-ignore:
+      - "docs/coverage.svg"
+
+jobs:
+  tests:
+    # allow committing coverage.svg back to the repo
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt || true; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt || true; fi
+          pip install pytest pytest-cov coverage-badge
+
+      - name: Run pytest with coverage
+        shell: bash
+        run: |
+          pytest -q
+
+      - name: Generate local coverage badge
+        shell: bash
+        run: |
+          mkdir -p docs
+          python -m coverage_badge -o docs/coverage.svg -f
+
+      - name: Upload coverage.xml
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: error
+
+      - name: Upload coverage.svg
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-badge
+          path: docs/coverage.svg
+          if-no-files-found: error
+
+      # Commit updated badge back to the repo on pushes to main
+      - name: Commit updated coverage badge to repo (main only)
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(coverage): update docs/coverage.svg [skip ci]"
+          file_pattern: docs/coverage.svg
+          branch: main

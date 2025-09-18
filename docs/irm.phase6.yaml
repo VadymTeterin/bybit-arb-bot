@@ -1,5 +1,5 @@
 phase: '6.3'
-updated_at: '2025-09-16T10:50:04Z'
+updated_at: '2025-09-18T11:58:32Z'
 status_legend:
   todo: заплановано
   wip: в роботі
@@ -74,9 +74,13 @@ sections:
   - "CI (GitHub Actions): irm-check.yml runs generator check on PR/push"
   - "README: contributor note about IRM workflow"
 - id: 6.3.8
-  name: 'CI: покриття, бейдж'
-  status: todo
-  tasks: []
+  name: "CI: покриття, бейдж"
+  status: done
+  tasks:
+  - "pytest-cov configured; coverage.xml generated"
+  - "CI workflow runs tests w/ coverage, uploads artifact"
+  - "Local coverage badge (docs/coverage.svg) generated in CI"
+  - "README badge added"
 - id: 6.3.9
   name: Генерувати секцію з YAML
   status: todo

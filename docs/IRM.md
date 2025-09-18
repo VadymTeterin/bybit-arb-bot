@@ -187,7 +187,11 @@ _Статуси_: **todo** — заплановано, **wip** — в робот
   - [ ] CI (GitHub Actions): irm-check.yml runs generator check on PR/push
   - [ ] README: contributor note about IRM workflow
 
-- [ ] **6.3.8 — CI: покриття, бейдж**  `status: todo`
+- [x] **6.3.8 — CI: покриття, бейдж**  `status: done`
+  - [ ] pytest-cov configured; coverage.xml generated
+  - [ ] CI workflow runs tests w/ coverage, uploads artifact
+  - [ ] Local coverage badge (docs/coverage.svg) generated in CI
+  - [ ] README badge added
 
 - [ ] **6.3.9 — Генерувати секцію з YAML**  `status: todo`
 
