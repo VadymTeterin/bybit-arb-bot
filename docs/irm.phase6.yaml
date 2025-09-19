@@ -85,3 +85,17 @@ sections:
   name: Генерувати секцію з YAML
   status: done
   tasks: []
+- id: 6.3.10
+  name: "IRM View (read-only) з YAML → docs/IRM.view.md"
+  status: done    # todo → wip → done
+  tasks:
+    - "Єдине джерело правди: docs/irm.phase6.yaml → генерує docs/IRM.view.md"
+    - "Локальний/CI-гвард блокують ручні правки IRM.view.md"
+    - "Додати секцію 6.3.10 у YAML (status=todo)"
+    - "Налаштувати генерацію docs/IRM.view.md: tools/render_irm_view.py --write"
+    - "Додати CI-перевірку (irm-view-check.yml): --check"
+    - "Оновлений docs/irm.phase6.yaml (6.3.10)"
+    - "Згенерований docs/IRM.view.md"
+    - "Зелений PR з новим CI-гвардом (irm-view-check.yml)"
+    - "Не правити IRM.view.md вручну; тільки через YAML"
+    - "Windows/PowerShell; контроль CRLF/LF через .gitattributes"

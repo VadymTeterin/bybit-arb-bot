@@ -74,7 +74,7 @@
 - [x] 6.1.1 Env precedence (flat > nested для alerts), тести, Ruff E402.
 - [ ] 6.1.2 DOCX-експорт для дайджесту — planned.
 - [ ] 6.1.3 Аналітика дайджестів (тижд./місячні агрегати) — planned.
-<!-- IRM:BEGIN 6.2 -->
+
 ### Фаза 6.2 — SSOT-lite (автоматизація IRM)
 > Оновлено: 2025-08-27T00:00:00Z
 
@@ -86,7 +86,7 @@ _Статуси_: **todo** — ще не почато, **doing** — в робо
   - [ ] Налаштовано .github/workflows/irm_phase6_sync.yml
 
 - [x] **6.2.1 — Інтеграція з docs/IRM.md (сентинели)**  `status: done`
-  - [ ] Додати/перевірити блок <!-- IRM:BEGIN 6.2 --> … <!-- IRM:END 6.2 -->
+  - [ ] Додати/перевірити блок  …
   - [ ] Генерувати секцію з YAML
 
 - [x] **6.2.2 — Перевірки у PR (--check)**  `status: done`
@@ -137,10 +137,7 @@ _Статуси_: **todo** — ще не почато, **doing** — в робо
   - [ ] Added jitter/backoff tests; WS coverage achieved 88%.
   - [ ] IRM SSOT-lite for 6.2 left unchanged; this entry records WS QS step.
 
-
-<!-- IRM:END 6.2 -->
-<!-- IRM:BEGIN 6.3 -->
-### Фаза 6.3 — 
+### Фаза 6.3 —
 
 _Статуси_: **todo** — заплановано, **wip** — в роботі, **done** — завершено
 
@@ -206,8 +203,6 @@ _Статуси_: **todo** — заплановано, **wip** — в робот
   - [ ] Зелений PR з новим CI-гвардом (irm-view-check.yml)
   - [ ] Не правити IRM.view.md вручну; тільки через YAML
   - [ ] Windows/PowerShell; контроль CRLF/LF через .gitattributes
-
-<!-- IRM:END 6.3 -->
 
 ### Подальші фази (укрупнено)
 - [ ] 7 — Risk & Money Management (quality-gates, ліміти, dry-run).
