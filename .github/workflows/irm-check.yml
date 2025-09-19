@@ -3,20 +3,17 @@ name: IRM Phase 6 Check
 on:
   pull_request:
     paths:
-      - 'docs/IRM.md'
       - 'docs/irm.phase6.yaml'
+      - 'docs/IRM.md'
       - 'tools/irm_phase6_gen.py'
       - '.github/workflows/irm-check.yml'
-  push:
-    branches: [ main ]
-    paths:
-      - 'docs/IRM.md'
-      - 'docs/irm.phase6.yaml'
-      - 'tools/irm_phase6_gen.py'
+  workflow_dispatch:
 
 jobs:
   check:
+    name: IRM 6.3 sync check
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,13 +21,15 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Install deps (best-effort)
         run: |
-          if [ -f requirements.txt ]; then
-            python -m pip install -r requirements.txt || true
-          fi
+          python -m pip install --upgrade pip
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt || true; fi
+          # Ensure YAML parser is present on runner for generator
+          pip install pyyaml
 
       - name: IRM 6.3 sync check
-        run: python tools/irm_phase6_gen.py --check --phase 6.3
+        run: |
+          python tools/irm_phase6_gen.py --check --phase 6.3

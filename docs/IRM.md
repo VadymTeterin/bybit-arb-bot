@@ -193,7 +193,7 @@ _Статуси_: **todo** — заплановано, **wip** — в робот
   - [ ] Local coverage badge (docs/coverage.svg) generated in CI
   - [ ] README badge added
 
-- [ ] **6.3.9 — Генерувати секцію з YAML**  `status: todo`
+- [x] **6.3.9 — Генерувати секцію з YAML**  `status: done`
 
 <!-- IRM:END 6.3 -->
 
