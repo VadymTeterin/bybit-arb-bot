@@ -83,5 +83,5 @@ sections:
   - "README badge added"
 - id: 6.3.9
   name: Генерувати секцію з YAML
-  status: todo
+  status: done
   tasks: []
