@@ -87,7 +87,7 @@ sections:
   tasks: []
 - id: 6.3.10
   name: "IRM View (read-only) з YAML → docs/IRM.view.md"
-  status: "todo"    # todo → wip → done
+  status: done    # todo → wip → done
   tasks:
     - "Єдине джерело правди: docs/irm.phase6.yaml → генерує docs/IRM.view.md"
     - "Локальний/CI-гвард блокують ручні правки IRM.view.md"

@@ -192,7 +192,7 @@ _Статуси_: **todo** — заплановано, **wip** — в робот
 
 - [x] **6.3.9 — Генерувати секцію з YAML**  `status: done`
 
-- [ ] **6.3.10 — IRM View (read-only) з YAML → docs/IRM.view.md**  `status: todo`
+- [x] **6.3.10 — IRM View (read-only) з YAML → docs/IRM.view.md**  `status: done`
   - [ ] Єдине джерело правди: docs/irm.phase6.yaml → генерує docs/IRM.view.md
   - [ ] Локальний/CI-гвард блокують ручні правки IRM.view.md
   - [ ] Додати секцію 6.3.10 у YAML (status=todo)
