@@ -150,7 +150,7 @@ new step.md
 dev/scripts/*.ps1
 
 # generated clean IRM view (no sentinels)
-docs/IRM.view.md
+# docs/IRM.view.md
 
 # VS Code: track only tasks.json
 !.vscode/
