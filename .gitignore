@@ -1,170 +1,108 @@
-# Virtual environments
-.venv/
-venv/
+# =============================================================================
+# .gitignore — Project: bybit-arb-bot (v2, audit add-ons for secrets)
+# Purpose: Keep repo clean; prevent secrets and local artifacts from entering Git.
+# =============================================================================
 
-# Python bytecode & caches
+# --- Python bytecode / caches -------------------------------------------------
 __pycache__/
-*.pyc
-.pytest_cache/
+*.py[cod]
+*.pyo
+*.pyd
+.pytype/
 .mypy_cache/
-.ruff_cache/
+.pyre/
+.pyright/
 
-# Coverage
+# --- Pytest / Coverage --------------------------------------------------------
+.pytest_cache/
 .coverage
-coverage.xml
+.coverage.*
 htmlcov/
+.coverage-results/
+coverage.xml
 
-# Environment / secrets
-.env
-.env.backup.*
-.backups/
+# --- Virtual environments -----------------------------------------------------
+.venv/
+venv/
+env/
 
-# Logs
+# --- Logs / Temp / Runtime ----------------------------------------------------
+*.log
 logs/
-app_console.log
-
-# Data & exports
-data/*.db
-exports/
-*.csv
-
-# Editor & OS
-.vscode/
-.DS_Store
-
-# Seeds & util scripts
-seed_signals.py
-files.txt
-use-profile.safe.ps1
-
-# Dev snapshots / temp
-dev/tmp/
-!dev/tmp/.gitkeep
-/project-tree.txt
-project-tree.txt
-tree.txt
-
-*.bak
-
-__tmp/
-
-.env.*
-.env1
-
-!.env.example
-
-# Local artifacts
-*.patch
-.env.test
-*.zip
-
-src/infra/dotenv_autoload_*.py
-!src/infra/dotenv_autoload.py
-# --- Python venvs & bytecode
-.venv/
-venv/
-**/__pycache__/
-*.py[cod]
-
-# --- Tool caches
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-
-# --- Local env files & backups
-.env
-.env.*
-!.env.example
-.backups/
-.backups/**
-
-# --- Logs & temp artifacts
-*.log
-tree.txt
-
-# --- OS / IDE
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/
-
-# === Project ignores (Step 5.8) ===
-# Python venv & bytecode
-.venv/
-venv/
-**/__pycache__/
-*.py[cod]
-
-# Tool caches
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-
-# Local env files & backups
-.env
-.env.*
-!.env.example
-.backups/
-.backups/**
-
-# Logs & temp artifacts
-*.log
-tree.txt
-
-# Local-only helpers / artifacts
-*.patch
-*.zip
-.env.test
-launcher_export.cmd
-
-# OS / IDE
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/
-# === End project ignores ===
-
-bybit.secrets.env
-_tmp/**
-_tmp/
+run/
 tmp/
-tmp/**
-t -q
-
-# Allow Windows launcher at repo root
-!launcher_export.cmd
-
-/run/
-/logs/
-*.log
-
-# GH digest throttle stamps
-run/gh_digest.sent.*.stamp
-
-tools/coveragerc.digest
+temp/
+dev/tmp/
+*_tmp/
+*.tmp
+*.bak
+*.old
+*.orig
+*.swp
+~*
+# Local run logs / artifacts
+_runlogs/
 artifacts/
 
-new step.md
+# --- OS / Editor junk ---------------------------------------------------------
+.DS_Store
+Thumbs.db
+Icon?
+.vscode/
+.idea/
 
-# helper scripts
-dev/scripts/*.ps1
-
-# generated clean IRM view (no sentinels)
-# docs/IRM.view.md
-
-# VS Code: track only tasks.json
-!.vscode/
-.vscode/*
-!.vscode/tasks.json
-*.egg-info/
+# --- Build / Dist / Packaging -------------------------------------------------
 dist/
 build/
-.coverage*
-.audit_*
-.env*
-_runlogs/
-tools/tmp/
-docs/*.bak
+*.egg-info/
+.eggs/
 
-# SQLite maintenance logs
-logs/sqlite_maint.log
+# --- Data artifacts (local only; keep examples/schemas elsewhere) ------------
+data/**/*.db
+data/**/*.sqlite
+data/**/*.sqlite3
+data/**/*.parquet
+*.db
+*.sqlite
+*.sqlite3
+*.parquet
+
+# --- Notebooks checkpoints ----------------------------------------------------
+.ipynb_checkpoints/
+
+# --- Env/Secrets files (NEVER commit secrets) --------------------------------
+# root-level
+.env
+.env.*
+# any folder
+*.env
+*.env.*
+*.secrets
+*.secrets.*
+# config-specific
+config/*.env
+config/*.env.*
+config/*.secrets
+config/*.secrets.*
+# allowlist examples
+!.env.example
+!config/example.config.json
+
+# --- Reports / exports (local) -----------------------------------------------
+reports/**/*.html
+reports/**/*.xlsx
+reports/**/*.csv
+# Generated digests (local)
+local-digest.*
+digest-*.json
+digest-*.md
+
+# --- GitHub Actions local artifacts (if any) ---------------------------------
+.github/workflows/*.local.*
+
+# --- Node / Frontend (if ever used) ------------------------------------------
+node_modules/
+
+# =============================================================================
+# End of .gitignore (v2)
+# =============================================================================
