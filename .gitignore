@@ -119,3 +119,4 @@ docs/*.bak
 
 # SQLite maintenance logs
 logs/sqlite_maint.log
+coverage_phase4.xml
