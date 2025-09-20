@@ -42,3 +42,12 @@ repos:
         entry: python tools/hooks/guard_irm_no_manual.py
         language: system
         pass_filenames: false
+  
+  - repo: local
+    hooks:
+      - id: irm-view-sync
+        name: "IRM.view must match YAML (render_irm_view.py --check)"
+        entry: python tools/render_irm_view.py --check
+        language: system
+        pass_filenames: false
+        files: ^docs/(IRM\.view\.md|irm\.phase6\.yaml)$
