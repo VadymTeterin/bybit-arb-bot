@@ -101,7 +101,7 @@ sections:
     - "Windows/PowerShell; контроль CRLF/LF через .gitattributes"
 - id: 6.3.11
   name: "Локальний guard: заборона ручних правок IRM.view.md"
-  status: "todo"      # todo → wip → done
+  status: done      # todo → wip → done
   tasks:
     - "Додати pre-commit хук, що виконує tools/render_irm_view.py --check"
     - "Розкоментувати або переозначити .gitignore для docs/IRM.view.md"
