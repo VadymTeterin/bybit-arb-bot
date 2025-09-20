@@ -207,7 +207,7 @@ _Статуси_: **todo** — заплановано, **wip** — в робот
   - [ ] Не правити IRM.view.md вручну; тільки через YAML
   - [ ] Windows/PowerShell; контроль CRLF/LF через .gitattributes
 
-- [ ] **6.3.11 — Локальний guard: заборона ручних правок IRM.view.md**  `status: todo`
+- [x] **6.3.11 — Локальний guard: заборона ручних правок IRM.view.md**  `status: done`
   - [ ] Додати pre-commit хук, що виконує tools/render_irm_view.py --check
   - [ ] Розкоментувати або переозначити .gitignore для docs/IRM.view.md
   - [ ] IRM.view.md редагується тільки через YAML → генератор
