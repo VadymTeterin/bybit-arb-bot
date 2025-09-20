@@ -221,3 +221,9 @@ git add AUDIT_CHECKLIST.md
 git commit -m "audit(6.3.12): fill audit checklist (IRM sync, hygiene plan, CI/tests)"
 git push -u origin step-6.3.12-audit
 ```
+## 6.3.12 — Audit (final)
+- Tests: 155 passed, 1 skipped; coverage 67.81% (67%).
+- Phase-4 subset: 28 passed; module coverage (selector/liquidity/alerts_gate): 67% / 89% / 85% (phase4-only).
+- IRM guards: Passed; IRM 6.3 up-to-date; IRM.view rendered OK.
+- EOL: normalized; hooks no longer rewrite IRM.view.md.
+- Note: Phase 4 changes kept local in IRM.md (manual), not committed (SSOT for Phase 4 is a follow-up).
