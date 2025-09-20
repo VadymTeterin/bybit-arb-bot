@@ -1,40 +1,53 @@
-* text=auto
-*.cmd  text eol=crlf
-*.bat  text eol=crlf
-*.ps1  text eol=crlf
-*.sh   text eol=lf
-*.py   text
-*.md   text
-*.yml  text
-*.yaml text
-*.toml text
+# =============================================================================
+# .gitattributes — Project: bybit-arb-bot
+# Purpose: Normalize line endings and diff behavior across the repo.
+# SSOT note: Keep textual sources with LF; Windows PowerShell scripts with CRLF.
+# =============================================================================
 
-tools/coveragerc.digest text eol=lf
-# Canonical LF для кросплатформених файлів
-*.py   text eol=lf
-*.md   text eol=lf
-*.yml  text eol=lf
-*.yaml text eol=lf
-*.json text eol=lf
-*.toml text eol=lf
-*.sh   text eol=lf
-tools/coveragerc.digest text eol=lf
+# --- Default: auto text normalization (LF) -----------------------------------
+* text=auto eol=lf
 
-# Windows-native скрипти
-*.ps1  text eol=crlf
-*.cmd  text eol=crlf
-*.bat  text eol=crlf
+# --- Windows scripts with CRLF -----------------------------------------------
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
 
-# .gitattributes
-* text=auto
-*.py     text eol=lf
-*.yml    text eol=lf
-*.yaml   text eol=lf
-*.md     text eol=lf
-
-*.py text eol=lf
+# --- Explicit LF for common text formats -------------------------------------
+*.py  text eol=lf
+*.pyi text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
-*.sh text eol=lf
-*.cmd text eol=crlf
-*.ps1 text eol=crlf
+*.toml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.rst text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+
+# --- GitHub Actions & configs -------------------------------------------------
+.github/** text eol=lf
+
+# --- Treat these as binary (no diff) -----------------------------------------
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.bmp binary
+*.pdf binary
+*.zip binary
+*.7z binary
+*.gz binary
+*.bz2 binary
+*.xz binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.parquet binary
+
+# --- Makefiles (LF) -----------------------------------------------------------
+Makefile text eol=lf
+
+# =============================================================================
+# End of .gitattributes
+# =============================================================================
