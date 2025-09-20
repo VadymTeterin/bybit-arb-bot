@@ -97,13 +97,25 @@ local-digest.*
 digest-*.json
 digest-*.md
 
-# --- GitHub Actions local artifacts (if any) ---------------------------------
-.github/workflows/*.local.*
+# helper scripts
+dev/scripts/*.ps1
 
-# --- Node / Frontend (if ever used) ------------------------------------------
-node_modules/
+# generated clean IRM view (no sentinels)
+# docs/IRM.view.md
 
-# =============================================================================
-# End of .gitignore (v2)
-# =============================================================================
-coverage_phase4.xml
+# VS Code: track only tasks.json
+!.vscode/
+.vscode/*
+!.vscode/tasks.json
+*.egg-info/
+dist/
+build/
+.coverage*
+.audit_*
+.env*
+_runlogs/
+tools/tmp/
+docs/*.bak
+
+# SQLite maintenance logs
+logs/sqlite_maint.log
