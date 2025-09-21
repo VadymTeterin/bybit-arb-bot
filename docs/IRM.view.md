@@ -224,6 +224,13 @@ _Статуси_: **todo** — заплановано, **wip** — в робот
   - [ ] Підготувати каркас тестів: tests/test_risk_manager.py
   - [ ] README/CHANGELOG: додати розділи для Phase 7 (чернетка)
 
+- [x] **7.0.1 — IRM scaffolding (generator, hooks, guard, CI)**  `status: done`
+  - [ ] Генератор tools/irm_phase7_gen.py (структурна вставка у Подальші фази)
+  - [ ] pre-commit хук: IRM Phase 7 sync check (UTF-8)
+  - [ ] Guard: узагальнення на irm.phase[0-9]+.yaml
+  - [ ] CI: GitHub Actions pre-commit workflow
+  - [ ] Шаблон двомовних PR (UA/EN)
+
 - [ ] **7.1.0 — Dry-run & базові ліміти (read-only guard)**  `status: todo`
   - [ ] Імплементувати RiskManager (read-only): перевірка лімітів перед виконанням дій
   - [ ] Ліміти: max position size (USD), max exposure (%) на портфель

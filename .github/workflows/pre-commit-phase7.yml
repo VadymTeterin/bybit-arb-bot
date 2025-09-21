@@ -1,22 +1,24 @@
 ﻿name: pre-commit (incl. IRM Phase 7)
 
 on:
-  pull_request:
-    branches: ["*"]
   push:
-    branches: ["*"]
+    branches: [ main, phase-7.0.a-irm-skeleton ]
+  pull_request:
 
 jobs:
-  pre-commit:
+  precommit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install deps
+      - name: Install pre-commit
+        run: pip install pre-commit
+      - name: Run IRM-only hooks
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Run pre-commit (all hooks)
-        uses: pre-commit/action@v3.0.1
+          pre-commit install
+          pre-commit run -a irm-phase6-check
+          pre-commit run -a irm-phase7-check
+          pre-commit run -a irm-view-sync
+          pre-commit run -a irm-no-manual-md

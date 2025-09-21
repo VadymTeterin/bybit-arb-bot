@@ -3,28 +3,16 @@
     rev: v4.6.0
     hooks:
       - id: trailing-whitespace
-        stages: [manual]
       - id: end-of-file-fixer
-        stages: [manual]
       - id: mixed-line-ending
-        stages: [manual]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.5.7
     hooks:
       - id: ruff
         args: [--fix]
-        stages: [manual]
       - id: ruff-format
-        stages: [manual]
 
-  - repo: https://github.com/pycqa/isort
-    rev: 6.0.1
-    hooks:
-      - id: isort
-        stages: [manual]
-
-repos:
   - repo: local
     hooks:
       - id: irm-phase6-check
@@ -33,7 +21,13 @@ repos:
         language: system
         pass_filenames: false
 
-
+  - repo: local
+    hooks:
+      - id: irm-phase7-check
+        name: IRM Phase 7 sync check
+        entry: python -X utf8 tools/irm_phase7_gen.py --check
+        language: system
+        pass_filenames: false
 
   - repo: local
     hooks:
@@ -42,11 +36,11 @@ repos:
         entry: python tools/hooks/guard_irm_no_manual.py
         language: system
         pass_filenames: false
-  
+
   - repo: local
     hooks:
       - id: irm-view-sync
-        name: "IRM.view must match YAML (render_irm_view.py --check)"
+        name: IRM.view must match YAML (render_irm_view.py --check)
         entry: python tools/render_irm_view.py --check
         language: system
         pass_filenames: false

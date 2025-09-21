@@ -6,23 +6,30 @@ status_legend:
   done: завершено
 sections:
 - id: 7.0.0
-  name: "Phase 7 kickoff & scaffolding"
+  name: Phase 7 kickoff & scaffolding
   status: wip
   tasks:
-    - "Додати файл docs/irm.phase7.yaml (каркас)"
-    - "Оновити pre-commit перевірку IRM.view → додати irm.phase7.yaml"
-    - "Підготувати місце для модуля ризик-менеджменту: src/core/risk_manager.py"
-    - "Додати плейсхолдери в .env.example: RISK_DRY_RUN, RISK_MAX_POS_USD, RISK_MAX_EXPOSURE_PCT"
-    - "Підготувати каркас тестів: tests/test_risk_manager.py"
-    - "README/CHANGELOG: додати розділи для Phase 7 (чернетка)"
+  - Додати файл docs/irm.phase7.yaml (каркас)
+  - Оновити pre-commit перевірку IRM.view → додати irm.phase7.yaml
+  - 'Підготувати місце для модуля ризик-менеджменту: src/core/risk_manager.py'
+  - 'Додати плейсхолдери в .env.example: RISK_DRY_RUN, RISK_MAX_POS_USD, RISK_MAX_EXPOSURE_PCT'
+  - 'Підготувати каркас тестів: tests/test_risk_manager.py'
+  - 'README/CHANGELOG: додати розділи для Phase 7 (чернетка)'
+- id: 7.0.1
+  name: IRM scaffolding (generator, hooks, guard, CI)
+  status: done
+  tasks:
+  - Генератор tools/irm_phase7_gen.py (структурна вставка у Подальші фази)
+  - 'pre-commit хук: IRM Phase 7 sync check (UTF-8)'
+  - 'Guard: узагальнення на irm.phase[0-9]+.yaml'
+  - 'CI: GitHub Actions pre-commit workflow'
+  - Шаблон двомовних PR (UA/EN)
 - id: 7.1.0
-  name: "Dry-run & базові ліміти (read-only guard)"
+  name: Dry-run & базові ліміти (read-only guard)
   status: todo
   tasks:
-    - "Імплементувати RiskManager (read-only): перевірка лімітів перед виконанням дій"
-    - "Ліміти: max position size (USD), max exposure (%) на портфель"
-    - "Флаг DRY_RUN: блокувати реальні дії, логувати причину відмови"
-    - "Юніт-тести граничних значень і режимів (dry-run / live-off)"
-    - "Документація: README (розділ Risk & Money Management), CHANGELOG запис"
-
-# sync: 2025-09-21T11:07:15
+  - 'Імплементувати RiskManager (read-only): перевірка лімітів перед виконанням дій'
+  - 'Ліміти: max position size (USD), max exposure (%) на портфель'
+  - 'Флаг DRY_RUN: блокувати реальні дії, логувати причину відмови'
+  - Юніт-тести граничних значень і режимів (dry-run / live-off)
+  - 'Документація: README (розділ Risk & Money Management), CHANGELOG запис'
