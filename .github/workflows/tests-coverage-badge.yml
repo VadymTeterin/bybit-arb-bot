@@ -26,11 +26,11 @@ jobs:
         with:
           filters: |
             code:
-              - 'src/**'
+              - "src/**"
+              - "tests/**"
             irm:
-              - 'tests/test_irm_patterns.py'
+              - "tests/test_irm_patterns.py"
 
-  # Повний suite  тільки на push у main
   tests-full:
     needs: changes
     if: ${{ github.event_name == 'push' && needs.changes.outputs.code == 'true' }}
@@ -43,11 +43,10 @@ jobs:
       - name: Install deps
         run: |
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio
+          pip install pytest pytest-asyncio pytest-cov
       - name: Run full test suite
         run: pytest -q
 
-  # Легкий набір  тільки на PR і лише коли змінено IRM-патерни
   tests-irm-only:
     needs: changes
     if: ${{ github.event_name == 'pull_request' && needs.changes.outputs.code != 'true' && needs.changes.outputs.irm == 'true' }}
