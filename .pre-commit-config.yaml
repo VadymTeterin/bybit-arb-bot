@@ -50,4 +50,11 @@ repos:
         entry: python tools/render_irm_view.py --check
         language: system
         pass_filenames: false
-        files: ^docs/(IRM\.view\.md|irm\.phase6\.yaml)$
+        files: ^docs/(IRM\.view\.md|irm\.phase[0-9]+\.yaml)$
+  - repo: local
+    hooks:
+      - id: irm-phase7-check
+        name: IRM Phase 7 sync check
+        entry: python -X utf8 tools/irm_phase7_gen.py --check
+        language: system
+        pass_filenames: false

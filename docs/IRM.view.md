@@ -211,6 +211,26 @@ _Статуси_: **todo** — заплановано, **wip** — в робот
 
 ### Подальші фази (укрупнено)
 - [ ] 7 — Risk & Money Management (quality-gates, ліміти, dry-run).
+
+### Фаза 7.0 —
+
+_Статуси_: **todo** — заплановано, **wip** — в роботі, **done** — завершено
+
+- [ ] **7.0.0 — Phase 7 kickoff & scaffolding**  `status: wip`
+  - [ ] Додати файл docs/irm.phase7.yaml (каркас)
+  - [ ] Оновити pre-commit перевірку IRM.view → додати irm.phase7.yaml
+  - [ ] Підготувати місце для модуля ризик-менеджменту: src/core/risk_manager.py
+  - [ ] Додати плейсхолдери в .env.example: RISK_DRY_RUN, RISK_MAX_POS_USD, RISK_MAX_EXPOSURE_PCT
+  - [ ] Підготувати каркас тестів: tests/test_risk_manager.py
+  - [ ] README/CHANGELOG: додати розділи для Phase 7 (чернетка)
+
+- [ ] **7.1.0 — Dry-run & базові ліміти (read-only guard)**  `status: todo`
+  - [ ] Імплементувати RiskManager (read-only): перевірка лімітів перед виконанням дій
+  - [ ] Ліміти: max position size (USD), max exposure (%) на портфель
+  - [ ] Флаг DRY_RUN: блокувати реальні дії, логувати причину відмови
+  - [ ] Юніт-тести граничних значень і режимів (dry-run / live-off)
+  - [ ] Документація: README (розділ Risk & Money Management), CHANGELOG запис
+
 - [ ] 8 — Бектест і симулятор (історія/офлайн).
 - [ ] 9 — Paper Trading (Bybit Testnet).
 - [ ] 10 — Продакшн та моніторинг.
