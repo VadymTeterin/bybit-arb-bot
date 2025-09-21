@@ -4,14 +4,14 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'src/**'
-      - 'tests/**'
-      - '.github/workflows/tests-coverage-badge.yml'
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/tests-coverage-badge.yml"
   pull_request:
     paths:
-      - 'src/**'
-      - 'tests/**'
-      - '.github/workflows/tests-coverage-badge.yml'
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/tests-coverage-badge.yml"
 
 jobs:
   changes:
@@ -26,13 +26,14 @@ jobs:
         with:
           filters: |
             code:
-              - 'src/**'
+              - "src/**"
+              - "tests/**"
             irm:
-              - 'tests/test_irm_patterns.py'
+              - "tests/test_irm_patterns.py"
 
   tests-full:
     needs: changes
-    if: ${{ needs.changes.outputs.code == 'true' }}
+    if: ${{ github.event_name == 'push' && needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,13 +43,13 @@ jobs:
       - name: Install deps
         run: |
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio
+          pip install pytest pytest-asyncio pytest-cov
       - name: Run full test suite
         run: pytest -q
 
   tests-irm-only:
     needs: changes
-    if: ${{ needs.changes.outputs.code != 'true' && needs.changes.outputs.irm == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && needs.changes.outputs.code != 'true' && needs.changes.outputs.irm == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
