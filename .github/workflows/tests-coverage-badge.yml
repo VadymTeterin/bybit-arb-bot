@@ -4,19 +4,35 @@ on:
   push:
     branches: [ main ]
     paths:
-      - "src/**"
-      - "tests/**"
-      - ".github/workflows/tests-coverage-badge.yml"
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/tests-coverage-badge.yml'
   pull_request:
     paths:
-      - "src/**"
-      - "tests/**"
-      - ".github/workflows/tests-coverage-badge.yml"
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/tests-coverage-badge.yml'
 
 jobs:
-  # Повний набір тестів лише на push
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+      irm:  ${{ steps.filter.outputs.irm }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'src/**'
+            irm:
+              - 'tests/test_irm_patterns.py'
+
   tests-full:
-    if: ${{ github.event_name == 'push' }}
+    needs: changes
+    if: ${{ github.event_name == 'push' && needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,12 +43,13 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install pytest pytest-asyncio pytest-cov
-      - name: Run full test suite
-        run: pytest -q
+      - name: Run full test suite with coverage
+        run: |
+          pytest -q --cov=src --cov-report=xml --cov-report=term-missing --cov-fail-under=67
 
-  # IRM-only (швидкий) залишається для PR
   tests-irm-only:
-    if: ${{ github.event_name == 'pull_request' }}
+    needs: changes
+    if: ${{ github.event_name == 'pull_request' && needs.changes.outputs.code != 'true' && needs.changes.outputs.irm == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
