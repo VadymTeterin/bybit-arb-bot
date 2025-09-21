@@ -4,14 +4,14 @@ on:
   push:
     branches: [ main ]
     paths:
-      - "src/**"
-      - "tests/**"
-      - ".github/workflows/tests-coverage-badge.yml"
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/tests-coverage-badge.yml'
   pull_request:
     paths:
-      - "src/**"
-      - "tests/**"
-      - ".github/workflows/tests-coverage-badge.yml"
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/tests-coverage-badge.yml'
 
 jobs:
   changes:
@@ -20,16 +20,14 @@ jobs:
       code: ${{ steps.filter.outputs.code }}
       irm:  ${{ steps.filter.outputs.irm }}
     steps:
-      - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
             code:
-              - "src/**"
-              - "tests/**"
+              - 'src/**'
             irm:
-              - "tests/test_irm_patterns.py"
+              - 'tests/test_irm_patterns.py'
 
   tests-full:
     needs: changes
@@ -59,6 +57,6 @@ jobs:
       - name: Install deps (minimal)
         run: |
           pip install -r requirements.txt
-          pip install pytest
+          pip install pytest pytest-cov
       - name: Run IRM regex unit test only
         run: pytest -q tests/test_irm_patterns.py
