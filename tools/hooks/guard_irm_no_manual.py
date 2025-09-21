@@ -1,34 +1,33 @@
-# tools/hooks/guard_irm_no_manual.py
-import subprocess
-import sys
+﻿#!/usr/bin/env python3
+import re, sys, subprocess
 
+# Treat staged file list as source of truth
 def staged_files():
-    try:
-        p = subprocess.run(
-            ["git", "diff", "--cached", "--name-only"],
-            check=True, capture_output=True, text=True
-        )
-    except Exception as e:
-        sys.stderr.write(f"ERROR: cannot query staged files: {e}\n")
-        return []
+    out = subprocess.check_output(
+        ["git", "diff", "--cached", "--name-only"],
+        text=True, encoding="utf-8", errors="replace"
+    )
+    return [p.strip().replace("\\", "/") for p in out.splitlines() if p.strip()]
 
-    files = [ln.strip().replace("\\", "/") for ln in p.stdout.splitlines() if ln.strip()]
-    return files
-
-def main():
+def main() -> int:
     files = staged_files()
-    irm = "docs/IRM.md"
-    yaml = "docs/irm.phase6.yaml"
+    changed_irm = "docs/IRM.md" in files
+    # allow any docs/irm.phaseN.yaml (N is digits), .yaml or .yml
+    yaml_pat = re.compile(r"^docs/irm\.phase[0-9]+\.ya?ml$")
+    changed_yaml = any(yaml_pat.fullmatch(p) for p in files)
 
-    if irm in files and yaml not in files:
-        sys.stderr.write(
+    if changed_irm and not changed_yaml:
+        msg = (
             "ERROR: Manual edits to docs/IRM.md are not allowed.\n"
-            "Please modify 'docs/irm.phase6.yaml' and re-generate via:\n"
-            "  python tools/irm_phase6_gen.py --write --phase 6.3\n"
-            "Then commit both YAML and generated IRM.md.\n"
+            "Commit must include matching docs/irm.phaseX.yaml and a re-generation step.\n"
+            "Examples:\n"
+            "  python tools/irm_phase7_gen.py --write   # for Phase 7\n"
+            "  python tools/irm_phase6_gen.py --write --phase 6.3  # for Phase 6\n"
+            "Then commit BOTH YAML and the generated IRM.md."
         )
+        print(msg, file=sys.stderr)
         return 1
     return 0
 
-if __name__ == '__main__':
-    sys.exit(main())
+if __name__ == "__main__":
+    raise SystemExit(main())
