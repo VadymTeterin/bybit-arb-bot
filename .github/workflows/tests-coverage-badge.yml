@@ -14,26 +14,9 @@ on:
       - ".github/workflows/tests-coverage-badge.yml"
 
 jobs:
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      code: ${{ steps.filter.outputs.code }}
-      irm:  ${{ steps.filter.outputs.irm }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            code:
-              - 'src/**'
-            irm:
-              - 'tests/test_irm_patterns.py'
-
-  # Повний suite  тільки на push у main
+  # Повний набір тестів лише на push
   tests-full:
-    needs: changes
-    if: ${{ github.event_name == 'push' && needs.changes.outputs.code == 'true' }}
+    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,14 +26,13 @@ jobs:
       - name: Install deps
         run: |
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio
+          pip install pytest pytest-asyncio pytest-cov
       - name: Run full test suite
         run: pytest -q
 
-  # Легкий набір  тільки на PR і лише коли змінено IRM-патерни
+  # IRM-only (швидкий) залишається для PR
   tests-irm-only:
-    needs: changes
-    if: ${{ github.event_name == 'pull_request' && needs.changes.outputs.code != 'true' && needs.changes.outputs.irm == 'true' }}
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
