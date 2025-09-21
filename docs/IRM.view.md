@@ -216,7 +216,7 @@ _Статуси_: **todo** — заплановано, **wip** — в робот
 
 _Статуси_: **todo** — заплановано, **wip** — в роботі, **done** — завершено
 
-- [ ] **7.0.0 — Phase 7 kickoff & scaffolding**  `status: wip`
+- [x] **7.0.0 — Phase 7 kickoff & scaffolding**  `status: done`
   - [ ] Додати файл docs/irm.phase7.yaml (каркас)
   - [ ] Оновити pre-commit перевірку IRM.view → додати irm.phase7.yaml
   - [ ] Підготувати місце для модуля ризик-менеджменту: src/core/risk_manager.py
