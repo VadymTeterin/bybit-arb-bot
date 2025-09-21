@@ -191,7 +191,23 @@ $rid = gh run list --workflow tests-coverage-badge.yml -e workflow_dispatch --li
 # переглянути параметри авто-коміту в логах:
 gh run view $rid --log | Select-String -Pattern 'git-auto-commit-action@v5|commit_user_name|commit_user_email|commit_author'
 ```
+---
+## Phase 7  Risk & Money Management (scaffold)
 
+**Status:** scaffold only (7.0.0). Enforcement (limits, dry-run guard) will land in 7.1.x.
+
+**New files**
+- src/core/risk_manager.py  placeholder interface
+- 	ests/test_risk_manager.py  minimal instantiation test
+
+**Environment placeholders** (.env.example):
+- RISK_DRY_RUN=true
+- RISK_MAX_POS_USD=0
+- RISK_MAX_EXPOSURE_PCT=0
+
+See docs/irm.phase7.yaml for the authoritative plan (SSOT).
+
+---
 
 ## Вимоги
 
