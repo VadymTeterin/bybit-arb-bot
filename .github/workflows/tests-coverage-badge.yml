@@ -1,12 +1,15 @@
-﻿name: Tests + Coverage Badge
+﻿name: ci
 
 on:
-  workflow_dispatch:
-  pull_request:
   push:
-    branches: ["main", "ci/**", "feat/**", "fix/**"]
-    paths-ignore:
-      - "docs/coverage.svg"
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
 
 jobs:
   tests:
@@ -67,5 +70,3 @@ jobs:
           commit_message: "chore(coverage): update docs/coverage.svg [skip ci]"
           file_pattern: docs/coverage.svg
           branch: main
-
-
