@@ -7,7 +7,7 @@ status_legend:
 sections:
 - id: 7.0.0
   name: Phase 7 kickoff & scaffolding
-  status: wip
+  status: done
   tasks:
   - Додати файл docs/irm.phase7.yaml (каркас)
   - Оновити pre-commit перевірку IRM.view → додати irm.phase7.yaml
