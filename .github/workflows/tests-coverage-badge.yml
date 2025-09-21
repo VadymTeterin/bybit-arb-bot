@@ -4,14 +4,14 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'src/**'
-      - 'tests/**'
-      - '.github/workflows/tests-coverage-badge.yml'
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/tests-coverage-badge.yml"
   pull_request:
     paths:
-      - 'src/**'
-      - 'tests/**'
-      - '.github/workflows/tests-coverage-badge.yml'
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/tests-coverage-badge.yml"
 
 jobs:
   changes:
@@ -30,9 +30,10 @@ jobs:
             irm:
               - 'tests/test_irm_patterns.py'
 
+  # Повний suite  тільки на push у main
   tests-full:
     needs: changes
-    if: ${{ needs.changes.outputs.code == 'true' }}
+    if: ${{ github.event_name == 'push' && needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,9 +47,10 @@ jobs:
       - name: Run full test suite
         run: pytest -q
 
+  # Легкий набір  тільки на PR і лише коли змінено IRM-патерни
   tests-irm-only:
     needs: changes
-    if: ${{ needs.changes.outputs.code != 'true' && needs.changes.outputs.irm == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && needs.changes.outputs.code != 'true' && needs.changes.outputs.irm == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
