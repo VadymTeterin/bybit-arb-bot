@@ -1,0 +1,26 @@
+phase: '7.0'
+updated_at: '2025-09-21T05:10:51Z'
+status_legend:
+  todo: заплановано
+  wip: в роботі
+  done: завершено
+sections:
+- id: 7.0.0
+  name: "Phase 7 kickoff & scaffolding"
+  status: wip
+  tasks:
+    - "Додати файл docs/irm.phase7.yaml (каркас)"
+    - "Оновити pre-commit перевірку IRM.view → додати irm.phase7.yaml"
+    - "Підготувати місце для модуля ризик-менеджменту: src/core/risk_manager.py"
+    - "Додати плейсхолдери в .env.example: RISK_DRY_RUN, RISK_MAX_POS_USD, RISK_MAX_EXPOSURE_PCT"
+    - "Підготувати каркас тестів: tests/test_risk_manager.py"
+    - "README/CHANGELOG: додати розділи для Phase 7 (чернетка)"
+- id: 7.1.0
+  name: "Dry-run & базові ліміти (read-only guard)"
+  status: todo
+  tasks:
+    - "Імплементувати RiskManager (read-only): перевірка лімітів перед виконанням дій"
+    - "Ліміти: max position size (USD), max exposure (%) на портфель"
+    - "Флаг DRY_RUN: блокувати реальні дії, логувати причину відмови"
+    - "Юніт-тести граничних значень і режимів (dry-run / live-off)"
+    - "Документація: README (розділ Risk & Money Management), CHANGELOG запис"
