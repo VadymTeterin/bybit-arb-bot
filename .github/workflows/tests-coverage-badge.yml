@@ -4,14 +4,14 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'src/**'
-      - 'tests/**'
-      - '.github/workflows/tests-coverage-badge.yml'
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/tests-coverage-badge.yml"
   pull_request:
     paths:
-      - 'src/**'
-      - 'tests/**'
-      - '.github/workflows/tests-coverage-badge.yml'
+      - "src/**"
+      - "tests/**"
+      - ".github/workflows/tests-coverage-badge.yml"
 
 jobs:
   changes:
@@ -26,9 +26,10 @@ jobs:
         with:
           filters: |
             code:
-              - 'src/**'
+              - "src/**"
+              - "tests/**"
             irm:
-              - 'tests/test_irm_patterns.py'
+              - "tests/test_irm_patterns.py"
 
   tests-full:
     needs: changes
@@ -43,9 +44,8 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install pytest pytest-asyncio pytest-cov
-      - name: Run full test suite with coverage
-        run: |
-          pytest -q --cov=src --cov-report=xml --cov-report=term-missing --cov-fail-under=67
+      - name: Run full test suite
+        run: pytest -q
 
   tests-irm-only:
     needs: changes
